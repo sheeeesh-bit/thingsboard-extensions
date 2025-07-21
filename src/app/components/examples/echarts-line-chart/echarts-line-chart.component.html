@@ -1,11 +1,105 @@
-<div class="echarts-line-chart-container">
-  <div #chartContainer class="chart-container"></div>
-  <div class="debug-info" *ngIf="showDebugInfo">
-    <div class="debug-status">Widget Status: {{ widgetStatus }}</div>
-    <div class="debug-data-count">Data Series: {{ dataSeriesCount }}</div>
-    <div class="debug-points">Total Points: {{ totalDataPoints }}</div>
-    <div class="debug-plots" *ngFor="let plot of plotInfo | keyvalue">
-      {{ plot.key }}: {{ plot.value }} series
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<!-- Main container: Layout as column, stretching across height -->
+<div fxFlex fxLayout="column" style="height: 100%; width: 100%;" fxLayoutAlign="start stretch">
+
+    <!-- Buttons at the top -->
+    <div class="tb-button-container" fxLayoutAlign="end stretch" *ngIf="hasVisibleButtons()">
+        <button mat-icon-button 
+                (click)="menuButtons('genImage')" 
+                class="tb-button"
+                *ngIf="settings?.enableImageExport !== false"
+                matTooltipPosition="above" 
+                matTooltip="Download Image">
+            <i class="material-icons">photo_camera</i>
+        </button>
+        
+        <button mat-icon-button 
+                (click)="menuButtons('reset')" 
+                class="tb-button"
+                *ngIf="settings?.enableDataZoom" 
+                matTooltipPosition="above" 
+                matTooltip="Reset Zoom" 
+                matTooltipClass="custom-tooltip">
+            <i class="material-icons">restore_page</i>
+        </button> 
+        
+        <button mat-icon-button 
+                (click)="menuButtons('toggleInlineStats')" 
+                class="tb-button"
+                *ngIf="settings?.showInlineStats !== false"
+                [class.active]="showStatsPanel" 
+                matTooltipPosition="above" 
+                matTooltip="Toggle Stats Cards">
+            <i class="material-icons">analytics</i>
+        </button>
+        
+        <button mat-icon-button 
+                (click)="menuButtons('showMinMax')" 
+                class="tb-button"
+                *ngIf="settings?.showMinMaxLines !== false"
+                [class.active]="showMinMaxLines" 
+                matTooltipPosition="above" 
+                matTooltip="Toggle Min/Max Lines">
+            <i class="material-icons">trending_up</i>
+        </button>
+        
+        <button mat-icon-button 
+                (click)="menuButtons('toggleAlarmStatus')" 
+                class="tb-button"
+                *ngIf="settings?.showAlarmViolationAreas !== false || settings?.showAlarmThresholdLines !== false"
+                [class.active]="showAlarmVisualization" 
+                matTooltipPosition="above" 
+                matTooltip="Toggle Alarm Status">
+            <i class="material-icons">notification_important</i>
+        </button>
     </div>
-  </div>
+  
+    <!-- Chart and Stats Container -->
+    <div fxFlex class="chart-main-container responsive-widget-container">
+        <div #chartContainer class="chart-container"></div>
+        
+        <!-- Inline Stats Panel -->
+        <div *ngIf="showStatsPanel && settings?.showInlineStats" 
+             [class]="'inline-stats-container stats-panel stats-' + (settings?.statsPosition || 'right')">
+            <div class="stats-header">
+                <span>Statistics</span>
+                <button mat-icon-button (click)="showStatsPanel = false" class="close-btn">
+                    <i class="material-icons">close</i>
+                </button>
+            </div>
+            <div class="stats-cards">
+                <div class="stat-card" *ngIf="settings?.statsCards?.showCurrent !== false">
+                    <div class="stat-label">Current</div>
+                    <div class="stat-value">{{ currentValue || '-' }}</div>
+                </div>
+                <div class="stat-card" *ngIf="settings?.statsCards?.showMin !== false">
+                    <div class="stat-label">Min</div>
+                    <div class="stat-value">{{ minValue || '-' }}</div>
+                </div>
+                <div class="stat-card" *ngIf="settings?.statsCards?.showMax !== false">
+                    <div class="stat-label">Max</div>
+                    <div class="stat-value">{{ maxValue || '-' }}</div>
+                </div>
+                <div class="stat-card" *ngIf="settings?.statsCards?.showAverage !== false">
+                    <div class="stat-label">Average</div>
+                    <div class="stat-value">{{ avgValue || '-' }}</div>
+                </div>
+                <div class="stat-card" *ngIf="settings?.statsCards?.showStdDev !== false">
+                    <div class="stat-label">Std Dev</div>
+                    <div class="stat-value">{{ stdDevValue || '-' }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Debug info panel -->
+        <div class="debug-info" *ngIf="showDebugInfo">
+            <div class="debug-status">Widget Status: {{ widgetStatus }}</div>
+            <div class="debug-data-count">Data Series: {{ dataSeriesCount }}</div>
+            <div class="debug-points">Total Points: {{ totalDataPoints }}</div>
+            <div class="debug-plots" *ngFor="let plot of plotInfo | keyvalue">
+                {{ plot.key }}: {{ plot.value }} series
+            </div>
+        </div>
+    </div>
 </div>
