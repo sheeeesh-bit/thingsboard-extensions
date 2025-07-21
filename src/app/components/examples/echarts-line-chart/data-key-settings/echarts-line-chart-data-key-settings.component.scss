@@ -1,14 +1,36 @@
 :host {
+  display: block;
+  width: 100%;
+  
+  form {
+    width: 100%;
+  }
+  
   .mat-content {
     padding: 0 !important;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  
+  .tb-data-key-settings-container {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
   }
   
   .tb-data-key-header {
-    margin-bottom: 32px;
-    padding: 24px;
+    display: block !important;
+    width: 100% !important;
+    margin-bottom: 24px;
+    padding: 20px;
     background-color: #fafafa;
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px solid rgba(0, 0, 0, 0.08);
+    box-sizing: border-box;
+    flex: none !important;
   }
   
   .tb-form-panel-title {
@@ -45,11 +67,15 @@
   }
   
   .tb-plot-selection {
-    margin-bottom: 32px;
-    padding: 24px;
+    display: block !important;
+    width: 100% !important;
+    margin-bottom: 24px;
+    padding: 20px;
     background-color: white;
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px solid rgba(0, 0, 0, 0.08);
+    box-sizing: border-box;
+    flex: none !important;
     
     mat-form-field {
       width: 100%;
@@ -229,6 +255,26 @@
           margin-bottom: 0;
         }
       }
+    }
+  }
+  
+  // Force parent containers to use column layout
+  ::ng-deep {
+    // Override any parent flex row layouts
+    .mat-content.mat-padding {
+      display: flex !important;
+      flex-direction: column !important;
+      
+      > * {
+        flex: none !important;
+        width: 100% !important;
+      }
+    }
+    
+    // Ensure ThingsBoard's widget settings container uses column layout
+    .tb-widget-settings-content {
+      display: flex !important;
+      flex-direction: column !important;
     }
   }
   

@@ -13,13 +13,18 @@
 
 This is a ThingsBoard Extension Widgets project that provides a framework for developing custom widgets that integrate with the ThingsBoard IoT platform. The project uses Angular 18 with a custom build system to create widgets that can be loaded dynamically into ThingsBoard dashboards.
 
+## Widget Access Information
+- **Widget Editor URL**: `http://localhost:8080/resources/widgets-library/widget-types/0b1f1400-63b2-11f0-ada4-17812a0522d3`
+- **Login Credentials**: `tenant@thingsboard.org` / `tenant`
+- **Development Server**: `http://localhost:5000/static/widgets/thingsboard-extension-widgets.js`
+- **testing dashboard**: http://localhost:8080/dashboards/865bc570-6630-11f0-90af-17812a0522d3
+
 ## Key Commands
 
 ### Development
 ```bash
 npm install              # Install dependencies
 npm start               # Start development server on port 5000
-npm run build:scss      # Compile SCSS styles with PostCSS
 npm run lint            # Run ESLint with Angular/TypeScript/Tailwind rules
 ```
 
@@ -82,3 +87,26 @@ Each widget consists of:
 
 - **Playwright Testing**:
   - Don't do screenshots, take the HTML element or context instead of screenshot when using Playwright
+  - For Testing a Widget go to the Dashboard and Test it
+
+## Widget Settings Navigation
+
+### Accessing Widget Settings in Dashboard Edit Mode
+1. Navigate to a dashboard containing the widget: `http://localhost:8080/dashboards/865bc570-6630-11f0-90af-17812a0522d3`
+2. Click "Edit mode" button in the top toolbar
+3. Hover over the widget to reveal action buttons
+4. Click the edit button (appears as `<tb-icon>edit</tb-icon>` in a button)
+5. Widget settings dialog opens with tabs: Data, Appearance, Widget card, Actions, Layout
+
+### Widget Settings Structure
+The Multi-Plot-Chart widget has the following settings categories in the Appearance tab:
+- **Basic Settings**: Chart title configuration
+- **Visual Settings**: Smooth lines toggle
+- **Multi-Plot Configuration**: 
+  - Number of Plots dropdown (Single Plot, 2 Plots, 3 Plots, etc.)
+  - Enable Zoom option
+
+### Important Findings
+1. The widget component supports multi-plot functionality but the Settings schema in the widget editor only exposes basic settings
+2. The actual multi-plot configuration is available in the widget instance settings when added to a dashboard
+3. The Data key settings schema is empty, which prevents proper plot assignment configuration

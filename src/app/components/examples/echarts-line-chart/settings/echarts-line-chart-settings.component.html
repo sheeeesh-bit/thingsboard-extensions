@@ -1,5 +1,5 @@
-<form [formGroup]="echartsLineChartSettingsForm" *ngIf="echartsLineChartSettingsForm">
-  <div class="mat-content mat-padding" fxLayout="column">
+<form [formGroup]="echartsLineChartSettingsForm" *ngIf="echartsLineChartSettingsForm" style="width: 100%;">
+  <div class="mat-content mat-padding tb-settings-container" fxLayout="column" style="width: 100%; display: flex; flex-direction: column;">
     
     <!-- Basic Settings Section -->
     <div class="tb-form-panel">
@@ -23,8 +23,8 @@
         <span>Visual Settings</span>
       </div>
       
-      <section class="tb-form-row" fxLayout="row" fxLayout.xs="column" fxLayoutGap="16px">
-        <mat-slide-toggle formControlName="smooth" class="mat-slide" fxFlex>
+      <div class="tb-settings-section" fxLayout="column" fxLayoutGap="8px">
+        <mat-slide-toggle formControlName="smooth" class="mat-slide">
           <div fxLayout="column">
             <div fxLayout="row" fxLayoutAlign="start center">
               <mat-icon class="tb-mat-toggle-icon">show_chart</mat-icon>
@@ -34,7 +34,7 @@
           </div>
         </mat-slide-toggle>
         
-        <mat-slide-toggle formControlName="enableDataZoom" class="mat-slide" fxFlex>
+        <mat-slide-toggle formControlName="enableDataZoom" class="mat-slide">
           <div fxLayout="column">
             <div fxLayout="row" fxLayoutAlign="start center">
               <mat-icon class="tb-mat-toggle-icon">zoom_in</mat-icon>
@@ -43,7 +43,7 @@
             <mat-hint>Allows users to zoom and pan through the data</mat-hint>
           </div>
         </mat-slide-toggle>
-      </section>
+      </div>
     </div>
 
     <!-- Multi-Plot Configuration Section -->
