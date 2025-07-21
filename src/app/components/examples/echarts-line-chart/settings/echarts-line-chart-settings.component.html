@@ -25,15 +25,23 @@
       
       <section class="tb-form-row" fxLayout="row" fxLayout.xs="column" fxLayoutGap="16px">
         <mat-slide-toggle formControlName="smooth" class="mat-slide" fxFlex>
-          <mat-icon class="tb-mat-toggle-icon">show_chart</mat-icon>
-          Smooth Lines
-          <mat-hint>Makes line transitions smoother and more visually appealing</mat-hint>
+          <div fxLayout="column">
+            <div fxLayout="row" fxLayoutAlign="start center">
+              <mat-icon class="tb-mat-toggle-icon">show_chart</mat-icon>
+              <span>Smooth Lines</span>
+            </div>
+            <mat-hint>Makes line transitions smoother and more visually appealing</mat-hint>
+          </div>
         </mat-slide-toggle>
         
         <mat-slide-toggle formControlName="enableDataZoom" class="mat-slide" fxFlex>
-          <mat-icon class="tb-mat-toggle-icon">zoom_in</mat-icon>
-          Enable Zoom
-          <mat-hint>Allows users to zoom and pan through the data</mat-hint>
+          <div fxLayout="column">
+            <div fxLayout="row" fxLayoutAlign="start center">
+              <mat-icon class="tb-mat-toggle-icon">zoom_in</mat-icon>
+              <span>Enable Zoom</span>
+            </div>
+            <mat-hint>Allows users to zoom and pan through the data</mat-hint>
+          </div>
         </mat-slide-toggle>
       </section>
     </div>
@@ -159,9 +167,13 @@
       </div>
       
       <mat-slide-toggle formControlName="showDebugInfo" class="mat-slide">
-        <mat-icon class="tb-mat-toggle-icon">bug_report</mat-icon>
-        Show Debug Information
-        <mat-hint>Displays widget status, data count, and plot distribution overlay</mat-hint>
+        <div fxLayout="column">
+          <div fxLayout="row" fxLayoutAlign="start center">
+            <mat-icon class="tb-mat-toggle-icon">bug_report</mat-icon>
+            <span>Show Debug Information</span>
+          </div>
+          <mat-hint>Displays widget status, data count, and plot distribution overlay</mat-hint>
+        </div>
       </mat-slide-toggle>
     </div>
 
