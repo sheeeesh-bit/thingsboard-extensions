@@ -177,5 +177,252 @@
       </mat-slide-toggle>
     </div>
 
+    <!-- Alarm Visualization Section -->
+    <div class="tb-form-panel">
+      <div class="tb-form-panel-title">
+        <mat-icon class="material-icons">notification_important</mat-icon>
+        <span>Alarm Visualization</span>
+      </div>
+      
+      <div class="tb-settings-section" fxLayout="column" fxLayoutGap="8px">
+        <mat-slide-toggle formControlName="showAlarmViolationAreas" class="mat-slide">
+          <div fxLayout="column">
+            <div fxLayout="row" fxLayoutAlign="start center">
+              <mat-icon class="tb-mat-toggle-icon">highlight</mat-icon>
+              <span>Show Alarm Violation Areas</span>
+            </div>
+            <mat-hint>Highlights regions where data exceeds alarm thresholds</mat-hint>
+          </div>
+        </mat-slide-toggle>
+        
+        <mat-form-field class="mat-block" *ngIf="echartsLineChartSettingsForm.get('showAlarmViolationAreas')?.value">
+          <mat-label>Alarm Area Opacity</mat-label>
+          <input matInput type="number" formControlName="alarmAreaOpacity" min="0" max="1" step="0.1">
+          <mat-icon matSuffix class="tb-mat-hint">opacity</mat-icon>
+          <mat-hint>Opacity of alarm violation areas (0-1)</mat-hint>
+        </mat-form-field>
+        
+        <mat-form-field class="mat-block" *ngIf="echartsLineChartSettingsForm.get('showAlarmViolationAreas')?.value">
+          <mat-label>Alarm Area Color</mat-label>
+          <input matInput formControlName="alarmAreaColor" placeholder="rgba(255, 0, 0, 0.1)">
+          <mat-icon matSuffix class="tb-mat-hint">palette</mat-icon>
+          <mat-hint>Color for alarm violation areas</mat-hint>
+        </mat-form-field>
+        
+        <mat-slide-toggle formControlName="showAlarmThresholdLines" class="mat-slide">
+          <div fxLayout="column">
+            <div fxLayout="row" fxLayoutAlign="start center">
+              <mat-icon class="tb-mat-toggle-icon">horizontal_rule</mat-icon>
+              <span>Show Alarm Threshold Lines</span>
+            </div>
+            <mat-hint>Display horizontal lines at alarm threshold values</mat-hint>
+          </div>
+        </mat-slide-toggle>
+        
+        <mat-form-field class="mat-block" *ngIf="echartsLineChartSettingsForm.get('showAlarmThresholdLines')?.value">
+          <mat-label>Threshold Line Style</mat-label>
+          <mat-select formControlName="alarmLineStyle">
+            <mat-option value="solid">Solid</mat-option>
+            <mat-option value="dashed">Dashed</mat-option>
+            <mat-option value="dotted">Dotted</mat-option>
+          </mat-select>
+          <mat-icon matSuffix class="tb-mat-hint">line_style</mat-icon>
+          <mat-hint>Style of alarm threshold lines</mat-hint>
+        </mat-form-field>
+      </div>
+    </div>
+
+    <!-- Statistics Display Section -->
+    <div class="tb-form-panel">
+      <div class="tb-form-panel-title">
+        <mat-icon class="material-icons">analytics</mat-icon>
+        <span>Statistics Display</span>
+      </div>
+      
+      <div class="tb-settings-section" fxLayout="column" fxLayoutGap="8px">
+        <mat-slide-toggle formControlName="showInlineStats" class="mat-slide">
+          <div fxLayout="column">
+            <div fxLayout="row" fxLayoutAlign="start center">
+              <mat-icon class="tb-mat-toggle-icon">insert_chart</mat-icon>
+              <span>Enable Inline Statistics</span>
+            </div>
+            <mat-hint>Show statistics panel with real-time data metrics</mat-hint>
+          </div>
+        </mat-slide-toggle>
+        
+        <mat-form-field class="mat-block" *ngIf="echartsLineChartSettingsForm.get('showInlineStats')?.value">
+          <mat-label>Statistics Position</mat-label>
+          <mat-select formControlName="statsPosition">
+            <mat-option value="top">Top</mat-option>
+            <mat-option value="right">Right</mat-option>
+            <mat-option value="bottom">Bottom</mat-option>
+            <mat-option value="left">Left</mat-option>
+          </mat-select>
+          <mat-icon matSuffix class="tb-mat-hint">picture_in_picture</mat-icon>
+          <mat-hint>Position of the statistics panel</mat-hint>
+        </mat-form-field>
+        
+        <div class="tb-stats-cards-config" *ngIf="echartsLineChartSettingsForm.get('showInlineStats')?.value" formGroupName="statsCards">
+          <div class="tb-form-hint">
+            <mat-icon>info</mat-icon>
+            <span>Select which statistics to display</span>
+          </div>
+          
+          <mat-checkbox formControlName="showCurrent" class="tb-mat-checkbox">Current Value</mat-checkbox>
+          <mat-checkbox formControlName="showMin" class="tb-mat-checkbox">Minimum</mat-checkbox>
+          <mat-checkbox formControlName="showMax" class="tb-mat-checkbox">Maximum</mat-checkbox>
+          <mat-checkbox formControlName="showAverage" class="tb-mat-checkbox">Average</mat-checkbox>
+          <mat-checkbox formControlName="showStdDev" class="tb-mat-checkbox">Standard Deviation</mat-checkbox>
+        </div>
+      </div>
+    </div>
+
+    <!-- Visual Enhancement Section -->
+    <div class="tb-form-panel">
+      <div class="tb-form-panel-title">
+        <mat-icon class="material-icons">auto_awesome</mat-icon>
+        <span>Visual Enhancements</span>
+      </div>
+      
+      <div class="tb-settings-section" fxLayout="column" fxLayoutGap="8px">
+        <mat-slide-toggle formControlName="showMinMaxLines" class="mat-slide">
+          <div fxLayout="column">
+            <div fxLayout="row" fxLayoutAlign="start center">
+              <mat-icon class="tb-mat-toggle-icon">trending_flat</mat-icon>
+              <span>Show Min/Max Lines</span>
+            </div>
+            <mat-hint>Display horizontal lines at minimum and maximum values</mat-hint>
+          </div>
+        </mat-slide-toggle>
+        
+        <mat-form-field class="mat-block" *ngIf="echartsLineChartSettingsForm.get('showMinMaxLines')?.value">
+          <mat-label>Min/Max Line Style</mat-label>
+          <mat-select formControlName="minMaxLineStyle">
+            <mat-option value="solid">Solid</mat-option>
+            <mat-option value="dashed">Dashed</mat-option>
+            <mat-option value="dotted">Dotted</mat-option>
+          </mat-select>
+          <mat-icon matSuffix class="tb-mat-hint">line_style</mat-icon>
+        </mat-form-field>
+        
+        <mat-form-field class="mat-block" *ngIf="echartsLineChartSettingsForm.get('showMinMaxLines')?.value">
+          <mat-label>Min/Max Line Opacity</mat-label>
+          <input matInput type="number" formControlName="minMaxLineOpacity" min="0" max="1" step="0.1">
+          <mat-icon matSuffix class="tb-mat-hint">opacity</mat-icon>
+        </mat-form-field>
+        
+        <mat-slide-toggle formControlName="showDataPoints" class="mat-slide">
+          <div fxLayout="column">
+            <div fxLayout="row" fxLayoutAlign="start center">
+              <mat-icon class="tb-mat-toggle-icon">scatter_plot</mat-icon>
+              <span>Show Data Points</span>
+            </div>
+            <mat-hint>Display individual data points on the lines</mat-hint>
+          </div>
+        </mat-slide-toggle>
+        
+        <mat-form-field class="mat-block">
+          <mat-label>Animation Duration (ms)</mat-label>
+          <input matInput type="number" formControlName="animationDuration" min="0" step="100">
+          <mat-icon matSuffix class="tb-mat-hint">speed</mat-icon>
+          <mat-hint>Chart animation duration in milliseconds</mat-hint>
+        </mat-form-field>
+      </div>
+    </div>
+
+    <!-- Export Settings Section -->
+    <div class="tb-form-panel">
+      <div class="tb-form-panel-title">
+        <mat-icon class="material-icons">download</mat-icon>
+        <span>Export Settings</span>
+      </div>
+      
+      <div class="tb-settings-section" fxLayout="column" fxLayoutGap="8px">
+        <mat-slide-toggle formControlName="enableImageExport" class="mat-slide">
+          <div fxLayout="column">
+            <div fxLayout="row" fxLayoutAlign="start center">
+              <mat-icon class="tb-mat-toggle-icon">photo_camera</mat-icon>
+              <span>Enable Image Export</span>
+            </div>
+            <mat-hint>Allow users to download chart as image</mat-hint>
+          </div>
+        </mat-slide-toggle>
+        
+        <mat-form-field class="mat-block" *ngIf="echartsLineChartSettingsForm.get('enableImageExport')?.value">
+          <mat-label>Export Format</mat-label>
+          <mat-select formControlName="exportFormat">
+            <mat-option value="png">PNG</mat-option>
+            <mat-option value="jpeg">JPEG</mat-option>
+            <mat-option value="svg">SVG</mat-option>
+          </mat-select>
+          <mat-icon matSuffix class="tb-mat-hint">image</mat-icon>
+          <mat-hint>Default image format for export</mat-hint>
+        </mat-form-field>
+        
+        <mat-form-field class="mat-block" *ngIf="echartsLineChartSettingsForm.get('enableImageExport')?.value && echartsLineChartSettingsForm.get('exportFormat')?.value === 'jpeg'">
+          <mat-label>Export Quality</mat-label>
+          <input matInput type="number" formControlName="exportQuality" min="0" max="1" step="0.01">
+          <mat-icon matSuffix class="tb-mat-hint">high_quality</mat-icon>
+          <mat-hint>JPEG compression quality (0-1)</mat-hint>
+        </mat-form-field>
+      </div>
+    </div>
+
+    <!-- Grid & Layout Section -->
+    <div class="tb-form-panel">
+      <div class="tb-form-panel-title">
+        <mat-icon class="material-icons">grid_on</mat-icon>
+        <span>Grid & Layout</span>
+      </div>
+      
+      <div class="tb-settings-section" fxLayout="column" fxLayoutGap="8px">
+        <mat-slide-toggle formControlName="showGridLines" class="mat-slide">
+          <div fxLayout="column">
+            <div fxLayout="row" fxLayoutAlign="start center">
+              <mat-icon class="tb-mat-toggle-icon">grid_3x3</mat-icon>
+              <span>Show Grid Lines</span>
+            </div>
+            <mat-hint>Display background grid lines on chart</mat-hint>
+          </div>
+        </mat-slide-toggle>
+        
+        <mat-form-field class="mat-block" *ngIf="echartsLineChartSettingsForm.get('showGridLines')?.value">
+          <mat-label>Grid Opacity</mat-label>
+          <input matInput type="number" formControlName="gridOpacity" min="0" max="1" step="0.1">
+          <mat-icon matSuffix class="tb-mat-hint">opacity</mat-icon>
+          <mat-hint>Opacity of grid lines (0-1)</mat-hint>
+        </mat-form-field>
+        
+        <div class="tb-margins-config" formGroupName="chartMargins">
+          <div class="tb-form-hint">
+            <mat-icon>space_bar</mat-icon>
+            <span>Chart Margins (pixels)</span>
+          </div>
+          
+          <div class="tb-margin-inputs" fxLayout="row" fxLayoutGap="8px">
+            <mat-form-field fxFlex>
+              <mat-label>Top</mat-label>
+              <input matInput type="number" formControlName="top" min="0">
+            </mat-form-field>
+            
+            <mat-form-field fxFlex>
+              <mat-label>Right</mat-label>
+              <input matInput type="number" formControlName="right" min="0">
+            </mat-form-field>
+            
+            <mat-form-field fxFlex>
+              <mat-label>Bottom</mat-label>
+              <input matInput type="number" formControlName="bottom" min="0">
+            </mat-form-field>
+            
+            <mat-form-field fxFlex>
+              <mat-label>Left</mat-label>
+              <input matInput type="number" formControlName="left" min="0">
+            </mat-form-field>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </form>

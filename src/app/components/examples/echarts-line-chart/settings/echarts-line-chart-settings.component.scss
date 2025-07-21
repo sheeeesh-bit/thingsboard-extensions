@@ -257,4 +257,59 @@
       }
     }
   }
+  
+  // Additional styles for new settings sections
+  .tb-stats-cards-config {
+    margin-top: 12px;
+    padding: 12px;
+    background-color: rgba(0, 0, 0, 0.02);
+    border-radius: 4px;
+    
+    .tb-form-hint {
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: rgba(0, 0, 0, 0.6);
+      
+      mat-icon {
+        font-size: 18px;
+        color: #1976d2;
+      }
+    }
+    
+    .tb-mat-checkbox {
+      display: block;
+      margin-bottom: 8px;
+      
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+  }
+  
+  .tb-margins-config {
+    margin-top: 12px;
+    
+    .tb-form-hint {
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: rgba(0, 0, 0, 0.6);
+      
+      mat-icon {
+        font-size: 18px;
+        color: #1976d2;
+      }
+    }
+    
+    .tb-margin-inputs {
+      mat-form-field {
+        margin-bottom: 0;
+      }
+    }
+  }
 }
