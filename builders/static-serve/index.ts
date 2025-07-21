@@ -125,4 +125,4 @@ export function createServer(options: StaticServeOptions, context: BuilderContex
   });
 }
 
-export default createBuilder<Record<string, string> & StaticServeOptions>(execute);
+export default createBuilder<Record<string, string> & StaticServeOptions>(execute as any);

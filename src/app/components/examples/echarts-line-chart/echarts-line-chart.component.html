@@ -1,0 +1,11 @@
+<div class="echarts-line-chart-container">
+  <div #chartContainer class="chart-container"></div>
+  <div class="debug-info" *ngIf="showDebugInfo">
+    <div class="debug-status">Widget Status: {{ widgetStatus }}</div>
+    <div class="debug-data-count">Data Series: {{ dataSeriesCount }}</div>
+    <div class="debug-points">Total Points: {{ totalDataPoints }}</div>
+    <div class="debug-plots" *ngFor="let plot of plotInfo | keyvalue">
+      {{ plot.key }}: {{ plot.value }} series
+    </div>
+  </div>
+</div>

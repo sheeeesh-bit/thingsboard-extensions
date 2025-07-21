@@ -1,0 +1,88 @@
+:host {
+  .tb-form-panel {
+    margin-bottom: 24px;
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+  
+  .tb-form-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    font-size: 16px;
+    font-weight: 500;
+    color: rgba(0, 0, 0, 0.87);
+    
+    mat-icon {
+      color: rgba(0, 0, 0, 0.54);
+    }
+  }
+  
+  .mat-slide-toggle {
+    margin-bottom: 16px;
+    
+    .tb-mat-toggle-icon {
+      margin-right: 8px;
+      font-size: 20px;
+      vertical-align: middle;
+      color: rgba(0, 0, 0, 0.54);
+    }
+    
+    mat-hint {
+      display: block;
+      margin-top: 4px;
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.54);
+    }
+  }
+  
+  .tb-form-row {
+    margin-bottom: 16px;
+  }
+  
+  .tb-mat-hint {
+    color: rgba(0, 0, 0, 0.38);
+  }
+  
+  .tb-mat-label-icon {
+    font-size: 18px;
+    vertical-align: middle;
+    margin-right: 4px;
+    color: rgba(0, 0, 0, 0.54);
+  }
+  
+  .tb-mat-option-icon {
+    margin-right: 8px;
+    color: rgba(0, 0, 0, 0.54);
+  }
+  
+  .tb-plot-titles {
+    margin-top: 16px;
+    
+    .tb-form-hint {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      font-size: 13px;
+      color: rgba(0, 0, 0, 0.6);
+      
+      mat-icon {
+        font-size: 20px;
+        color: #1976d2;
+      }
+    }
+  }
+  
+  .tb-plot-grid {
+    mat-form-field {
+      margin-bottom: 0;
+    }
+  }
+}

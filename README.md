@@ -25,23 +25,23 @@ Example:
 import { WidgetConfig } from '@shared/public-api';
 ```
 ## External Dependencies
-In case you want to use your own dependencies package from the npm registry (unless you have specified another one in your package.json), you can easily add them to yarn packet manager running the next command:
+In case you want to use your own dependencies package from the npm registry (unless you have specified another one in your package.json), you can easily add them to npm package manager running the next command:
 ```
-yarn add <package-name>
+npm install <package-name>
 ```
 
 Example:
 
 ```
-yarn add lodash
+npm install lodash
 ```
-If it's not the npm/yarn registry, and you want to add it in another way, please refer to [yarn docs](https://classic.yarnpkg.com/en/docs/cli/add).
+If it's not the npm registry, and you want to add it in another way, please refer to [npm docs](https://docs.npmjs.com/cli/v10/commands/npm-install).
 
 ## Run project in development mode
 ```
 cd ${TB_EXTENSION_WORK_DIR}
-yarn install
-yarn start
+npm install
+npm start
 ```
 In widgets library create a new widget and in the resources tab of the widget editor add this file path:
 
@@ -54,7 +54,7 @@ You must also check "Is module"
 
 ```
 cd ${TB_EXTENSION_WORK_DIR}
-yarn build
+npm run build
 ```
 
 You can find the compiled file at the following path:

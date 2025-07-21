@@ -4,7 +4,7 @@
   "description": "Builder for Architect",
   "builders": "builders.json",
   "scripts": {
-    "postinstall": "tsc -p tsconfig.builders.json --skipLibCheck"
+    "build": "tsc -p tsconfig.builders.json --skipLibCheck"
   },
   "dependencies": {
     "@angular-devkit/architect": "0.1802.12",

@@ -1,0 +1,169 @@
+<form [formGroup]="echartsLineChartSettingsForm" *ngIf="echartsLineChartSettingsForm">
+  <div class="mat-content mat-padding" fxLayout="column">
+    
+    <!-- Basic Settings Section -->
+    <div class="tb-form-panel">
+      <div class="tb-form-panel-title">
+        <mat-icon class="material-icons">settings</mat-icon>
+        <span>Basic Settings</span>
+      </div>
+      
+      <mat-form-field class="mat-block">
+        <mat-label>Chart Title</mat-label>
+        <input matInput formControlName="title" placeholder="Enter a descriptive title for your chart">
+        <mat-icon matSuffix class="tb-mat-hint">title</mat-icon>
+        <mat-hint>This title will appear at the top of your chart</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <!-- Visual Settings Section -->
+    <div class="tb-form-panel">
+      <div class="tb-form-panel-title">
+        <mat-icon class="material-icons">brush</mat-icon>
+        <span>Visual Settings</span>
+      </div>
+      
+      <section class="tb-form-row" fxLayout="row" fxLayout.xs="column" fxLayoutGap="16px">
+        <mat-slide-toggle formControlName="smooth" class="mat-slide" fxFlex>
+          <mat-icon class="tb-mat-toggle-icon">show_chart</mat-icon>
+          Smooth Lines
+          <mat-hint>Makes line transitions smoother and more visually appealing</mat-hint>
+        </mat-slide-toggle>
+        
+        <mat-slide-toggle formControlName="enableDataZoom" class="mat-slide" fxFlex>
+          <mat-icon class="tb-mat-toggle-icon">zoom_in</mat-icon>
+          Enable Zoom
+          <mat-hint>Allows users to zoom and pan through the data</mat-hint>
+        </mat-slide-toggle>
+      </section>
+    </div>
+
+    <!-- Multi-Plot Configuration Section -->
+    <div class="tb-form-panel">
+      <div class="tb-form-panel-title">
+        <mat-icon class="material-icons">view_column</mat-icon>
+        <span>Multi-Plot Configuration</span>
+      </div>
+      
+      <mat-form-field class="mat-block">
+        <mat-label>Number of Plots</mat-label>
+        <mat-select formControlName="numberOfPlots">
+          <mat-option [value]="1">
+            <mat-icon class="tb-mat-option-icon">looks_one</mat-icon>
+            Single Plot
+          </mat-option>
+          <mat-option [value]="2">
+            <mat-icon class="tb-mat-option-icon">looks_two</mat-icon>
+            2 Plots
+          </mat-option>
+          <mat-option [value]="3">
+            <mat-icon class="tb-mat-option-icon">looks_3</mat-icon>
+            3 Plots
+          </mat-option>
+          <mat-option [value]="4">
+            <mat-icon class="tb-mat-option-icon">looks_4</mat-icon>
+            4 Plots
+          </mat-option>
+          <mat-option [value]="5">
+            <mat-icon class="tb-mat-option-icon">looks_5</mat-icon>
+            5 Plots
+          </mat-option>
+          <mat-option [value]="6">
+            <mat-icon class="tb-mat-option-icon">looks_6</mat-icon>
+            6 Plots
+          </mat-option>
+          <mat-option [value]="7">
+            <mat-icon class="tb-mat-option-icon">filter_7</mat-icon>
+            7 Plots
+          </mat-option>
+        </mat-select>
+        <mat-icon matSuffix class="tb-mat-hint">dashboard</mat-icon>
+        <mat-hint>Split your chart into multiple independent plots with shared time axis</mat-hint>
+        <mat-error *ngIf="echartsLineChartSettingsForm.get('numberOfPlots')?.hasError('required')">
+          Number of plots is required
+        </mat-error>
+      </mat-form-field>
+
+      <!-- Plot Titles -->
+      <div class="tb-plot-titles" *ngIf="numberOfPlots > 1">
+        <div class="tb-form-hint">
+          <mat-icon>info</mat-icon>
+          <span>Give each plot a descriptive title to help users understand the data</span>
+        </div>
+        
+        <div class="tb-plot-grid" fxLayout="column" fxLayoutGap="12px">
+          <mat-form-field class="mat-block" *ngIf="numberOfPlots >= 1">
+            <mat-label>
+              <mat-icon class="tb-mat-label-icon">looks_one</mat-icon>
+              Plot 1 Title
+            </mat-label>
+            <input matInput formControlName="plot1Title" placeholder="e.g., Temperature">
+          </mat-form-field>
+
+          <mat-form-field class="mat-block" *ngIf="numberOfPlots >= 2">
+            <mat-label>
+              <mat-icon class="tb-mat-label-icon">looks_two</mat-icon>
+              Plot 2 Title
+            </mat-label>
+            <input matInput formControlName="plot2Title" placeholder="e.g., Humidity">
+          </mat-form-field>
+
+          <mat-form-field class="mat-block" *ngIf="numberOfPlots >= 3">
+            <mat-label>
+              <mat-icon class="tb-mat-label-icon">looks_3</mat-icon>
+              Plot 3 Title
+            </mat-label>
+            <input matInput formControlName="plot3Title" placeholder="e.g., Pressure">
+          </mat-form-field>
+
+          <mat-form-field class="mat-block" *ngIf="numberOfPlots >= 4">
+            <mat-label>
+              <mat-icon class="tb-mat-label-icon">looks_4</mat-icon>
+              Plot 4 Title
+            </mat-label>
+            <input matInput formControlName="plot4Title" placeholder="e.g., Wind Speed">
+          </mat-form-field>
+
+          <mat-form-field class="mat-block" *ngIf="numberOfPlots >= 5">
+            <mat-label>
+              <mat-icon class="tb-mat-label-icon">looks_5</mat-icon>
+              Plot 5 Title
+            </mat-label>
+            <input matInput formControlName="plot5Title" placeholder="e.g., Solar Radiation">
+          </mat-form-field>
+
+          <mat-form-field class="mat-block" *ngIf="numberOfPlots >= 6">
+            <mat-label>
+              <mat-icon class="tb-mat-label-icon">looks_6</mat-icon>
+              Plot 6 Title
+            </mat-label>
+            <input matInput formControlName="plot6Title" placeholder="e.g., Precipitation">
+          </mat-form-field>
+
+          <mat-form-field class="mat-block" *ngIf="numberOfPlots >= 7">
+            <mat-label>
+              <mat-icon class="tb-mat-label-icon">filter_7</mat-icon>
+              Plot 7 Title
+            </mat-label>
+            <input matInput formControlName="plot7Title" placeholder="e.g., Air Quality">
+          </mat-form-field>
+        </div>
+      </div>
+    </div>
+
+    <!-- Developer Settings Section -->
+    <div class="tb-form-panel">
+      <div class="tb-form-panel-title">
+        <mat-icon class="material-icons">code</mat-icon>
+        <span>Developer Options</span>
+      </div>
+      
+      <mat-slide-toggle formControlName="showDebugInfo" class="mat-slide">
+        <mat-icon class="tb-mat-toggle-icon">bug_report</mat-icon>
+        Show Debug Information
+        <mat-hint>Displays widget status, data count, and plot distribution overlay</mat-hint>
+      </mat-slide-toggle>
+    </div>
+
+  </div>
+</form>
