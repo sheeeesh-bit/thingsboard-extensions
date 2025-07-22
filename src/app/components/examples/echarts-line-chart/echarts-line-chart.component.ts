@@ -335,13 +335,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   private generatePlotConfigs(numberOfPlots: number): PlotConfig[] {
     const configs: PlotConfig[] = [];
-    // Reduce total height to make room for toolbar and zoom control
-    const totalHeight = 75; // Reduced from 85% to leave space
+    // Increase total height for better space utilization
+    const totalHeight = 82; // Increased from 75% to use more vertical space
     const plotHeight = Math.floor(totalHeight / numberOfPlots);
-    const spacing = Math.floor(8 / numberOfPlots); // Dynamic spacing
+    const spacing = Math.floor(6 / numberOfPlots); // Reduced spacing between plots
     
     for (let i = 0; i < numberOfPlots; i++) {
-      const top = i * (plotHeight + spacing) + 5; // Start from 5%
+      const top = i * (plotHeight + spacing) + 3; // Start from 3% instead of 5%
       configs.push({
         id: `plot_${i}`,
         title: this.ctx.settings[`plot${i + 1}Title`] || `Plot ${i + 1}`,
@@ -424,8 +424,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         start: 0,
         end: 100,
         filterMode: 'none' as const,
-        bottom: 25, // Increased from 5 to ensure it's not cut off
-        height: 20
+        bottom: 15, // Reduced from 25 to 15 for better space usage
+        height: 18 // Slightly smaller height
       }
     ] : [];
 
@@ -454,9 +454,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         }
       },
       legend: {
-        bottom: 50, // Increased to leave space for zoom control
+        bottom: 30, // Reduced from 50 to 30 for better balance
         data: legendData,
-        type: 'scroll'
+        type: 'scroll',
+        pageIconSize: 12, // Smaller page icons
+        itemGap: 8, // Reduced gap between legend items
+        itemHeight: 10, // Smaller legend items
+        textStyle: {
+          fontSize: 11 // Smaller font for legend
+        }
       },
       grid: grids,
       xAxis: xAxes,
