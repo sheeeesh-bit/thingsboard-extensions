@@ -107,8 +107,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   ngAfterViewInit(): void {
     console.log('[ECharts Line Chart] AfterViewInit - Chart container:', this.chartContainer.nativeElement);
-    this.initChart();
-    this.setupResizeObserver();
+    // Delay initialization to ensure layout is complete
+    setTimeout(() => {
+      this.initChart();
+      this.setupResizeObserver();
+    }, 100);
   }
 
   ngOnDestroy(): void {
@@ -293,9 +296,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   private initChart(): void {
     console.log('[ECharts Line Chart] Initializing chart');
+    
+    // Get container dimensions
+    const container = this.chartContainer.nativeElement;
+    const width = container.offsetWidth;
+    const height = container.offsetHeight;
+    console.log('[ECharts Line Chart] Container dimensions:', { width, height });
+    
     // Initialize chart instance
-    this.chart = echarts.init(this.chartContainer.nativeElement);
+    this.chart = echarts.init(container);
     console.log('[ECharts Line Chart] Chart instance created:', !!this.chart);
+    
+    // Force initial resize
+    this.chart.resize();
 
     // Get initial plot configuration
     const numberOfPlots = this.ctx.settings.numberOfPlots || 1;
@@ -450,8 +463,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private setupResizeObserver(): void {
-    this.resizeObserver = new ResizeObserver(() => {
-      this.onResize();
+    this.resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          console.log('[ECharts Line Chart] Container resized:', { width, height });
+          this.onResize();
+        }
+      }
     });
     this.resizeObserver.observe(this.chartContainer.nativeElement);
   }
