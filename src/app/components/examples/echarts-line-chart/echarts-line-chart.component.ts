@@ -16,7 +16,9 @@ import {
   TooltipComponent,
   DataZoomComponent,
   LegendComponent,
-  TitleComponent
+  TitleComponent,
+  MarkLineComponent,
+  MarkAreaComponent
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import { formatValue, isDefinedAndNotNull } from '@core/public-api';
@@ -29,6 +31,8 @@ echarts.use([
   DataZoomComponent,
   LegendComponent,
   TitleComponent,
+  MarkLineComponent,
+  MarkAreaComponent,
   CanvasRenderer
 ]);
 
@@ -585,17 +589,211 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
     
-    // TODO: Implement min/max lines using markLine
-    console.log('[ECharts Line Chart] Min/Max lines feature to be implemented');
+    const option = this.chart.getOption() as any;
+    if (!option || !option.series) {
+      return;
+    }
+    
+    // Update all series with min/max lines
+    const updatedSeries = option.series.map((series: any, index: number) => {
+      const newSeries = { ...series };
+      
+      if (this.showMinMaxLines && this.ctx.data[index] && this.ctx.data[index].data.length > 0) {
+        // Calculate min and max values for this series
+        const values = this.ctx.data[index].data.map(point => point[1]);
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        
+        // Create or update markLine
+        const existingMarkLine = newSeries.markLine || {
+          silent: true,
+          symbol: 'none',
+          label: {
+            position: 'end'
+          },
+          data: []
+        };
+        
+        // Filter out existing min/max lines
+        const otherLines = existingMarkLine.data ? 
+          existingMarkLine.data.filter((line: any) => line.name !== 'Min' && line.name !== 'Max') : [];
+        
+        // Add new min/max lines
+        const minMaxLines = [
+          {
+            name: 'Min',
+            yAxis: min,
+            lineStyle: {
+              color: this.settings.minLineColor || '#4CAF50',
+              type: 'solid',
+              width: 2
+            },
+            label: {
+              formatter: `Min: ${formatValue(min, this.getDecimals(index), this.getUnits(index), false)}`
+            }
+          },
+          {
+            name: 'Max',
+            yAxis: max,
+            lineStyle: {
+              color: this.settings.maxLineColor || '#FF5722',
+              type: 'solid',
+              width: 2
+            },
+            label: {
+              formatter: `Max: ${formatValue(max, this.getDecimals(index), this.getUnits(index), false)}`
+            }
+          }
+        ];
+        
+        newSeries.markLine = {
+          ...existingMarkLine,
+          data: [...otherLines, ...minMaxLines]
+        };
+      } else if (!this.showMinMaxLines && newSeries.markLine) {
+        // Remove min/max lines but keep other lines (like alarm thresholds)
+        const otherLines = newSeries.markLine.data ? 
+          newSeries.markLine.data.filter((line: any) => line.name !== 'Min' && line.name !== 'Max') : [];
+        
+        if (otherLines.length > 0) {
+          newSeries.markLine.data = otherLines;
+        } else {
+          delete newSeries.markLine;
+        }
+      }
+      
+      return newSeries;
+    });
+    
+    // Update chart with new series
+    this.chart.setOption({
+      series: updatedSeries
+    }, {
+      notMerge: false,
+      lazyUpdate: true
+    });
   }
   
   // Update alarm visualization
   private updateAlarmVisualization(): void {
-    if (!this.chart) {
+    if (!this.chart || !this.ctx.data) {
       return;
     }
     
-    // TODO: Implement alarm visualization using markArea and markLine
-    console.log('[ECharts Line Chart] Alarm visualization feature to be implemented');
+    const option = this.chart.getOption() as any;
+    if (!option || !option.series) {
+      return;
+    }
+    
+    // Update all series with alarm visualization
+    const updatedSeries = option.series.map((series: any, index: number) => {
+      const newSeries = { ...series };
+      
+      if (this.showAlarmVisualization) {
+        // Add alarm threshold lines if enabled
+        if (this.settings.showAlarmThresholdLines) {
+          newSeries.markLine = {
+            silent: true,
+            symbol: 'none',
+            label: {
+              position: 'end',
+              formatter: '{b}: {c}'
+            },
+            lineStyle: {
+              color: this.settings.alarmThresholdLineColor || '#ff4444',
+              type: this.settings.alarmThresholdLineStyle || 'dashed',
+              width: 2
+            },
+            data: this.getAlarmThresholds(index)
+          };
+        }
+        
+        // Add alarm violation areas if enabled
+        if (this.settings.showAlarmViolationAreas) {
+          newSeries.markArea = {
+            silent: true,
+            itemStyle: {
+              color: this.settings.alarmViolationAreaColor || 'rgba(255, 68, 68, 0.2)'
+            },
+            data: this.getAlarmViolationAreas(index)
+          };
+        }
+      } else {
+        // Remove alarm visualizations
+        delete newSeries.markLine;
+        delete newSeries.markArea;
+      }
+      
+      return newSeries;
+    });
+    
+    // Update chart with new series
+    this.chart.setOption({
+      series: updatedSeries
+    }, {
+      notMerge: false,
+      lazyUpdate: true
+    });
+  }
+  
+  // Get alarm thresholds for a series
+  private getAlarmThresholds(seriesIndex: number): any[] {
+    const thresholds = [];
+    
+    // Check for custom thresholds in settings
+    if (this.settings.customAlarmThresholds) {
+      const customThreshold = this.settings.customAlarmThresholds[`series${seriesIndex}`];
+      if (customThreshold) {
+        if (customThreshold.high) {
+          thresholds.push({
+            name: 'High',
+            yAxis: customThreshold.high,
+            label: {
+              formatter: `High: ${customThreshold.high}`
+            }
+          });
+        }
+        if (customThreshold.low) {
+          thresholds.push({
+            name: 'Low',
+            yAxis: customThreshold.low,
+            label: {
+              formatter: `Low: ${customThreshold.low}`
+            }
+          });
+        }
+      }
+    }
+    
+    // If no custom thresholds, use default from settings
+    if (thresholds.length === 0 && this.settings.defaultAlarmThresholds) {
+      if (this.settings.defaultAlarmThresholds.high) {
+        thresholds.push({
+          name: 'High',
+          yAxis: this.settings.defaultAlarmThresholds.high
+        });
+      }
+      if (this.settings.defaultAlarmThresholds.low) {
+        thresholds.push({
+          name: 'Low',
+          yAxis: this.settings.defaultAlarmThresholds.low
+        });
+      }
+    }
+    
+    return thresholds;
+  }
+  
+  // Get alarm violation areas for a series
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private getAlarmViolationAreas(seriesIndex: number): any[] {
+    const areas = [];
+    
+    // For now, return empty array - this would be populated based on actual alarm data
+    // In a real implementation, this would analyze the data points and create areas
+    // where values exceed thresholds
+    // The seriesIndex parameter will be used to get series-specific alarm data
+    
+    return areas;
   }
 }
