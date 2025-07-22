@@ -6,23 +6,135 @@
 
 // Toolbar styles
 .tb-button-container {
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.95);
-  border-bottom: 1px solid #e0e0e0;
-  gap: 8px;
-  
-  .tb-button {
-    color: rgba(0, 0, 0, 0.54);
-    
-    &:hover {
-      background-color: rgba(0, 0, 0, 0.04);
-    }
-    
-    &.active {
-      background-color: #e3f2fd;
-      color: #1976d2;
-    }
-  }
+  display: flex;
+  margin-top: 4px;
+  margin-bottom: var(--dynamic-spacing-lg, 16px);
+  margin-right: var(--dynamic-spacing-md, 8px);
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--dynamic-spacing-md, 8px);
+  min-height: 50px;  /* Ensure minimum height to prevent overlap */
+  padding-bottom: 8px;  /* Additional padding to create separation */
+  z-index: 10;  /* Ensure buttons stay above chart elements */
+  position: relative;  /* Enable z-index */
+}
+
+/* Base button style with custom color scheme */
+button[mat-icon-button] {
+  --btn-base: rgba(33, 150, 243, 0.1);
+  --icon-color: rgb(33, 150, 243);
+  background-color: var(--btn-base);
+  color: var(--icon-color);
+  border: 1px solid rgba(33, 150, 243, 0.2);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--dynamic-spacing-sm, 8px);
+  margin: 0;
+  flex-shrink: 0;
+  min-width: 40px;
+  min-height: 40px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+button[mat-icon-button]:hover {
+  background-color: rgba(33, 150, 243, 0.2);
+  border-color: rgba(33, 150, 243, 0.4);
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.25), 0 2px 6px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+  color: rgb(33, 150, 243);
+}
+
+button[mat-icon-button]:active {
+  transform: translateY(0);
+  background-color: rgba(33, 150, 243, 0.3);
+  box-shadow: 0 1px 4px rgba(33, 150, 243, 0.2), 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgb(33, 150, 243);
+}
+
+button[mat-icon-button]:focus {
+  outline: none;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 3px rgba(33, 150, 243, 0.2);
+}
+
+/* Active/Toggle state styles */
+button[mat-icon-button].active {
+  --btn-base: rgba(33, 150, 243, 0.25);
+  --icon-color: rgb(33, 150, 243);
+  background-color: var(--btn-base);
+  border: 2px solid rgba(33, 150, 243, 0.6);
+  box-shadow: 0 3px 12px rgba(33, 150, 243, 0.3), 0 2px 4px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+button[mat-icon-button].active .material-icons {
+  color: rgb(33, 150, 243);
+  text-shadow: 0 0 8px rgba(33, 150, 243, 0.4);
+}
+
+button[mat-icon-button].inactive {
+  --btn-base: rgba(120, 120, 120, 0.1);
+  --icon-color: rgb(120, 120, 120);
+  background-color: var(--btn-base);
+  border: 1px solid rgba(120, 120, 120, 0.2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+button[mat-icon-button].inactive .material-icons {
+  color: rgb(120, 120, 120);
+}
+
+button[mat-icon-button]::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(33, 150, 243, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+button[mat-icon-button]:active::before {
+  width: 120%;
+  height: 120%;
+  transition: width 0.3s, height 0.3s;
+}
+
+/* Icon style */
+button[mat-icon-button] .material-icons,
+.material-icons {
+  vertical-align: middle;
+  font-size: var(--dynamic-font-lg, 18px);
+  color: rgb(33, 150, 243);
+  text-shadow: 0 1px 2px rgba(33, 150, 243, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 1;
+  font-weight: 400;
+  line-height: 1;
+}
+
+button[mat-icon-button]:hover .material-icons {
+  transform: scale(1.1);
+  text-shadow: 0 0 5px rgba(33, 150, 243, 0.6);
+  color: rgb(33, 150, 243);
+}
+
+/* Tooltip and containers */
+.tooltip-container {
+  position: relative;
+  display: inline-block;
 }
 
 // Main container
@@ -152,15 +264,19 @@
 // Responsive adjustments
 @media (max-width: 600px) {
   .tb-button-container {
-    padding: 4px;
+    margin-bottom: var(--dynamic-spacing-sm, 8px);
+    margin-right: var(--dynamic-spacing-sm, 4px);
+    gap: var(--dynamic-spacing-sm, 4px);
+    min-height: 40px;
+  }
+  
+  button[mat-icon-button] {
+    min-width: 36px;
+    min-height: 36px;
+    padding: var(--dynamic-spacing-xs, 6px);
     
-    .tb-button {
-      width: 36px;
-      height: 36px;
-      
-      .material-icons {
-        font-size: 20px;
-      }
+    .material-icons {
+      font-size: var(--dynamic-font-md, 16px);
     }
   }
   
