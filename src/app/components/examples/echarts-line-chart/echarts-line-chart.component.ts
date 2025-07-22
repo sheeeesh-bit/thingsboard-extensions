@@ -568,8 +568,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Min/Max
     const min = Math.min(...values);
     const max = Math.max(...values);
+    console.log('[ECharts Line Chart] Stats - Raw min:', min, 'Raw max:', max);
     this.minValue = formatValue(min, decimals, units, false);
     this.maxValue = formatValue(max, decimals, units, false);
+    console.log('[ECharts Line Chart] Stats - Formatted min:', this.minValue, 'Formatted max:', this.maxValue);
     
     // Average
     const sum = values.reduce((acc, val) => acc + val, 0);
@@ -604,6 +606,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         const min = Math.min(...values);
         const max = Math.max(...values);
         
+        // Debug logging for max value issue
+        const decimals = this.getDecimals(index);
+        const units = this.getUnits(index);
+        console.log(`[ECharts Line Chart] Series ${index} - Raw max value:`, max);
+        console.log(`[ECharts Line Chart] Series ${index} - Formatted max:`, formatValue(max, decimals, units, false));
+        console.log(`[ECharts Line Chart] Series ${index} - Decimals:`, decimals);
+        
         // Create or update markLine
         const existingMarkLine = newSeries.markLine || {
           silent: true,
@@ -618,30 +627,35 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         const otherLines = existingMarkLine.data ? 
           existingMarkLine.data.filter((line: any) => line.name !== 'Min' && line.name !== 'Max') : [];
         
+        // Get series color
+        const seriesColor = this.ctx.data[index]?.dataKey?.color || '#1976d2';
+        
         // Add new min/max lines
         const minMaxLines = [
           {
             name: 'Min',
             yAxis: min,
             lineStyle: {
-              color: this.settings.minLineColor || '#4CAF50',
-              type: 'solid',
+              color: seriesColor,
+              type: 'dashed',
               width: 2
             },
             label: {
-              formatter: `Min: ${formatValue(min, this.getDecimals(index), this.getUnits(index), false)}`
+              formatter: `Min: ${formatValue(min, this.getDecimals(index), this.getUnits(index), false)}`,
+              color: seriesColor
             }
           },
           {
             name: 'Max',
             yAxis: max,
             lineStyle: {
-              color: this.settings.maxLineColor || '#FF5722',
-              type: 'solid',
+              color: seriesColor,
+              type: 'dashed',
               width: 2
             },
             label: {
-              formatter: `Max: ${formatValue(max, this.getDecimals(index), this.getUnits(index), false)}`
+              formatter: `Max: ${formatValue(max, this.getDecimals(index), this.getUnits(index), false)}`,
+              color: seriesColor
             }
           }
         ];
