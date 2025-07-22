@@ -335,8 +335,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   private generatePlotConfigs(numberOfPlots: number): PlotConfig[] {
     const configs: PlotConfig[] = [];
-    const plotHeight = Math.floor(85 / numberOfPlots); // 85% total height divided by number of plots
-    const spacing = Math.floor(10 / numberOfPlots); // Dynamic spacing
+    // Reduce total height to make room for toolbar and zoom control
+    const totalHeight = 75; // Reduced from 85% to leave space
+    const plotHeight = Math.floor(totalHeight / numberOfPlots);
+    const spacing = Math.floor(8 / numberOfPlots); // Dynamic spacing
     
     for (let i = 0; i < numberOfPlots; i++) {
       const top = i * (plotHeight + spacing) + 5; // Start from 5%
@@ -422,7 +424,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         start: 0,
         end: 100,
         filterMode: 'none' as const,
-        bottom: 5,
+        bottom: 25, // Increased from 5 to ensure it's not cut off
         height: 20
       }
     ] : [];
@@ -452,7 +454,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         }
       },
       legend: {
-        bottom: 0,
+        bottom: 50, // Increased to leave space for zoom control
         data: legendData,
         type: 'scroll'
       },
@@ -670,15 +672,21 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           ...existingMarkLine,
           data: [...otherLines, ...minMaxLines]
         };
-      } else if (!this.showMinMaxLines && newSeries.markLine) {
+      } else if (!this.showMinMaxLines) {
         // Remove min/max lines but keep other lines (like alarm thresholds)
-        const otherLines = newSeries.markLine.data ? 
-          newSeries.markLine.data.filter((line: any) => line.name !== 'Min' && line.name !== 'Max') : [];
-        
-        if (otherLines.length > 0) {
-          newSeries.markLine.data = otherLines;
-        } else {
-          delete newSeries.markLine;
+        if (newSeries.markLine && newSeries.markLine.data) {
+          const otherLines = newSeries.markLine.data.filter((line: any) => 
+            line.name !== 'Min' && line.name !== 'Max'
+          );
+          
+          if (otherLines.length > 0) {
+            newSeries.markLine = {
+              ...newSeries.markLine,
+              data: otherLines
+            };
+          } else {
+            delete newSeries.markLine;
+          }
         }
       }
       

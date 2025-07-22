@@ -8,16 +8,17 @@
 .tb-button-container {
   display: flex;
   margin-top: 4px;
-  margin-bottom: var(--dynamic-spacing-lg, 16px);
+  margin-bottom: 8px; // Reduced to minimize space usage
   margin-right: var(--dynamic-spacing-md, 8px);
   flex-direction: row;
   align-items: center;
   justify-content: flex-end;
   gap: var(--dynamic-spacing-md, 8px);
-  min-height: 50px;  /* Ensure minimum height to prevent overlap */
-  padding-bottom: 8px;  /* Additional padding to create separation */
+  min-height: 45px;  /* Reduced height */
+  padding-bottom: 4px;  /* Reduced padding */
   z-index: 10;  /* Ensure buttons stay above chart elements */
   position: relative;  /* Enable z-index */
+  flex-shrink: 0; /* Prevent toolbar from shrinking */
 }
 
 /* Base button style with custom color scheme */
