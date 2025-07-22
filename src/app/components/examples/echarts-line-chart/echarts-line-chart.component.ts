@@ -565,13 +565,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Current value (last point)
     this.currentValue = formatValue(values[values.length - 1], decimals, units, false);
     
-    // Min/Max
+    // Min/Max with precision fix
     const min = Math.min(...values);
     const max = Math.max(...values);
-    console.log('[ECharts Line Chart] Stats - Raw min:', min, 'Raw max:', max);
-    this.minValue = formatValue(min, decimals, units, false);
-    this.maxValue = formatValue(max, decimals, units, false);
-    console.log('[ECharts Line Chart] Stats - Formatted min:', this.minValue, 'Formatted max:', this.maxValue);
+    
+    // Fix potential floating-point precision issues
+    const precision = Math.pow(10, decimals);
+    const fixedMin = Math.round(min * precision) / precision;
+    const fixedMax = Math.round(max * precision) / precision;
+    
+    this.minValue = formatValue(fixedMin, decimals, units, false);
+    this.maxValue = formatValue(fixedMax, decimals, units, false);
     
     // Average
     const sum = values.reduce((acc, val) => acc + val, 0);
@@ -603,15 +607,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       if (this.showMinMaxLines && this.ctx.data[index] && this.ctx.data[index].data.length > 0) {
         // Calculate min and max values for this series
         const values = this.ctx.data[index].data.map(point => point[1]);
+        // Use parseFloat to ensure proper number handling and Math.round to fix precision issues
         const min = Math.min(...values);
         const max = Math.max(...values);
         
-        // Debug logging for max value issue
+        // Fix potential floating-point precision issues
+        const precision = Math.pow(10, this.getDecimals(index));
+        const fixedMax = Math.round(max * precision) / precision;
+        const fixedMin = Math.round(min * precision) / precision;
+        
         const decimals = this.getDecimals(index);
         const units = this.getUnits(index);
-        console.log(`[ECharts Line Chart] Series ${index} - Raw max value:`, max);
-        console.log(`[ECharts Line Chart] Series ${index} - Formatted max:`, formatValue(max, decimals, units, false));
-        console.log(`[ECharts Line Chart] Series ${index} - Decimals:`, decimals);
         
         // Create or update markLine
         const existingMarkLine = newSeries.markLine || {
@@ -634,27 +640,27 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         const minMaxLines = [
           {
             name: 'Min',
-            yAxis: min,
+            yAxis: fixedMin,
             lineStyle: {
               color: seriesColor,
               type: 'dashed',
               width: 2
             },
             label: {
-              formatter: `Min: ${formatValue(min, this.getDecimals(index), this.getUnits(index), false)}`,
+              formatter: `Min: ${formatValue(fixedMin, decimals, units, false)}`,
               color: seriesColor
             }
           },
           {
             name: 'Max',
-            yAxis: max,
+            yAxis: fixedMax,
             lineStyle: {
               color: seriesColor,
               type: 'dashed',
               width: 2
             },
             label: {
-              formatter: `Max: ${formatValue(max, this.getDecimals(index), this.getUnits(index), false)}`,
+              formatter: `Max: ${formatValue(fixedMax, decimals, units, false)}`,
               color: seriesColor
             }
           }
