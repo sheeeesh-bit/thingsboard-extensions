@@ -62,6 +62,37 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public dataSeriesCount = 0;
   public totalDataPoints = 0;
   public plotInfo: {[key: string]: number} = {};
+  
+  // UI state properties
+  public showStatsPanel = false;
+  public showMinMaxLines = false;
+  public showAlarmVisualization = true;
+  
+  // Statistics values
+  public currentValue: string;
+  public minValue: string;
+  public maxValue: string;
+  public avgValue: string;
+  public stdDevValue: string;
+  
+  // Store current data for statistics calculation
+  private currentData: any[] = [];
+  
+  // Settings shortcut
+  public get settings() {
+    return this.ctx?.settings || {};
+  }
+  
+  // Check if any toolbar buttons should be visible
+  public hasVisibleButtons(): boolean {
+    const s = this.settings;
+    return s?.enableImageExport !== false || 
+           s?.enableDataZoom || 
+           s?.showInlineStats !== false || 
+           s?.showMinMaxLines !== false || 
+           s?.showAlarmViolationAreas !== false || 
+           s?.showAlarmThresholdLines !== false;
+  }
 
   ngOnInit(): void {
     console.log('[ECharts Line Chart] Component initialized');
@@ -86,6 +117,38 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     if (this.chart) {
       this.chart.dispose();
+    }
+  }
+  
+  // Handle toolbar button clicks
+  public menuButtons(action: string): void {
+    console.log('[ECharts Line Chart] Menu button clicked:', action);
+    
+    switch (action) {
+      case 'genImage':
+        this.exportChartImage();
+        break;
+      case 'reset':
+        this.resetZoom();
+        break;
+      case 'toggleInlineStats':
+        this.showStatsPanel = !this.showStatsPanel;
+        if (this.showStatsPanel) {
+          this.calculateStatistics();
+        }
+        break;
+      case 'showMinMax':
+        this.showMinMaxLines = !this.showMinMaxLines;
+        this.updateMinMaxLines();
+        break;
+      case 'toggleAlarmStatus':
+        this.showAlarmVisualization = !this.showAlarmVisualization;
+        this.updateAlarmVisualization();
+        break;
+    }
+    
+    if (this.ctx.detectChanges) {
+      this.ctx.detectChanges();
     }
   }
 
@@ -207,6 +270,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         this.chart.resize();
       }
     }, 100);
+    
+    // Calculate statistics if panel is visible
+    if (this.showStatsPanel) {
+      this.calculateStatistics();
+    }
+    
+    // Store current data for future calculations
+    this.currentData = this.ctx.data;
     
     // Trigger change detection for debug info
     if (this.ctx.detectChanges) {
@@ -410,5 +481,102 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
            typeof point[1] === 'number' &&
            !isNaN(point[0]) && 
            !isNaN(point[1]);
+  }
+  
+  // Export chart as image
+  private exportChartImage(): void {
+    if (!this.chart) {
+      console.warn('[ECharts Line Chart] No chart instance available for export');
+      return;
+    }
+    
+    const format = this.settings.exportSettings?.format || 'png';
+    const backgroundColor = this.settings.exportSettings?.backgroundColor || '#ffffff';
+    
+    // Get base64 image data
+    const url = this.chart.getDataURL({
+      type: format,
+      pixelRatio: 2,
+      backgroundColor: backgroundColor,
+      excludeComponents: ['toolbox']
+    });
+    
+    // Create download link
+    const link = document.createElement('a');
+    link.download = `chart-${new Date().getTime()}.${format}`;
+    link.href = url;
+    link.click();
+  }
+  
+  // Reset zoom to show all data
+  private resetZoom(): void {
+    if (!this.chart) {
+      return;
+    }
+    
+    // Reset all data zoom components
+    this.chart.dispatchAction({
+      type: 'dataZoom',
+      start: 0,
+      end: 100
+    });
+  }
+  
+  // Calculate statistics for displayed data
+  private calculateStatistics(): void {
+    if (!this.ctx.data || this.ctx.data.length === 0) {
+      return;
+    }
+    
+    // For now, calculate stats for the first data series
+    // TODO: Add series selector for multi-series stats
+    const firstSeries = this.ctx.data[0];
+    if (!firstSeries.data || firstSeries.data.length === 0) {
+      return;
+    }
+    
+    const values = firstSeries.data.map(point => point[1]);
+    const decimals = this.getDecimals(0);
+    const units = this.getUnits(0);
+    
+    // Current value (last point)
+    this.currentValue = formatValue(values[values.length - 1], decimals, units, false);
+    
+    // Min/Max
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    this.minValue = formatValue(min, decimals, units, false);
+    this.maxValue = formatValue(max, decimals, units, false);
+    
+    // Average
+    const sum = values.reduce((acc, val) => acc + val, 0);
+    const avg = sum / values.length;
+    this.avgValue = formatValue(avg, decimals, units, false);
+    
+    // Standard deviation
+    const squaredDiffs = values.map(val => Math.pow(val - avg, 2));
+    const avgSquaredDiff = squaredDiffs.reduce((acc, val) => acc + val, 0) / values.length;
+    const stdDev = Math.sqrt(avgSquaredDiff);
+    this.stdDevValue = formatValue(stdDev, decimals, units, false);
+  }
+  
+  // Update min/max lines on chart
+  private updateMinMaxLines(): void {
+    if (!this.chart || !this.ctx.data) {
+      return;
+    }
+    
+    // TODO: Implement min/max lines using markLine
+    console.log('[ECharts Line Chart] Min/Max lines feature to be implemented');
+  }
+  
+  // Update alarm visualization
+  private updateAlarmVisualization(): void {
+    if (!this.chart) {
+      return;
+    }
+    
+    // TODO: Implement alarm visualization using markArea and markLine
+    console.log('[ECharts Line Chart] Alarm visualization feature to be implemented');
   }
 }
