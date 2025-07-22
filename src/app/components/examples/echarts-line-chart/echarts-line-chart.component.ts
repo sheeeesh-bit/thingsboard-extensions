@@ -66,7 +66,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // UI state properties
   public showStatsPanel = false;
   public showMinMaxLines = false;
-  public showAlarmVisualization = true;
+  public showAlarmVisualization = false;
   
   // Statistics values
   public currentValue: string;
