@@ -335,13 +335,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   private generatePlotConfigs(numberOfPlots: number): PlotConfig[] {
     const configs: PlotConfig[] = [];
-    // Increase total height for better space utilization
-    const totalHeight = 82; // Increased from 75% to use more vertical space
+    // Maximize plot area now that legend and zoom are compact
+    const totalHeight = 88; // Increased to use almost all vertical space
     const plotHeight = Math.floor(totalHeight / numberOfPlots);
-    const spacing = Math.floor(6 / numberOfPlots); // Reduced spacing between plots
+    const spacing = Math.floor(4 / numberOfPlots); // Minimal spacing between plots
     
     for (let i = 0; i < numberOfPlots; i++) {
-      const top = i * (plotHeight + spacing) + 3; // Start from 3% instead of 5%
+      const top = i * (plotHeight + spacing) + 2; // Start from 2%
       configs.push({
         id: `plot_${i}`,
         title: this.ctx.settings[`plot${i + 1}Title`] || `Plot ${i + 1}`,
@@ -424,8 +424,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         start: 0,
         end: 100,
         filterMode: 'none' as const,
-        bottom: 15, // Reduced from 25 to 15 for better space usage
-        height: 18 // Slightly smaller height
+        bottom: 2, // Very close to bottom
+        height: 15, // Smaller height
+        handleSize: '80%' // Smaller handles
       }
     ] : [];
 
@@ -454,7 +455,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         }
       },
       legend: {
-        bottom: 30, // Reduced from 50 to 30 for better balance
+        bottom: 5, // Much closer to the bottom
         data: legendData,
         type: 'scroll',
         pageIconSize: 12, // Smaller page icons
@@ -699,12 +700,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return newSeries;
     });
     
-    // Update chart with new series
+    // Update chart with new series - use notMerge: true to completely replace series
     this.chart.setOption({
       series: updatedSeries
     }, {
-      notMerge: false,
-      lazyUpdate: true
+      notMerge: true,
+      lazyUpdate: false
     });
   }
   
@@ -761,12 +762,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return newSeries;
     });
     
-    // Update chart with new series
+    // Update chart with new series - use notMerge: true to completely replace series
     this.chart.setOption({
       series: updatedSeries
     }, {
-      notMerge: false,
-      lazyUpdate: true
+      notMerge: true,
+      lazyUpdate: false
     });
   }
   
