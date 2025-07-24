@@ -388,6 +388,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   private recalculateGridLayout(visiblePlots: number[]): PlotConfig[] {
+    console.log('[ECharts Line Chart] Recalculating grid layout for visible plots:', visiblePlots);
+    
     if (visiblePlots.length === 0) {
       // If no plots are visible, return empty config
       return [];
@@ -407,10 +409,20 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const originalConfig = this.originalPlotConfigs[plotIndex];
       if (originalConfig) {
         const top = idx * (plotHeight + spacing) + 2; // Recalculate position
-        configs.push({
+        const newConfig = {
           ...originalConfig,
+          gridIndex: idx,  // Update to new sequential index
+          xAxisIndex: idx, // Update to new sequential index
+          yAxisIndex: idx, // Update to new sequential index
           height: `${plotHeight}%`,
           top: `${top}%`
+        };
+        configs.push(newConfig);
+        console.log(`[ECharts Line Chart] Plot ${plotIndex} -> new position:`, {
+          originalIndex: plotIndex,
+          newIndex: idx,
+          height: newConfig.height,
+          top: newConfig.top
         });
       }
     });
@@ -472,17 +484,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
     }));
 
+    const xAxisIndices = plotConfigs.map((_, i) => i);
     const dataZoomConfig = this.ctx.settings.enableDataZoom !== false ? [
       {
         type: 'inside' as const,
-        xAxisIndex: plotConfigs.map((_, i) => i),
+        xAxisIndex: xAxisIndices,
         start: 0,
         end: 100,
         filterMode: 'none' as const
       },
       {
         type: 'slider' as const,
-        xAxisIndex: plotConfigs.map((_, i) => i),
+        xAxisIndex: xAxisIndices,
         start: 0,
         end: 100,
         filterMode: 'none' as const,
@@ -918,6 +931,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Convert to array and sort
     const visiblePlotIndices = Array.from(visiblePlots).sort((a, b) => a - b);
+    
+    console.log('[ECharts Line Chart] Visible plots after legend change:', visiblePlotIndices);
+    console.log('[ECharts Line Chart] Series plot mappings:', Array.from(this.seriesPlotMap.entries()));
+    console.log('[ECharts Line Chart] Legend states:', Array.from(this.legendSelectedState.entries()));
     
     // If visibility hasn't changed for plots, no need to update
     const currentVisiblePlots = Array.from(this.plotVisibility.entries())
