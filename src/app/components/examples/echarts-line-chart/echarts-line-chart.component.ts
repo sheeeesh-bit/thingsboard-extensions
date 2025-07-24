@@ -82,6 +82,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // Store current data for statistics calculation
   private currentData: any[] = [];
   
+  // Dynamic plot visibility tracking
+  private seriesPlotMap = new Map<string, number>(); // Maps series name to plot index
+  private plotVisibility = new Map<number, boolean>(); // Tracks which plots are visible
+  private originalPlotConfigs: PlotConfig[] = []; // Store original plot configurations
+  private legendSelectedState = new Map<string, boolean>(); // Track legend selection state
+  
   // Settings shortcut
   public get settings() {
     return this.ctx?.settings || {};
@@ -123,6 +129,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.resizeObserver.disconnect();
     }
     if (this.chart) {
+      // Remove event listeners before disposing
+      this.chart.off('legendselectchanged');
       this.chart.dispose();
     }
   }
@@ -177,6 +185,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const numberOfPlots = this.ctx.settings.numberOfPlots || 1;
     const plotConfigs = this.generatePlotConfigs(numberOfPlots);
     
+    // Clear previous mappings
+    this.seriesPlotMap.clear();
+    this.legendSelectedState.clear();
+    
     // Group series by plot
     const seriesByPlot: {[key: string]: any[]} = {};
     const legendData = [];
@@ -205,6 +217,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         
         totalDataPoints += dataItem.data.length;
         legendData.push(seriesName);
+        
+        // Store series to plot mapping
+        this.seriesPlotMap.set(seriesName, plotIndex);
+        // Initialize all series as visible
+        this.legendSelectedState.set(seriesName, true);
 
         // Convert data points and ensure proper format
         const chartData = dataItem.data
@@ -318,11 +335,25 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const numberOfPlots = this.ctx.settings.numberOfPlots || 1;
     const plotConfigs = this.generatePlotConfigs(numberOfPlots);
     
+    // Store original plot configurations
+    this.originalPlotConfigs = [...plotConfigs];
+    
+    // Initialize plot visibility (all visible by default)
+    plotConfigs.forEach((_, index) => {
+      this.plotVisibility.set(index, true);
+    });
+    
     // Set initial chart options
     this.chartOption = this.createMultiPlotOption(plotConfigs, [], []);
 
     this.chart.setOption(this.chartOption);
     console.log('[ECharts Line Chart] Initial chart options set:', this.chartOption);
+    
+    // Register legend selection event listener
+    this.chart.on('legendselectchanged', (params: any) => {
+      this.onLegendSelectChanged(params);
+    });
+    console.log('[ECharts Line Chart] Legend event listener registered');
     
     // If we already have data, update the chart
     if (this.ctx && this.ctx.data && this.ctx.data.length > 0) {
@@ -352,6 +383,37 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         top: `${top}%`
       });
     }
+    
+    return configs;
+  }
+  
+  private recalculateGridLayout(visiblePlots: number[]): PlotConfig[] {
+    if (visiblePlots.length === 0) {
+      // If no plots are visible, return empty config
+      return [];
+    }
+    
+    // Use original plot configs as base
+    const configs: PlotConfig[] = [];
+    const totalHeight = 88; // Total available height
+    const visibleCount = visiblePlots.length;
+    const plotHeight = Math.floor(totalHeight / visibleCount);
+    const spacing = Math.floor(4 / visibleCount); // Dynamic spacing
+    
+    // Sort visible plots to maintain order
+    visiblePlots.sort((a, b) => a - b);
+    
+    visiblePlots.forEach((plotIndex, idx) => {
+      const originalConfig = this.originalPlotConfigs[plotIndex];
+      if (originalConfig) {
+        const top = idx * (plotHeight + spacing) + 2; // Recalculate position
+        configs.push({
+          ...originalConfig,
+          height: `${plotHeight}%`,
+          top: `${top}%`
+        });
+      }
+    });
     
     return configs;
   }
@@ -830,5 +892,100 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // The seriesIndex parameter will be used to get series-specific alarm data
     
     return areas;
+  }
+  
+  private onLegendSelectChanged(params: any): void {
+    console.log('[ECharts Line Chart] Legend selection changed:', params);
+    
+    // Update legend selection state from the event
+    // params.selected contains the current state of all legend items
+    if (params.selected) {
+      Object.keys(params.selected).forEach(seriesName => {
+        this.legendSelectedState.set(seriesName, params.selected[seriesName]);
+      });
+    }
+    
+    // Determine which plots still have visible series
+    const visiblePlots = new Set<number>();
+    
+    // Check each series and its visibility
+    this.seriesPlotMap.forEach((plotIndex, seriesName) => {
+      const isVisible = this.legendSelectedState.get(seriesName) !== false;
+      if (isVisible) {
+        visiblePlots.add(plotIndex);
+      }
+    });
+    
+    // Convert to array and sort
+    const visiblePlotIndices = Array.from(visiblePlots).sort((a, b) => a - b);
+    
+    // If visibility hasn't changed for plots, no need to update
+    const currentVisiblePlots = Array.from(this.plotVisibility.entries())
+      .filter(([, visible]) => visible)
+      .map(([plotIndex]) => plotIndex)
+      .sort((a, b) => a - b);
+    
+    if (JSON.stringify(visiblePlotIndices) === JSON.stringify(currentVisiblePlots)) {
+      return; // No change in plot visibility
+    }
+    
+    // Update plot visibility map
+    this.originalPlotConfigs.forEach((_, index) => {
+      this.plotVisibility.set(index, visiblePlots.has(index));
+    });
+    
+    // Recalculate grid layout for visible plots
+    const newPlotConfigs = this.recalculateGridLayout(visiblePlotIndices);
+    
+    // Get current chart option
+    const currentOption = this.chart.getOption() as any;
+    
+    // Update the chart with new grid layout
+    this.updateChartWithNewLayout(newPlotConfigs, currentOption);
+  }
+  
+  private updateChartWithNewLayout(newPlotConfigs: PlotConfig[], currentOption: any): void {
+    if (!currentOption || !currentOption.series) {
+      return;
+    }
+    
+    // Create mapping of old to new indices
+    const indexMapping = new Map<number, number>();
+    newPlotConfigs.forEach((config, newIndex) => {
+      const oldIndex = this.originalPlotConfigs.findIndex(c => c.id === config.id);
+      if (oldIndex !== -1) {
+        indexMapping.set(oldIndex, newIndex);
+      }
+    });
+    
+    // Update series with new axis indices
+    const updatedSeries = currentOption.series.map((series: any) => {
+      const seriesName = series.name;
+      const originalPlotIndex = this.seriesPlotMap.get(seriesName);
+      
+      if (originalPlotIndex !== undefined && indexMapping.has(originalPlotIndex)) {
+        const newIndex = indexMapping.get(originalPlotIndex);
+        return {
+          ...series,
+          xAxisIndex: newIndex,
+          yAxisIndex: newIndex
+        };
+      }
+      
+      return series;
+    });
+    
+    // Create new option with updated layout
+    const updatedOption = this.createMultiPlotOption(
+      newPlotConfigs, 
+      currentOption.legend[0].data, 
+      updatedSeries
+    );
+    
+    // Apply the new option with animation
+    this.chart.setOption(updatedOption, {
+      notMerge: false,
+      lazyUpdate: false
+    });
   }
 }
