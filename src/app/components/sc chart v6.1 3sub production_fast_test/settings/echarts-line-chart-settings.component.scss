@@ -1,0 +1,315 @@
+:host {
+  display: block;
+  width: 100%;
+  
+  form {
+    width: 100%;
+  }
+  
+  .mat-content {
+    padding: 0 !important;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  
+  .tb-settings-container {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+  
+  .tb-form-panel {
+    display: block !important;
+    width: 100% !important;
+    margin-bottom: 16px;
+    padding: 16px;
+    background-color: #fafafa;
+    border-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-sizing: border-box;
+    flex: none !important;
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+    
+    &:hover {
+      border-color: rgba(0, 0, 0, 0.12);
+      background-color: #f8f8f8;
+    }
+  }
+  
+  .tb-form-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    font-size: 15px;
+    font-weight: 500;
+    color: rgba(0, 0, 0, 0.87);
+    width: 100%;
+    
+    mat-icon {
+      color: #1976d2;
+      font-size: 24px;
+    }
+  }
+  
+  mat-form-field {
+    &.mat-block {
+      margin-bottom: 16px;
+      width: 100%;
+    }
+  }
+  
+  .mat-slide-toggle {
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background-color: white;
+    border-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    transition: all 0.2s ease;
+    width: 100%;
+    
+    &:hover {
+      background-color: #f5f5f5;
+      border-color: rgba(0, 0, 0, 0.12);
+    }
+    
+    .tb-mat-toggle-icon {
+      margin-right: 8px;
+      font-size: 18px;
+      vertical-align: middle;
+      color: #1976d2;
+    }
+    
+    mat-hint {
+      display: block;
+      margin-top: 4px;
+      margin-left: 26px;
+      font-size: 11px;
+      color: rgba(0, 0, 0, 0.54);
+      line-height: 1.3;
+    }
+  }
+  
+  .tb-form-row {
+    margin-bottom: 24px;
+    gap: 24px !important;
+    
+    .mat-slide-toggle {
+      flex: 1;
+      margin-bottom: 0;
+    }
+  }
+  
+  .tb-settings-section {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    
+    .mat-slide-toggle {
+      width: 100%;
+      
+      &:last-child {
+        margin-bottom: 0;
+      }
+      
+      > div {
+        width: 100%;
+      }
+    }
+  }
+  
+  .tb-mat-hint {
+    color: rgba(0, 0, 0, 0.38);
+  }
+  
+  .tb-mat-label-icon {
+    font-size: 18px;
+    vertical-align: middle;
+    margin-right: 6px;
+    color: #1976d2;
+  }
+  
+  .tb-mat-option-icon {
+    margin-right: 12px;
+    color: #1976d2;
+    font-size: 20px;
+  }
+  
+  .tb-plot-titles {
+    margin-top: 20px;
+    
+    .tb-form-hint {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 12px;
+      margin-bottom: 20px;
+      background-color: #e3f2fd;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #0d47a1;
+      line-height: 1.4;
+      
+      mat-icon {
+        font-size: 24px;
+        color: #1976d2;
+        flex-shrink: 0;
+        margin-top: -2px;
+      }
+    }
+  }
+  
+  .tb-plot-grid {
+    mat-form-field {
+      margin-bottom: 16px;
+      
+      &:last-child {
+        margin-bottom: 0;
+      }
+      
+      .mat-mdc-form-field-hint {
+        font-size: 12px;
+      }
+    }
+  }
+  
+  // Force parent containers to use column layout
+  ::ng-deep {
+    // Override any parent flex row layouts
+    .mat-content.mat-padding {
+      display: flex !important;
+      flex-direction: column !important;
+      
+      > * {
+        flex: none !important;
+        width: 100% !important;
+      }
+    }
+    
+    // Ensure ThingsBoard's widget settings container uses column layout
+    .tb-widget-settings-content {
+      display: flex !important;
+      flex-direction: column !important;
+    }
+  }
+  
+  // Improve form field appearance and ensure full width
+  ::ng-deep {
+    .mat-mdc-form-field {
+      display: block;
+      width: 100% !important;
+      
+      .mat-mdc-form-field-flex {
+        padding: 0 12px;
+        width: 100%;
+      }
+      
+      .mat-mdc-form-field-icon-suffix {
+        color: rgba(0, 0, 0, 0.38);
+      }
+    }
+    
+    .mat-mdc-select-trigger {
+      padding: 6px 0;
+    }
+    
+    // Prevent horizontal scrolling
+    .mat-mdc-form-field-infix {
+      min-width: 0;
+      width: 100%;
+    }
+    
+    // Ensure dialogs don't overflow
+    .mat-mdc-dialog-container {
+      max-width: 100vw !important;
+    }
+  }
+  
+  // Responsive adjustments
+  @media (max-width: 600px) {
+    .tb-form-panel {
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    
+    .tb-form-panel-title {
+      font-size: 15px;
+      margin-bottom: 16px;
+      
+      mat-icon {
+        font-size: 20px;
+      }
+    }
+    
+    .mat-slide-toggle {
+      padding: 8px 12px;
+      
+      .tb-mat-toggle-icon {
+        font-size: 16px;
+      }
+    }
+  }
+  
+  // Additional styles for new settings sections
+  .tb-stats-cards-config {
+    margin-top: 12px;
+    padding: 12px;
+    background-color: rgba(0, 0, 0, 0.02);
+    border-radius: 4px;
+    
+    .tb-form-hint {
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: rgba(0, 0, 0, 0.6);
+      
+      mat-icon {
+        font-size: 18px;
+        color: #1976d2;
+      }
+    }
+    
+    .tb-mat-checkbox {
+      display: block;
+      margin-bottom: 8px;
+      
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+  }
+  
+  .tb-margins-config {
+    margin-top: 12px;
+    
+    .tb-form-hint {
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: rgba(0, 0, 0, 0.6);
+      
+      mat-icon {
+        font-size: 18px;
+        color: #1976d2;
+      }
+    }
+    
+    .tb-margin-inputs {
+      mat-form-field {
+        margin-bottom: 0;
+      }
+    }
+  }
+}

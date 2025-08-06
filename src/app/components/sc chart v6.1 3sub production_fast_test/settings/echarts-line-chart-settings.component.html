@@ -1,0 +1,220 @@
+<form [formGroup]="echartsLineChartSettingsForm" *ngIf="echartsLineChartSettingsForm" style="width: 100%;">
+  <div class="mat-content mat-padding" fxLayout="column" style="width: 100%;">
+    
+    <!-- Legend Style Settings -->
+    <mat-expansion-panel expanded>
+      <mat-expansion-panel-header>
+        <mat-panel-title>Legend Style Settings</mat-panel-title>
+      </mat-expansion-panel-header>
+      
+      <div fxLayout="column" fxLayoutGap="16px">
+        <mat-checkbox formControlName="showlegend">Show Legend</mat-checkbox>
+        
+        <mat-form-field class="mat-block" appearance="outline">
+          <mat-label>Legend Color</mat-label>
+          <input matInput type="color" formControlName="legendcolortext">
+        </mat-form-field>
+      </div>
+    </mat-expansion-panel>
+
+    <!-- Graph Settings -->
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>Graph Settings</mat-panel-title>
+      </mat-expansion-panel-header>
+      
+      <div fxLayout="column" fxLayoutGap="16px">
+        <mat-checkbox formControlName="smooth">Smooth out</mat-checkbox>
+        
+        <!-- Left Y-Axis Settings -->
+        <div class="axis-section">
+          <h4>Left Y-Axis</h4>
+          <mat-form-field class="mat-block" appearance="outline">
+            <mat-label>Title Left Y-Axis</mat-label>
+            <input matInput formControlName="yAxisLeftTitle">
+          </mat-form-field>
+          
+          <mat-form-field class="mat-block" appearance="outline">
+            <mat-label>Unit Left Y-Axis</mat-label>
+            <input matInput formControlName="yAxisLeftUnit">
+          </mat-form-field>
+          
+          <mat-checkbox formControlName="yAxisLeftAutoScale">Left Y-Axis Autoscale</mat-checkbox>
+          
+          <div fxLayout="row" fxLayoutGap="16px" *ngIf="!echartsLineChartSettingsForm.get('yAxisLeftAutoScale')?.value">
+            <mat-form-field fxFlex appearance="outline">
+              <mat-label>Left Y-Axis Min-Value</mat-label>
+              <input matInput type="number" formControlName="yAxisLeftMinScale">
+            </mat-form-field>
+            
+            <mat-form-field fxFlex appearance="outline">
+              <mat-label>Left Y-Axis Max-Value</mat-label>
+              <input matInput type="number" formControlName="yAxisLeftMaxScale">
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- Right Y-Axis Settings -->
+        <div class="axis-section">
+          <h4>Right Y-Axis</h4>
+          <mat-form-field class="mat-block" appearance="outline">
+            <mat-label>Title Right Y-Axis</mat-label>
+            <input matInput formControlName="yAxisRightTitle">
+          </mat-form-field>
+          
+          <mat-form-field class="mat-block" appearance="outline">
+            <mat-label>Unit Right Y-Axis</mat-label>
+            <input matInput formControlName="yAxisRightUnit">
+          </mat-form-field>
+          
+          <mat-checkbox formControlName="yAxisRightAutoScale">Right Y-Axis Autoscale</mat-checkbox>
+          
+          <div fxLayout="row" fxLayoutGap="16px" *ngIf="!echartsLineChartSettingsForm.get('yAxisRightAutoScale')?.value">
+            <mat-form-field fxFlex appearance="outline">
+              <mat-label>Right Y-Axis Min-Value</mat-label>
+              <input matInput type="number" formControlName="yAxisRightMinScale">
+            </mat-form-field>
+            
+            <mat-form-field fxFlex appearance="outline">
+              <mat-label>Right Y-Axis Max-Value</mat-label>
+              <input matInput type="number" formControlName="yAxisRightMaxScale">
+            </mat-form-field>
+          </div>
+          
+          <mat-form-field class="mat-block" appearance="outline">
+            <mat-label>Right y-Axis Color</mat-label>
+            <input matInput type="color" formControlName="yAxisRightColorChoser">
+          </mat-form-field>
+        </div>
+
+        <!-- Data Points Settings -->
+        <mat-checkbox formControlName="showDataPoints">Show Data points</mat-checkbox>
+        
+        <mat-form-field class="mat-block" appearance="outline" *ngIf="echartsLineChartSettingsForm.get('showDataPoints')?.value">
+          <mat-label>Size of Data points</mat-label>
+          <input matInput type="number" formControlName="symbolSize_data">
+        </mat-form-field>
+        
+        <mat-checkbox formControlName="showPanZoomTool">Show Pan and Zoom tool</mat-checkbox>
+        
+        <mat-form-field class="mat-block" appearance="outline">
+          <mat-label>Max, Min, Avg percent for moving</mat-label>
+          <input matInput type="number" formControlName="movingseriesMarkLine">
+        </mat-form-field>
+
+        <!-- Grid Layout Settings -->
+        <h4>Grid Layout</h4>
+        <div fxLayout="row" fxLayoutGap="16px">
+          <mat-form-field fxFlex appearance="outline">
+            <mat-label>Chart to the right</mat-label>
+            <input matInput type="number" formControlName="grid_layout_right">
+          </mat-form-field>
+          
+          <mat-form-field fxFlex appearance="outline">
+            <mat-label>Chart to the left</mat-label>
+            <input matInput type="number" formControlName="grid_layout_left">
+          </mat-form-field>
+        </div>
+        
+        <div fxLayout="row" fxLayoutGap="16px">
+          <mat-form-field fxFlex appearance="outline">
+            <mat-label>Chart to the top</mat-label>
+            <input matInput type="number" formControlName="grid_layout_top">
+          </mat-form-field>
+          
+          <mat-form-field fxFlex appearance="outline">
+            <mat-label>Chart to the bottom</mat-label>
+            <input matInput type="number" formControlName="grid_layout_bottom">
+          </mat-form-field>
+        </div>
+        
+        <mat-form-field class="mat-block" appearance="outline">
+          <mat-label>Markline Left or Right</mat-label>
+          <input matInput type="number" formControlName="markline_layout_left_or_right">
+        </mat-form-field>
+
+        <!-- Annotations -->
+        <h4>Annotations</h4>
+        <div formArrayName="annotations">
+          <div *ngFor="let annotation of annotationsFormArray.controls; let i = index" [formGroupName]="i" class="annotation-item">
+            <mat-card>
+              <mat-card-content>
+                <div fxLayout="row" fxLayoutGap="16px">
+                  <mat-form-field fxFlex appearance="outline">
+                    <mat-label>Annotations Type</mat-label>
+                    <mat-select formControlName="annotationsType">
+                      <mat-option value="Fixed">Fixed</mat-option>
+                      <mat-option value="Attribute">Attribute</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  
+                  <mat-form-field fxFlex appearance="outline" *ngIf="annotation.get('annotationsType')?.value === 'Fixed'">
+                    <mat-label>Fixed Number</mat-label>
+                    <input matInput type="number" formControlName="fixedNumber">
+                  </mat-form-field>
+                  
+                  <mat-form-field fxFlex appearance="outline" *ngIf="annotation.get('annotationsType')?.value === 'Attribute'">
+                    <mat-label>Attribute</mat-label>
+                    <input matInput formControlName="attribute">
+                  </mat-form-field>
+                </div>
+                
+                <div fxLayout="row" fxLayoutGap="16px">
+                  <mat-form-field fxFlex appearance="outline">
+                    <mat-label>Description</mat-label>
+                    <input matInput formControlName="description">
+                  </mat-form-field>
+                  
+                  <mat-form-field appearance="outline">
+                    <mat-label>Color</mat-label>
+                    <mat-select formControlName="color">
+                      <mat-option value="Red">Red</mat-option>
+                      <mat-option value="Green">Green</mat-option>
+                      <mat-option value="Blue">Blue</mat-option>
+                      <mat-option value="Yellow">Yellow</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  
+                  <mat-form-field appearance="outline" *ngIf="annotation.get('annotationsType')?.value === 'Attribute'">
+                    <mat-label>Attribute Type</mat-label>
+                    <mat-select formControlName="attributeType">
+                      <mat-option value="Client">Client</mat-option>
+                      <mat-option value="Server">Server</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  
+                  <mat-form-field appearance="outline">
+                    <mat-label>Axis Assignment</mat-label>
+                    <mat-select formControlName="axisAssignment">
+                      <mat-option value="Left">Left</mat-option>
+                      <mat-option value="Right">Right</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  
+                  <button mat-icon-button color="warn" (click)="removeAnnotation(i)">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </div>
+        </div>
+        
+        <button mat-raised-button color="primary" (click)="addAnnotation()">
+          <mat-icon>add</mat-icon>
+          Add Annotation
+        </button>
+      </div>
+    </mat-expansion-panel>
+
+    <!-- Debug Settings -->
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>Debug</mat-panel-title>
+      </mat-expansion-panel-header>
+      
+      <mat-checkbox formControlName="debugOutput">Use Debug Output</mat-checkbox>
+    </mat-expansion-panel>
+
+  </div>
+</form>

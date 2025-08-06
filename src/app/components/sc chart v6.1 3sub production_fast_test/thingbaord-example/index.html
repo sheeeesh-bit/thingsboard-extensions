@@ -1,0 +1,25 @@
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<!-- Main container: Layout as column, stretching across height -->
+<div fxFlex fxLayout="column" style="height: 100%; width: 100%;" fxLayoutAlign="start stretch">
+
+    <!-- Buttons at the top -->
+    <div class="tb-button-container" fxLayoutAlign="end stretch">
+        <!-- 
+        <button mat-icon-button (click)="menuButtons('delete')" class="tb-button"  matTooltipPosition="above" matTooltip="Delete Grid"><i class="material-icons">delete</i></button>
+        !-->
+        <button mat-icon-button (click)="menuButtons('genImage')" class="tb-button"  matTooltipPosition="above" matTooltip="Download Image"><i class="material-icons">photo_camera</i></button>
+        
+        <button mat-icon-button (click)="menuButtons('reset')" class="tb-button" matTooltipPosition="above" matTooltip="Reset Zoom" matTooltipClass="custom-tooltip"><i class="material-icons">restore_page</i></button> 
+        
+        
+    </div>
+  
+  <!-- Second part: Left side text (50% width) -->
+  <div fxFlex fxLayout="row" style="graph-container">
+    <div id="echartContainer">
+    </div>
+  </div>
+
+
+</div>

@@ -1,0 +1,107 @@
+{
+    "schema": {
+        "type": "object",
+        "title": "DataKeySettings",
+        "properties": {
+            "chartType": {
+                "title": "Type",
+                "type": "string",
+                "enum": [
+                    "Line",
+                    "Bar"],
+                "default": "Line"
+            },
+            "showAverage": {
+                "title": "Show horizonal average line",
+                "type": "boolean",
+                "default": false
+            },
+            "showMinValue": {
+                "title": "Show min. Value",
+                "type": "boolean",
+                "default": false
+            },
+            "showMaxValue": {
+                "title": "Show max. value",
+                "type": "boolean",
+                "default": false
+            },
+            
+            
+            
+            "gradientColor1": {
+                "title": "Gradient Color 1",
+                "type": "string",
+                "default": "#008a00"
+            },
+            "gradientColor2": {
+                "title": "Gradient Color 2",
+                "type": "string",
+                "default": "#008a00"
+            },
+            
+            "fillOpacity": {
+                "title": "Fill Opacity",
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.5
+            },
+            "grid_layout_right": {
+                "title": "Chart to the right",
+                "type": "number",
+                "default": 40
+            },
+            "grid_layout_left": {
+                "title": "Chart to the left",
+                "type": "number",
+                "default": 130
+            },
+            "markline_layout_left_or_right": {
+                "title": "Markline Left or Right",
+                "type": "number",
+                "default": 285
+            },
+            "fillChart": {
+                "title": "fill Chart",
+                "type": "boolean",
+                "default": false
+            },
+            "axisAssignment": {
+                "title": "Subplot Assignment",
+                "type": "string",
+                "enum": [
+                    "Top",
+                    "Middle",
+                    "Bottom"],
+                "default": "Top"
+            },
+            "numberOfDigits": {
+                "title": "Number of Digits",
+                "type": "number",
+                "default": 1
+            },
+             "bottomPlotAssigment": {
+                "title": "Show bottom Plot devicetype",
+                "type": "string",
+                "enum": [
+                    "Always",
+                    "S-100"],
+                "default": "S-100"
+            },
+        
+        "required": [
+            "chartType",
+        "axisAssignment",
+        "bottomPlotAssigment",
+        "numberOfDigits"
+                    ]
+        }
+        },
+    "form": [
+        "chartType",
+        "axisAssignment",
+        "bottomPlotAssigment",
+        "numberOfDigits"
+    ]
+}

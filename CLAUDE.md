@@ -54,12 +54,6 @@ import { DashboardService } from '@core/public-api';
 1. Create component files in `src/app/components/examples/[widget-name]/`
 2. Export component in `src/app/components/examples/examples.module.ts`
 3. Add to module imports if using additional Angular modules
-4. Test in ThingsBoard dashboard using the development server URL
-
-### Testing in ThingsBoard
-- Widget Editor: `http://localhost:8080/resources/widgets-library/widget-types/0b1f1400-63b2-11f0-ada4-17812a0522d3`
-- Test Dashboard: `http://localhost:8080/dashboards/865bc570-6630-11f0-90af-17812a0522d3`
-- Credentials: `tenant@thingsboard.org` / `tenant`
 
 ## Current Widget: ECharts Multi-Plot Line Chart
 
