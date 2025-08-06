@@ -390,40 +390,53 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private recalculateGridLayout(visiblePlots: number[]): PlotConfig[] {
     console.log('[ECharts Line Chart] Recalculating grid layout for visible plots:', visiblePlots);
     
-    if (visiblePlots.length === 0) {
-      // If no plots are visible, return empty config
-      return [];
-    }
-    
-    // Use original plot configs as base
+    // Always return all plots, but adjust their heights
     const configs: PlotConfig[] = [];
     const totalHeight = 88; // Total available height
     const visibleCount = visiblePlots.length;
+    
+    if (visibleCount === 0) {
+      // If no plots are visible, still return configs but with 0 height
+      return this.originalPlotConfigs.map((config) => ({
+        ...config,
+        height: '0%',
+        top: '0%'
+      }));
+    }
+    
     const plotHeight = Math.floor(totalHeight / visibleCount);
     const spacing = Math.floor(4 / visibleCount); // Dynamic spacing
     
-    // Sort visible plots to maintain order
-    visiblePlots.sort((a, b) => a - b);
+    // Create a set for quick lookup
+    const visiblePlotsSet = new Set(visiblePlots);
     
-    visiblePlots.forEach((plotIndex, idx) => {
-      const originalConfig = this.originalPlotConfigs[plotIndex];
-      if (originalConfig) {
-        const top = idx * (plotHeight + spacing) + 2; // Recalculate position
-        const newConfig = {
+    let visibleIndex = 0;
+    
+    // Process all plots, maintaining their original indices
+    this.originalPlotConfigs.forEach((originalConfig, plotIndex) => {
+      if (visiblePlotsSet.has(plotIndex)) {
+        // This plot is visible
+        const top = visibleIndex * (plotHeight + spacing) + 2;
+        configs.push({
           ...originalConfig,
-          gridIndex: idx,  // Update to new sequential index
-          xAxisIndex: idx, // Update to new sequential index
-          yAxisIndex: idx, // Update to new sequential index
           height: `${plotHeight}%`,
           top: `${top}%`
-        };
-        configs.push(newConfig);
-        console.log(`[ECharts Line Chart] Plot ${plotIndex} -> new position:`, {
-          originalIndex: plotIndex,
-          newIndex: idx,
-          height: newConfig.height,
-          top: newConfig.top
         });
+        console.log(`[ECharts Line Chart] Plot ${plotIndex} visible at position:`, {
+          plotIndex,
+          visibleIndex,
+          height: `${plotHeight}%`,
+          top: `${top}%`
+        });
+        visibleIndex++;
+      } else {
+        // This plot is hidden - keep it but with 0 height
+        configs.push({
+          ...originalConfig,
+          height: '0%',
+          top: '0%'
+        });
+        console.log(`[ECharts Line Chart] Plot ${plotIndex} hidden`);
       }
     });
     
@@ -439,50 +452,73 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       containLabel: true
     }));
 
-    const xAxes = plotConfigs.map((config, index) => ({
-      type: 'time',
-      gridIndex: index,
-      axisLine: {
-        onZero: false
-      },
-      axisLabel: {
-        formatter: (value: number) => {
-          const date = new Date(value);
-          return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+    // Find the last visible plot index
+    let lastVisibleIndex = -1;
+    for (let i = plotConfigs.length - 1; i >= 0; i--) {
+      if (plotConfigs[i].height !== '0%') {
+        lastVisibleIndex = i;
+        break;
+      }
+    }
+    
+    const xAxes = plotConfigs.map((config, index) => {
+      const isHidden = config.height === '0%';
+      return {
+        type: 'time',
+        gridIndex: index,
+        axisLine: {
+          onZero: false,
+          show: !isHidden
         },
-        show: index === plotConfigs.length - 1 // Only show labels on the bottom plot
-      },
-      splitLine: {
-        show: false
-      }
-    } as any));
+        axisLabel: {
+          formatter: (value: number) => {
+            const date = new Date(value);
+            return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+          },
+          show: !isHidden && index === lastVisibleIndex // Only show labels on the bottom visible plot
+        },
+        splitLine: {
+          show: false
+        },
+        show: !isHidden
+      } as any;
+    });
 
-    const yAxes = plotConfigs.map((config, index) => ({
-      type: 'value' as const,
-      gridIndex: index,
-      scale: true,
-      name: config.title,
-      nameLocation: 'middle' as const,
-      nameGap: 50,
-      axisLabel: {
-        formatter: (value: number) => {
-          return formatValue(value, this.ctx.decimals || 2, this.ctx.units || '', false);
-        }
-      },
-      splitLine: {
-        show: true
-      }
-    }));
+    const yAxes = plotConfigs.map((config, index) => {
+      const isHidden = config.height === '0%';
+      return {
+        type: 'value' as const,
+        gridIndex: index,
+        scale: true,
+        name: isHidden ? '' : config.title,
+        nameLocation: 'middle' as const,
+        nameGap: 50,
+        axisLabel: {
+          formatter: (value: number) => {
+            return formatValue(value, this.ctx.decimals || 2, this.ctx.units || '', false);
+          },
+          show: !isHidden
+        },
+        splitLine: {
+          show: !isHidden
+        },
+        show: !isHidden
+      };
+    });
 
-    const titles = plotConfigs.map((config) => ({
-      text: config.title,
-      left: 'center',
-      top: `${parseInt(config.top) - 2}%`,
-      textStyle: {
-        fontSize: 14,
-        fontWeight: 'normal' as const
-      }
-    }));
+    const titles = plotConfigs.map((config) => {
+      const isHidden = config.height === '0%';
+      return {
+        text: isHidden ? '' : config.title,
+        left: 'center',
+        top: `${parseInt(config.top) - 2}%`,
+        textStyle: {
+          fontSize: 14,
+          fontWeight: 'normal' as const
+        },
+        show: !isHidden
+      };
+    });
 
     const xAxisIndices = plotConfigs.map((_, i) => i);
     const dataZoomConfig = this.ctx.settings.enableDataZoom !== false ? [
@@ -966,37 +1002,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
     
-    // Create mapping of old to new indices
-    const indexMapping = new Map<number, number>();
-    newPlotConfigs.forEach((config, newIndex) => {
-      const oldIndex = this.originalPlotConfigs.findIndex(c => c.id === config.id);
-      if (oldIndex !== -1) {
-        indexMapping.set(oldIndex, newIndex);
-      }
-    });
-    
-    // Update series with new axis indices
-    const updatedSeries = currentOption.series.map((series: any) => {
-      const seriesName = series.name;
-      const originalPlotIndex = this.seriesPlotMap.get(seriesName);
-      
-      if (originalPlotIndex !== undefined && indexMapping.has(originalPlotIndex)) {
-        const newIndex = indexMapping.get(originalPlotIndex);
-        return {
-          ...series,
-          xAxisIndex: newIndex,
-          yAxisIndex: newIndex
-        };
-      }
-      
-      return series;
-    });
+    // Since we're keeping all plots with their original indices, 
+    // we don't need to remap series indices
     
     // Create new option with updated layout
     const updatedOption = this.createMultiPlotOption(
       newPlotConfigs, 
       currentOption.legend[0].data, 
-      updatedSeries
+      currentOption.series
     );
     
     // Apply the new option with animation
