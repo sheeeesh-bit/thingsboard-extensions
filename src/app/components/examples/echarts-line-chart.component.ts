@@ -156,16 +156,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('[ECharts Line Chart] AfterViewInit - Chart container:', this.chartContainer.nativeElement);
     this.LOG(`[HEIGHT DEBUG] ngAfterViewInit - ctx.height: ${this.ctx.height}, ctx.width: ${this.ctx.width}`);
     
-    if (this.chartContainer && this.chartContainer.nativeElement) {
-      // Apply ctx.height directly to the container
-      if (this.ctx.height) {
-        this.chartContainer.nativeElement.style.height = `${this.ctx.height}px`;
-        this.LOG(`[HEIGHT DEBUG] Applied height ${this.ctx.height}px to container`);
-      }
-      
-      const containerRect = this.chartContainer.nativeElement.getBoundingClientRect();
-      this.LOG(`[HEIGHT DEBUG] Container element dimensions after height set: width=${containerRect.width}, height=${containerRect.height}`);
-    }
+    // Don't apply height here - let initChart handle it
     
     // Delay initialization to ensure layout is complete
     setTimeout(() => {
@@ -244,7 +235,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         yAxisIndex: actualYAxisIndex,
         data: this.ctx.data[i].data,
         symbol: (this.ctx.settings.showDataPoints) ? 'circle' : 'none',
-        symbolSize: (this.ctx.settings.symbolSize_data || 5) * 1.5, // Increase default size by 50%
+        symbolSize: (this.ctx.settings.symbolSize_data || 5) * 2.5, // Increase size by 2.5x to match original
         smooth: this.ctx.settings.smooth
       };
       myNewOptions.series.push(seriesElement);
@@ -281,10 +272,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG("ONRESIZE!!!");
     this.LOG(`[HEIGHT DEBUG] onResize triggered - ctx.height: ${this.ctx.height}, ctx.width: ${this.ctx.width}`);
     
-    // Apply the new height to the container
-    if (this.chartContainer && this.chartContainer.nativeElement && this.ctx.height) {
-      this.chartContainer.nativeElement.style.height = `${this.ctx.height}px`;
-      this.LOG(`[HEIGHT DEBUG] Applied new height ${this.ctx.height}px to container in onResize`);
+    // Update chart container height, not the outer container
+    const container = this.chartContainer.nativeElement;
+    const containerElement = container.querySelector('#echartContainer') as HTMLElement;
+    
+    if (containerElement && this.ctx.height) {
+      const buttonBarHeight = 50; // Button container takes about 50px
+      const availableHeight = this.ctx.height - buttonBarHeight;
+      containerElement.style.height = `${availableHeight}px`;
+      this.LOG(`[HEIGHT DEBUG] Resized chart container to ${availableHeight}px`);
     }
     
     if (this.chart) {
@@ -311,6 +307,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     if (!containerElement) {
       this.LOG('[ECharts Line Chart] echartContainer element not found!');
       return;
+    }
+    
+    // Set height for chart container to account for button bar
+    if (this.ctx.height) {
+      const buttonBarHeight = 50; // Button container takes about 50px
+      const availableHeight = this.ctx.height - buttonBarHeight;
+      containerElement.style.height = `${availableHeight}px`;
+      containerElement.style.width = '100%';
+      this.LOG(`[HEIGHT DEBUG] Set chart container height to ${availableHeight}px (ctx.height: ${this.ctx.height} - buttonBar: ${buttonBarHeight})`);
     }
     
     this.chart = echarts.init(containerElement);
@@ -1196,37 +1201,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private getDataZoomConfig(): any[] {
-    // Dynamic datazoom positioning based on number of grids
-    let dataZoomTop = '92%';
-    
-    // Adjust position when there are multiple grids to avoid overlap
-    if (this.currentGrids === 2) {
-      // With 2 grids, position between bottom grid and edge
-      if (this.currentSize === 'small') {
-        dataZoomTop = '83%'; // Below grid at ~80% height
-      } else if (this.currentSize === 'large') {
-        dataZoomTop = '88%'; // Below grid at ~85% height
-      } else {
-        dataZoomTop = '88%'; // Below grid at ~85% height
-      }
-    } else if (this.currentGrids === 3) {
-      // With 3 grids, position below the bottom grid
-      if (this.currentSize === 'small') {
-        dataZoomTop = '91%'; // Below grid at ~88% height
-      } else {
-        dataZoomTop = '93%'; // Below grid at ~90% height
-      }
-    }
-    
+    // DataZoom always at 92% as in original
     return [
       {
         show: true,
         xAxisIndex: 'all',
         type: 'slider',
-        top: dataZoomTop,
+        top: '92%',
         start: 0,
-        end: 100,
-        height: 20 // Fixed height for consistency
+        end: 100
       },
       {
         type: 'inside',
@@ -1499,11 +1482,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         "legend": {
           "textStyle": {
             "fontWeight": "bold",
-            "fontSize": 12
+            "fontSize": 14
           },
-          "itemWidth": 35,
-          "itemHeight": 10,
-          "itemGap": 15,
+          "itemWidth": 40,
+          "itemHeight": 12,
+          "itemGap": 20,
         },
         "xAxis": {
           "splitLine": {
@@ -1512,7 +1495,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             }
           },
           "axisLabel": {
-            "fontSize": 12,
+            "fontSize": 14,
             "fontWeight": "normal"
           },
           "rotate": 40,
@@ -1526,7 +1509,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             }
           },
           "axisLabel": {
-            "fontSize": 12,
+            "fontSize": 14,
             "fontWeight": "normal"
           }
         }
@@ -1551,11 +1534,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         "legend": {
           "textStyle": {
             "fontWeight": "bold",
-            "fontSize": 16
+            "fontSize": 20
           },
-          "itemWidth": 50,
-          "itemHeight": 12,
-          "itemGap": 18,
+          "itemWidth": 60,
+          "itemHeight": 15,
+          "itemGap": 20,
         },
         "xAxis": {
           "splitLine": {
@@ -1564,7 +1547,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             }
           },
           "axisLabel": {
-            "fontSize": 14,
+            "fontSize": 16,
             "fontWeight": 550
           },
           "rotate": 40,
@@ -1578,7 +1561,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             }
           },
           "axisLabel": {
-            "fontSize": 14,
+            "fontSize": 16,
             "fontWeight": 550
           }
         }
@@ -1603,11 +1586,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         "legend": {
           "textStyle": {
             "fontWeight": "bold",
-            "fontSize": 20
+            "fontSize": 24
           },
-          "itemWidth": 60,
-          "itemHeight": 16,
-          "itemGap": 25,
+          "itemWidth": 70,
+          "itemHeight": 20,
+          "itemGap": 30,
         },
         "xAxis": {
           "splitLine": {
@@ -1616,7 +1599,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             }
           },
           "axisLabel": {
-            "fontSize": 16,
+            "fontSize": 18,
             "fontWeight": 550
           },
           "rotate": 40,
@@ -1630,7 +1613,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             }
           },
           "axisLabel": {
-            "fontSize": 16,
+            "fontSize": 18,
             "fontWeight": 550
           }
         }
