@@ -256,6 +256,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     myNewOptions.xAxis = this.currentXAxisArray();
     myNewOptions.yAxis = this.currentYAxisArray();
     myNewOptions.grid = this.currentGridArray();
+    myNewOptions.dataZoom = this.getDataZoomConfig(); // Update datazoom based on current grid config
     
     this.LOG("myNewOptions:", myNewOptions);
     
@@ -1193,23 +1194,50 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           xAxisIndex: 'all'
         }]
       },
-      dataZoom: [
-        {
-          show: true,
-          xAxisIndex: 'all',
-          type: 'slider',
-          top: '92%',
-          start: 0,
-          end: 100
-        },
-        {
-          type: 'inside',
-          xAxisIndex: 'all',
-          start: 0,
-          end: 100
-        }
-      ]
+      dataZoom: this.getDataZoomConfig()
     };
+  }
+
+  private getDataZoomConfig(): any[] {
+    // Dynamic datazoom positioning based on number of grids
+    let dataZoomTop = '92%';
+    
+    // Adjust position when there are multiple grids to avoid overlap
+    if (this.currentGrids === 2) {
+      // With 2 grids, position between bottom grid and edge
+      if (this.currentSize === 'small') {
+        dataZoomTop = '83%'; // Below grid at ~80% height
+      } else if (this.currentSize === 'large') {
+        dataZoomTop = '88%'; // Below grid at ~85% height
+      } else {
+        dataZoomTop = '88%'; // Below grid at ~85% height
+      }
+    } else if (this.currentGrids === 3) {
+      // With 3 grids, position below the bottom grid
+      if (this.currentSize === 'small') {
+        dataZoomTop = '91%'; // Below grid at ~88% height
+      } else {
+        dataZoomTop = '93%'; // Below grid at ~90% height
+      }
+    }
+    
+    return [
+      {
+        show: true,
+        xAxisIndex: 'all',
+        type: 'slider',
+        top: dataZoomTop,
+        start: 0,
+        end: 100,
+        height: 20 // Fixed height for consistency
+      },
+      {
+        type: 'inside',
+        xAxisIndex: 'all',
+        start: 0,
+        end: 100
+      }
+    ];
   }
 
   // Utility methods
