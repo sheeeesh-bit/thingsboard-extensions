@@ -8,7 +8,6 @@ import {
   OnDestroy
 } from '@angular/core';
 import * as echarts from 'echarts/core';
-import { EChartsOption } from 'echarts';
 import { WidgetContext } from '@home/models/widget-component.models';
 import { LineChart } from 'echarts/charts';
 import {
@@ -21,7 +20,6 @@ import {
   MarkAreaComponent
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
-import { formatValue, isDefinedAndNotNull } from '@core/public-api';
 import * as XLSX from 'xlsx';
 
 // Register required components
@@ -76,7 +74,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private containerHeightLimit = [1000, 1200];
   private currentSize = "small";
   private maxGrids = 0;
-  private setGrids: Set<string> = new Set();
+  private setGrids = new Set<string>();
   private currentGrids = 3;
   private currentGridNames: string[] = [];
   private resetGrid = false;
@@ -246,7 +244,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         yAxisIndex: actualYAxisIndex,
         data: this.ctx.data[i].data,
         symbol: (this.ctx.settings.showDataPoints) ? 'circle' : 'none',
-        symbolSize: this.ctx.settings.symbolSize_data,
+        symbolSize: (this.ctx.settings.symbolSize_data || 5) * 1.5, // Increase default size by 50%
         smooth: this.ctx.settings.smooth
       };
       myNewOptions.series.push(seriesElement);
@@ -668,11 +666,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       if (this.ctx && this.ctx.widgetTitle) {
         // Clean sheet name to be Excel-compatible (max 31 chars, no special chars)
         sheetName = this.ctx.widgetTitle
-          .replace(/[\/\\\?\*\[\]]/g, '_') // Replace invalid chars
+          .replace(/[/\\?*[\]]/g, '_') // Replace invalid chars
           .substring(0, 31); // Excel sheet name limit
       } else if (this.ctx && this.ctx.widgetConfig && this.ctx.widgetConfig.title) {
         sheetName = this.ctx.widgetConfig.title
-          .replace(/[\/\\\?\*\[\]]/g, '_')
+          .replace(/[/\\?*[\]]/g, '_')
           .substring(0, 31);
       }
       
@@ -739,7 +737,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   private overrideCsvExport(): void {
     // Monitor for dynamic saveAs calls
-    const self = this;
     const checkInterval = setInterval(() => {
       if ((window as any).saveAs && !(window as any).saveAs._customOverride) {
         const originalSaveAs = (window as any).saveAs;
@@ -1031,7 +1028,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     });
     this.LOG("matchedValues:", matchedValues);
     
-    const uniqueMatches = new Set(matchedValues.filter(item => item && axisPositionMap.hasOwnProperty(item)));
+    const uniqueMatches = new Set(matchedValues.filter(item => item && Object.prototype.hasOwnProperty.call(axisPositionMap, item)));
     this.LOG("uniqueMatches:", uniqueMatches, ", len:", uniqueMatches.size);
     return uniqueMatches;
   }
@@ -1051,10 +1048,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         // Default to 'Top' if no assignment is set
         const assignment = item.dataKey?.settings?.axisAssignment || 'Top';
         this.LOG(`  - Data[${index}] axisAssignment:`, assignment, 
-                 'Valid:', axisPositionMap.hasOwnProperty(assignment));
+                 'Valid:', Object.prototype.hasOwnProperty.call(axisPositionMap, assignment));
         return assignment;
       })
-      .filter(assignment => axisPositionMap.hasOwnProperty(assignment));
+      .filter(assignment => Object.prototype.hasOwnProperty.call(axisPositionMap, assignment));
     
     this.LOG('Filtered valid assignments:', axisAssignments);
     const uniqueAssignments = new Set(axisAssignments);
@@ -1100,7 +1097,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       } else {
         this.usedFormatter = this.zoomFormatterWithMonths();
       }
-    } catch(error) {
+    } catch {
       this.usedFormatter = this.zoomFormatterWithMinutes();
     }
   }
@@ -1502,11 +1499,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         "legend": {
           "textStyle": {
             "fontWeight": "bold",
-            "fontSize": 14
+            "fontSize": 12
           },
-          "itemWidth": 40,
-          "itemHeight": 12,
-          "itemGap": 20,
+          "itemWidth": 35,
+          "itemHeight": 10,
+          "itemGap": 15,
         },
         "xAxis": {
           "splitLine": {
@@ -1515,7 +1512,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             }
           },
           "axisLabel": {
-            "fontSize": 14,
+            "fontSize": 12,
             "fontWeight": "normal"
           },
           "rotate": 40,
@@ -1529,7 +1526,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             }
           },
           "axisLabel": {
-            "fontSize": 14,
+            "fontSize": 12,
             "fontWeight": "normal"
           }
         }
@@ -1554,11 +1551,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         "legend": {
           "textStyle": {
             "fontWeight": "bold",
-            "fontSize": 20
+            "fontSize": 16
           },
-          "itemWidth": 60,
-          "itemHeight": 15,
-          "itemGap": 20,
+          "itemWidth": 50,
+          "itemHeight": 12,
+          "itemGap": 18,
         },
         "xAxis": {
           "splitLine": {
@@ -1567,7 +1564,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             }
           },
           "axisLabel": {
-            "fontSize": 16,
+            "fontSize": 14,
             "fontWeight": 550
           },
           "rotate": 40,
@@ -1581,7 +1578,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             }
           },
           "axisLabel": {
-            "fontSize": 16,
+            "fontSize": 14,
             "fontWeight": 550
           }
         }
@@ -1606,11 +1603,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         "legend": {
           "textStyle": {
             "fontWeight": "bold",
-            "fontSize": 24
+            "fontSize": 20
           },
-          "itemWidth": 70,
-          "itemHeight": 20,
-          "itemGap": 30,
+          "itemWidth": 60,
+          "itemHeight": 16,
+          "itemGap": 25,
         },
         "xAxis": {
           "splitLine": {
@@ -1619,7 +1616,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             }
           },
           "axisLabel": {
-            "fontSize": 18,
+            "fontSize": 16,
             "fontWeight": 550
           },
           "rotate": 40,
@@ -1633,7 +1630,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             }
           },
           "axisLabel": {
-            "fontSize": 18,
+            "fontSize": 16,
             "fontWeight": 550
           }
         }
