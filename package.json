@@ -25,7 +25,8 @@
     "playwright": "^1.53.1",
     "primeicons": "~7.0.0",
     "primeng": "~18.0.2",
-    "tinycolor2": "^1.6.0"
+    "tinycolor2": "^1.6.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "18.2.12",

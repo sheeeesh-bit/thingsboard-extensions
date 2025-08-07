@@ -1,0 +1,40 @@
+<form [formGroup]="dataKeySettingsForm" *ngIf="dataKeySettingsForm" style="width: 100%;">
+  <div class="mat-content mat-padding" fxLayout="column" style="width: 100%;">
+    
+    <!-- Chart Type -->
+    <mat-form-field class="mat-block" appearance="outline">
+      <mat-label>Type</mat-label>
+      <mat-select formControlName="chartType">
+        <mat-option value="Line">Line</mat-option>
+        <mat-option value="Bar">Bar</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <!-- Subplot Assignment -->
+    <mat-form-field class="mat-block" appearance="outline">
+      <mat-label>Subplot Assignment</mat-label>
+      <mat-select formControlName="axisAssignment">
+        <mat-option value="Top">Top</mat-option>
+        <mat-option value="Middle">Middle</mat-option>
+        <mat-option value="Bottom">Bottom</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <!-- Bottom Plot Assignment -->
+    <mat-form-field class="mat-block" appearance="outline">
+      <mat-label>Show bottom Plot devicetype</mat-label>
+      <mat-select formControlName="bottomPlotAssigment">
+        <mat-option value="Always">Always</mat-option>
+        <mat-option value="S-100">S-100</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <!-- Number of Digits -->
+    <mat-form-field class="mat-block" appearance="outline">
+      <mat-label>Number of Digits</mat-label>
+      <input matInput type="number" formControlName="numberOfDigits" placeholder="1">
+    </mat-form-field>
+
+
+  </div>
+</form>

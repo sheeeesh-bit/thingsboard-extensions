@@ -10,9 +10,11 @@ npm install
 
 # Start development server (port 5000)
 npm start
+# Widget will be available at: http://localhost:5000/static/widgets/thingsboard-extension-widgets.js
 
 # Build for production
 npm run build
+# Built file will be at: target/generated-resources/thingsboard-extension-widgets.js
 
 # Run linter
 npm run lint
@@ -56,13 +58,6 @@ import { DashboardService } from '@core/public-api';
 3. Add to module imports if using additional Angular modules
 
 ## Current Widget: ECharts Multi-Plot Line Chart
-
-Located in `src/app/components/examples/echarts-line-chart/`, this widget provides:
-- Multi-plot support (up to 7 plots)
-- Interactive toolbar with export, zoom, statistics
-- Real-time data visualization
-- Alarm threshold visualization
-- Extensive customization through settings
 
 ## Important Development Notes
 

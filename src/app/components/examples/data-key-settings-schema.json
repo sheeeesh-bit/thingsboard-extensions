@@ -1,0 +1,50 @@
+{
+    "schema": {
+        "type": "object",
+        "title": "DataKeySettings",
+        "properties": {
+            "chartType": {
+                "title": "Type",
+                "type": "string",
+                "enum": [
+                    "Line",
+                    "Bar"],
+                "default": "Line"
+            },
+            "axisAssignment": {
+                "title": "Subplot Assignment",
+                "type": "string",
+                "enum": [
+                    "Top",
+                    "Middle",
+                    "Bottom"],
+                "default": "Top"
+            },
+            "numberOfDigits": {
+                "title": "Number of Digits",
+                "type": "number",
+                "default": 1
+            },
+            "bottomPlotAssigment": {
+                "title": "Show bottom Plot devicetype",
+                "type": "string",
+                "enum": [
+                    "Always",
+                    "S-100"],
+                "default": "S-100"
+            }
+        },
+        "required": [
+            "chartType",
+            "axisAssignment",
+            "bottomPlotAssigment",
+            "numberOfDigits"
+        ]
+    },
+    "form": [
+        "chartType",
+        "axisAssignment",
+        "bottomPlotAssigment",
+        "numberOfDigits"
+    ]
+}

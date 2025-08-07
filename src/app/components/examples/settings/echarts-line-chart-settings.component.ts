@@ -36,7 +36,6 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   grid_layout_top?: number;
   grid_layout_bottom?: number;
   markline_layout_left_or_right?: number;
-  movingseriesMarkLine?: number;
   
   // Annotations
   annotations?: Array<{
@@ -90,10 +89,9 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       showPanZoomTool: true,
       grid_layout_right: 40,
       grid_layout_left: 130,
-      grid_layout_top: 0,
-      grid_layout_bottom: 0,
+      grid_layout_top: 40,
+      grid_layout_bottom: 240,
       markline_layout_left_or_right: 285,
-      movingseriesMarkLine: 0,
       annotations: [],
       debugOutput: false
     };
@@ -121,12 +119,11 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       showDataPoints: [settings.showDataPoints],
       symbolSize_data: [settings.symbolSize_data || 5],
       showPanZoomTool: [settings.showPanZoomTool !== false],
-      movingseriesMarkLine: [settings.movingseriesMarkLine || 0],
-      markline_layout_left_or_right: [settings.markline_layout_left_or_right || 285],
       grid_layout_right: [settings.grid_layout_right || 40],
       grid_layout_left: [settings.grid_layout_left || 130],
-      grid_layout_top: [settings.grid_layout_top || 0],
-      grid_layout_bottom: [settings.grid_layout_bottom || 0],
+      grid_layout_top: [settings.grid_layout_top || 40],
+      grid_layout_bottom: [settings.grid_layout_bottom || 240],
+      markline_layout_left_or_right: [settings.markline_layout_left_or_right || 285],
       
       // Annotations
       annotations: this.fb.array(this.createAnnotations(settings.annotations || [])),

@@ -6,9 +6,10 @@ import {
   HomeComponentsModule,
   WidgetConfigComponentsModule
 } from '@home/components/public-api';
-import { EchartsLineChartComponent } from './echarts-line-chart/echarts-line-chart.component';
-import { EchartsLineChartSettingsComponent } from './echarts-line-chart/settings/echarts-line-chart-settings.component';
-import { EchartsLineChartDataKeySettingsComponent } from './echarts-line-chart/data-key-settings/echarts-line-chart-data-key-settings.component';
+import { MatMenuModule } from '@angular/material/menu';
+import { EchartsLineChartComponent } from './echarts-line-chart.component';
+import { EchartsLineChartSettingsComponent } from './settings/echarts-line-chart-settings.component';
+import { EchartsLineChartDataKeySettingsComponent } from './data-key-settings/echarts-line-chart-data-key-settings.component';
 
 @NgModule({
   declarations: [
@@ -21,7 +22,8 @@ import { EchartsLineChartDataKeySettingsComponent } from './echarts-line-chart/d
     SharedModule,
     HomeComponentsModule,
     BasicWidgetConfigModule,
-    WidgetConfigComponentsModule
+    WidgetConfigComponentsModule,
+    MatMenuModule
   ],
   exports: [
     EchartsLineChartComponent,

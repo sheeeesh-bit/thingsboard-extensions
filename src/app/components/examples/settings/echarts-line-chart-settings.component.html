@@ -97,17 +97,12 @@
         
         <mat-checkbox formControlName="showPanZoomTool">Show Pan and Zoom tool</mat-checkbox>
         
-        <mat-form-field class="mat-block" appearance="outline">
-          <mat-label>Max, Min, Avg percent for moving</mat-label>
-          <input matInput type="number" formControlName="movingseriesMarkLine">
-        </mat-form-field>
-
         <!-- Grid Layout Settings -->
         <h4>Grid Layout</h4>
         <div fxLayout="row" fxLayoutGap="16px">
           <mat-form-field fxFlex appearance="outline">
-            <mat-label>Chart to the right</mat-label>
-            <input matInput type="number" formControlName="grid_layout_right">
+            <mat-label>Markline Left or Right</mat-label>
+            <input matInput type="number" formControlName="markline_layout_left_or_right">
           </mat-form-field>
           
           <mat-form-field fxFlex appearance="outline">
@@ -118,19 +113,19 @@
         
         <div fxLayout="row" fxLayoutGap="16px">
           <mat-form-field fxFlex appearance="outline">
-            <mat-label>Chart to the top</mat-label>
-            <input matInput type="number" formControlName="grid_layout_top">
+            <mat-label>Chart to the right</mat-label>
+            <input matInput type="number" formControlName="grid_layout_right">
           </mat-form-field>
           
           <mat-form-field fxFlex appearance="outline">
-            <mat-label>Chart to the bottom</mat-label>
-            <input matInput type="number" formControlName="grid_layout_bottom">
+            <mat-label>Chart to the top</mat-label>
+            <input matInput type="number" formControlName="grid_layout_top">
           </mat-form-field>
         </div>
         
         <mat-form-field class="mat-block" appearance="outline">
-          <mat-label>Markline Left or Right</mat-label>
-          <input matInput type="number" formControlName="markline_layout_left_or_right">
+          <mat-label>Chart to the bottom</mat-label>
+          <input matInput type="number" formControlName="grid_layout_bottom">
         </mat-form-field>
 
         <!-- Annotations -->

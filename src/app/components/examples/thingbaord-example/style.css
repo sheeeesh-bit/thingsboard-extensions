@@ -1,3 +1,5 @@
+
+
 .graph-container {
     flex: 1; 
   min-width: 400px; 
@@ -48,6 +50,9 @@ button[mat-icon-button]:hover {
   transition: background-color 0.3s ease;
 }
 
+
+
+
 .tb-button-container {
   margin-top: 0px;
   margin-bottom: 30px;
@@ -94,6 +99,13 @@ button[mat-icon-button]:hover {
 /* Expanded state (default) */
 div[fxFlex] {
   transition: width 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+/* Style for the statsTable content */
+.stats-table {
+    padding: 20px;
+    /* Ensure the content doesn't display when collapsed */
+    opacity: 1;
+    transition: opacity 0.3s ease;
 }
 
 .graph-container {

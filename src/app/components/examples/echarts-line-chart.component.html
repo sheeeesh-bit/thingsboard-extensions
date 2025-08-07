@@ -1,0 +1,38 @@
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<!-- Main container: Layout as column, stretching across height -->
+<div fxFlex fxLayout="column" style="height: 100%; width: 100%;" fxLayoutAlign="start stretch">
+
+    <!-- Buttons at the top -->
+    <div class="tb-button-container" fxLayoutAlign="end stretch">
+        <button mat-icon-button (click)="menuButtons('genImage')" class="tb-button"  matTooltipPosition="above" matTooltip="Download Image"><i class="material-icons">photo_camera</i></button>
+        
+        <!-- Export dropdown menu -->
+        <button mat-icon-button [matMenuTriggerFor]="exportMenu" class="tb-button" matTooltipPosition="above" matTooltip="Export Data">
+            <i class="material-icons">save_alt</i>
+        </button>
+        <mat-menu #exportMenu="matMenu">
+            <button mat-menu-item (click)="exportData('csv')">
+                <i class="material-icons">description</i>
+                <span>Export as CSV</span>
+            </button>
+            <button mat-menu-item (click)="exportData('xls')">
+                <i class="material-icons">table_chart</i>
+                <span>Export as XLS</span>
+            </button>
+            <button mat-menu-item (click)="exportData('xlsx')">
+                <i class="material-icons">grid_on</i>
+                <span>Export as XLSX</span>
+            </button>
+        </mat-menu>
+        
+        <button mat-icon-button (click)="menuButtons('reset')" class="tb-button" matTooltipPosition="above" matTooltip="Reset Zoom" matTooltipClass="custom-tooltip"><i class="material-icons">restore_page</i></button> 
+    </div>
+  
+  <!-- Chart container -->
+  <div #chartContainer fxFlex fxLayout="row" style="graph-container">
+    <div id="echartContainer">
+    </div>
+  </div>
+
+</div>
