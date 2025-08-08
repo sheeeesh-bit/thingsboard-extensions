@@ -168,10 +168,29 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.LOG(`[HEIGHT DEBUG] After timeout - ctx.height: ${this.ctx.height}`);
       this.initChart();
       this.setupResizeObserver();
+      
+      // CRITICAL: Expose component to ThingsBoard's widget.js bridge
+      // This allows TB to call our methods and flush pending updates
+      if (this.ctx.$scope) {
+        this.LOG('[ECharts Line Chart] Exposing component to ThingsBoard scope');
+        this.ctx.$scope.echartsLineChartComponent = this;
+        
+        // If widget.js has already queued pending updates, flush them now
+        if (typeof this.ctx.$scope.componentReady === 'function') {
+          this.LOG('[ECharts Line Chart] Calling componentReady() to flush pending updates');
+          this.ctx.$scope.componentReady();
+        }
+      }
     }, 100);
   }
 
   ngOnDestroy(): void {
+    // Clean up component reference from ThingsBoard scope
+    if (this.ctx.$scope && this.ctx.$scope.echartsLineChartComponent === this) {
+      this.LOG('[ECharts Line Chart] Removing component from ThingsBoard scope');
+      delete this.ctx.$scope.echartsLineChartComponent;
+    }
+    
     // Clean up state subscriptions
     if (this.stateChangeSubscription) {
       this.stateChangeSubscription.unsubscribe();
