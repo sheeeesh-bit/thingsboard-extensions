@@ -173,6 +173,20 @@ When working with this codebase, these linting issues commonly appear:
 - Debug mode controlled by `ctx.settings.debugOutput`
 - Chart version tracked in `CHART_VERSION` constant
 
+### ECharts setOption Usage
+- **NEVER use merge mode**: Always call `chart.setOption(options)` without the second parameter
+- Do NOT use `chart.setOption(options, true)` - merge mode must not be enabled
+- To ensure rendering with large datasets, use `chart.resize()` after a timeout instead
+- Example pattern for forcing redraw:
+  ```javascript
+  this.chart.setOption(myNewOptions);
+  setTimeout(() => {
+    if (this.chart && !this.chart.isDisposed()) {
+      this.chart.resize();
+    }
+  }, 50);
+  ```
+
 ## Testing Checklist
 When making changes, verify:
 1. ✅ DataZoom is visible and not cut off at bottom

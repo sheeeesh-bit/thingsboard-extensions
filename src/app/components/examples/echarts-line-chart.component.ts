@@ -200,10 +200,34 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('Chart instance exists:', !!this.chart);
     this.LOG('Data series count:', this.ctx.data?.length || 0);
     
-    if (!this.ctx.data) {
+    if (!this.ctx.data || this.ctx.data.length === 0) {
       this.LOG('ERROR: No data available');
       return;
     }
+    
+    // Check if we have real data with actual points
+    const totalDataPoints = this.ctx.data.reduce((sum, series) => 
+      sum + (series.data?.length || 0), 0);
+    
+    if (totalDataPoints === 0) {
+      this.LOG('WARNING: Data series exist but contain no data points, skipping update');
+      // Keep showing loading spinner if chart is initialized
+      if (this.chart && !this.chart.isDisposed()) {
+        this.chart.showLoading({
+          text: 'Waiting for data...',
+          color: '#1976d2',
+          textColor: '#000',
+          maskColor: 'rgba(255, 255, 255, 0.8)',
+          fontSize: 14,
+          showSpinner: true,
+          spinnerRadius: 10,
+          lineWidth: 2
+        });
+      }
+      return;
+    }
+    
+    this.LOG(`Processing ${totalDataPoints} total data points across ${this.ctx.data.length} series`);
     
     // If chart is not initialized yet, just return
     // The data will be loaded when the chart initializes in ngAfterViewInit
@@ -375,13 +399,20 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.setTimeFormatter();
     this.initChartAndGrid();
     
-    // Immediately load data if available
-    if (this.ctx.data && this.ctx.data.length > 0) {
-      this.LOG('[ECharts Line Chart] Loading initial data after chart grid setup');
-      this.onDataUpdated();
+    // Don't call onDataUpdated immediately - wait for real data to arrive
+    // The data will come through ThingsBoard's data subscription
+    if (!this.ctx.data || this.ctx.data.length === 0) {
+      this.LOG('[ECharts Line Chart] No data available yet, waiting for data subscription');
     } else {
-      // No data yet - keep showing loading until data arrives
-      this.LOG('[ECharts Line Chart] No data available yet, keeping loading spinner');
+      this.LOG('[ECharts Line Chart] Data already available:', this.ctx.data.length, 'series');
+      // Only update if we have real data with actual points
+      const hasRealData = this.ctx.data.some(series => series.data && series.data.length > 0);
+      if (hasRealData) {
+        this.LOG('[ECharts Line Chart] Real data detected, updating chart');
+        this.onDataUpdated();
+      } else {
+        this.LOG('[ECharts Line Chart] Data series exist but are empty, waiting for real data');
+      }
     }
   }
 
