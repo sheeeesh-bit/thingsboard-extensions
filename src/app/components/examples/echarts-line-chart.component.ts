@@ -7,6 +7,7 @@ import {
   ViewChild,
   OnDestroy
 } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import * as echarts from 'echarts/core';
 import { WidgetContext } from '@home/models/widget-component.models';
 import { LineChart } from 'echarts/charts';
@@ -90,12 +91,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // Formatter configurations
   private browserLocale = Intl.DateTimeFormat().resolvedOptions().timeZone.startsWith('Europe/') ? "en-GB" : navigator.language || (navigator as any).userLanguage;
+  private datePipe: DatePipe;
   
   ngOnInit(): void {
     this.LOG(`=== CHART VERSION ${this.CHART_VERSION} INITIALIZATION START ===`);
     this.LOG('Component initialized');
     this.LOG('Widget context:', this.ctx);
     this.LOG('Widget settings:', this.ctx.settings);
+    
+    // Initialize DatePipe with user's locale
+    this.datePipe = new DatePipe(this.browserLocale);
     
     // Initialize debug output first
     this.DEBUG = this.ctx.settings.debugOutput;
@@ -679,7 +684,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     return this.ctx.attributeService
-      .getEntityAttributes(entity, 'SERVER_SCOPE', ['label'])
+      .getEntityAttributes(entity, 'SERVER_SCOPE' as any, ['label'])
       .pipe(
         map(attrs => {
           const attr = attrs.find((a: any) => a.key === 'label');
@@ -695,13 +700,71 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   /**
+   * Format timestamp to local "YYYY-MM-DD HH:mm:ss" format
+   * Matches ThingsBoard's CSV export format exactly
+   */
+  private formatLocalTimestamp(ms: number): string {
+    const d = new Date(ms);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` +
+           ` ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  /**
+   * Format number with fixed decimal places (avoids scientific notation)
+   * Safely handles any input type (string, undefined, null, etc.)
+   * Removes unnecessary trailing zeros after the decimal point
+   */
+  private formatNum(value: any, decimals?: number): string {
+    // Convert to number; if it's NaN or not finite, return empty string
+    const num = Number(value);
+    if (!isFinite(num)) {
+      return '';
+    }
+    // Ensure decimals is a valid number, default to 2
+    const decimalPlaces = Math.max(0, Math.floor(Number(decimals) || 2));
+    
+    // Format with fixed decimals first
+    let formatted = num.toFixed(decimalPlaces);
+    
+    // Remove trailing zeros after decimal point
+    // Only if there's a decimal point in the string
+    if (formatted.includes('.')) {
+      // Remove trailing zeros, and remove decimal point if all decimals were zeros
+      formatted = formatted.replace(/(\.\d*?)0+$/, '$1'); // Remove trailing zeros
+      formatted = formatted.replace(/\.$/, ''); // Remove decimal point if no decimals left
+    }
+    
+    return formatted;
+  }
+
+  /**
+   * Format timestamp using the user's timezone settings
+   * Matches ThingsBoard's history display format
+   */
+  private formatTimestamp(timestamp: number): string {
+    // Use formatLocalTimestamp for consistency
+    return this.formatLocalTimestamp(timestamp);
+  }
+
+  /**
    * Build a filename: "<label>_YYYY-MM-DDThh-mm-ss-SSSZ.<ext>"
    */
   private makeFilename(ext: string): Observable<string> {
     return this.getSensorLabel().pipe(
       map(label => {
-        // e.g. 2025-01-08T14-23-45-123Z
-        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+        // Use local time for filename to match export content
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const ms = String(now.getMilliseconds()).padStart(3, '0');
+        
+        // Format: label_YYYY-MM-DD_HH-mm-ss-SSS.ext
+        const ts = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}-${ms}`;
         const filename = `${label}_${ts}.${ext}`;
         this.LOG('Generated filename:', filename);
         return filename;
@@ -755,22 +818,27 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
     
-    this.LOG('[Chart Widget] Exporting data to CSV with custom filename');
+    this.LOG('[Chart Widget] Exporting data to CSV with ThingsBoard format');
     
-    let csvContent = '';
-    
-    // Create header row
+    // Build dynamic headers based on actual data keys
     const headers = ['Timestamp'];
+    const dataKeyOrder: string[] = [];
+    
+    // Collect all unique data keys in the order they appear
     this.ctx.data.forEach((series) => {
       const seriesName = series.dataKey.label || series.dataKey.name;
-      headers.push(seriesName);
+      if (!dataKeyOrder.includes(seriesName)) {
+        dataKeyOrder.push(seriesName);
+        headers.push(seriesName);
+      }
     });
-    csvContent += headers.join(',') + '\n';
     
-    // Find all unique timestamps
-    const timestampMap = new Map<number, any>();
+    // Use semicolon separator to match ThingsBoard format
+    let csvContent = headers.join(';') + '\n';
     
-    // Collect all data points by timestamp
+    // Group points by timestamp
+    const timestampMap = new Map<number, Record<string, number>>();
+    
     this.ctx.data.forEach((series) => {
       if (series.data) {
         series.data.forEach((point) => {
@@ -782,7 +850,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           }
           
           const seriesName = series.dataKey.label || series.dataKey.name;
-          timestampMap.get(timestamp)[seriesName] = value;
+          timestampMap.get(timestamp)![seriesName] = value;
         });
       }
     });
@@ -790,31 +858,32 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Sort timestamps
     const sortedTimestamps = Array.from(timestampMap.keys()).sort((a, b) => a - b);
     
-    // Create data rows
+    // Build rows with proper formatting
     sortedTimestamps.forEach((timestamp) => {
-      const row = [new Date(timestamp).toISOString()];
-      const dataPoint = timestampMap.get(timestamp);
+      const dataPoint = timestampMap.get(timestamp)!;
+      const parts: string[] = [
+        this.formatLocalTimestamp(timestamp)
+      ];
       
-      this.ctx.data.forEach((series) => {
-        const seriesName = series.dataKey.label || series.dataKey.name;
-        const value = dataPoint[seriesName];
-        
-        if (value !== undefined) {
-          const decimals = series.dataKey.decimals || this.ctx.decimals || 2;
-          row.push(value.toFixed(decimals));
-        } else {
-          row.push('');
-        }
+      // Add values in the same order as headers
+      dataKeyOrder.forEach((key) => {
+        const value = dataPoint[key];
+        const series = this.ctx.data.find(s => 
+          (s.dataKey.label || s.dataKey.name) === key
+        );
+        // Use exportDecimals setting for all exports (default 6 to match ThingsBoard)
+        const decimals = this.ctx.settings?.exportDecimals ?? series?.dataKey?.decimals ?? this.ctx.decimals ?? 6;
+        parts.push(this.formatNum(value, decimals));
       });
       
-      csvContent += row.join(',') + '\n';
+      csvContent += parts.join(';') + '\n';
     });
     
     // Create blob and download with dynamic filename
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     this.downloadFileWithDynamicName(blob, 'csv');
     
-    this.LOG('[Chart Widget] CSV export initiated');
+    this.LOG('[Chart Widget] CSV export completed with ThingsBoard format');
   }
 
   public exportData(format: 'csv' | 'xls' | 'xlsx'): void {
@@ -825,15 +894,22 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
     
-    // Prepare data structure (original approach)
+    // Build dynamic headers based on actual data keys
     const headers = ['Timestamp'];
+    const dataKeyOrder: string[] = [];
+    
+    // Collect all unique data keys in the order they appear
     this.ctx.data.forEach((series) => {
       const seriesName = series.dataKey.label || series.dataKey.name;
-      headers.push(seriesName);
+      if (!dataKeyOrder.includes(seriesName)) {
+        dataKeyOrder.push(seriesName);
+        headers.push(seriesName);
+      }
     });
     
-    // Collect all data points by timestamp
-    const timestampMap = new Map<number, any>();
+    // Group points by timestamp
+    const timestampMap = new Map<number, Record<string, number>>();
+    
     this.ctx.data.forEach((series) => {
       if (series.data) {
         series.data.forEach((point) => {
@@ -845,7 +921,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           }
           
           const seriesName = series.dataKey.label || series.dataKey.name;
-          timestampMap.get(timestamp)[seriesName] = value;
+          timestampMap.get(timestamp)![seriesName] = value;
         });
       }
     });
@@ -853,22 +929,21 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Sort timestamps
     const sortedTimestamps = Array.from(timestampMap.keys()).sort((a, b) => a - b);
     
-    // Create data rows (original approach)
-    const dataRows = [];
+    // Create data rows with consistent formatting
+    const dataRows: any[] = [];
     sortedTimestamps.forEach((timestamp) => {
-      const row = [new Date(timestamp).toISOString()];
-      const dataPoint = timestampMap.get(timestamp);
+      const dataPoint = timestampMap.get(timestamp)!;
+      const row: any[] = [this.formatLocalTimestamp(timestamp)];
       
-      this.ctx.data.forEach((series) => {
-        const seriesName = series.dataKey.label || series.dataKey.name;
-        const value = dataPoint[seriesName];
-        
-        if (value !== undefined) {
-          const decimals = series.dataKey.decimals || this.ctx.decimals || 2;
-          row.push(value.toFixed(decimals));
-        } else {
-          row.push('');
-        }
+      // Add values in the same order as headers
+      dataKeyOrder.forEach((key) => {
+        const value = dataPoint[key];
+        const series = this.ctx.data.find(s => 
+          (s.dataKey.label || s.dataKey.name) === key
+        );
+        // Use exportDecimals setting for all export formats (default 6 to match ThingsBoard)
+        const decimals = this.ctx.settings?.exportDecimals ?? series?.dataKey?.decimals ?? this.ctx.decimals ?? 6;
+        row.push(this.formatNum(value, decimals));
       });
       
       dataRows.push(row);
@@ -923,7 +998,29 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
     } else if (format === 'xlsx') {
       // Export as modern Excel with binary format matching ThingsBoard
-      const worksheet_data = [headers, ...dataRows];
+      // Create numeric data for XLSX (not formatted strings)
+      const xlsxDataRows: any[] = [];
+      sortedTimestamps.forEach((timestamp) => {
+        const dataPoint = timestampMap.get(timestamp)!;
+        const row: any[] = [this.formatLocalTimestamp(timestamp)];
+        
+        // Add numeric values (not formatted strings) for XLSX
+        dataKeyOrder.forEach((key) => {
+          const value = dataPoint[key];
+          // Convert to number for XLSX, keep as number (not string)
+          const numValue = Number(value);
+          if (isFinite(numValue)) {
+            // Store as actual number, Excel will handle display
+            row.push(numValue);
+          } else {
+            row.push(''); // Empty cell for non-numeric values
+          }
+        });
+        
+        xlsxDataRows.push(row);
+      });
+      
+      const worksheet_data = [headers, ...xlsxDataRows];
       const worksheet = XLSX.utils.aoa_to_sheet(worksheet_data);
       
       // Apply header styling (bold, background color)
@@ -939,14 +1036,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         }
       }
       
-      // Apply number formatting to data cells
-      for (let row = 1; row <= dataRows.length; row++) {
+      // Apply General number format to data cells (no fixed decimals)
+      // This allows Excel to display numbers without trailing zeros
+      for (let row = 1; row <= xlsxDataRows.length; row++) {
         for (let col = 1; col < headers.length; col++) { // Skip timestamp column
           const cellRef = XLSX.utils.encode_cell({ r: row, c: col });
-          if (worksheet[cellRef] && worksheet[cellRef].v !== '') {
-            // Apply number format for numeric values
+          if (worksheet[cellRef] && typeof worksheet[cellRef].v === 'number') {
+            // Use General format to let Excel handle trailing zeros
             worksheet[cellRef].t = 'n'; // Set type to number
-            worksheet[cellRef].z = '0.000000'; // Number format with 6 decimals
+            // Don't set .z format - let Excel use General format which removes trailing zeros
           }
         }
       }
@@ -955,10 +1053,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const columnWidths = headers.map((header, index) => {
         // Find max width for this column
         let maxWidth = header.length;
-        dataRows.forEach(row => {
+        xlsxDataRows.forEach(row => {
           const cellValue = row[index];
-          if (cellValue && cellValue.toString().length > maxWidth) {
-            maxWidth = cellValue.toString().length;
+          if (cellValue !== undefined && cellValue !== null) {
+            const strLength = cellValue.toString().length;
+            if (strLength > maxWidth) {
+              maxWidth = strLength;
+            }
           }
         });
         // Add some padding and set min/max bounds like ThingsBoard

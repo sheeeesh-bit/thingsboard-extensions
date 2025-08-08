@@ -202,6 +202,30 @@
       </div>
     </mat-expansion-panel>
 
+    <!-- Export Settings -->
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>Export Settings</mat-panel-title>
+      </mat-expansion-panel-header>
+      
+      <div fxLayout="column" fxLayoutGap="16px">
+        <mat-form-field class="mat-block" appearance="outline">
+          <mat-label>Export Decimal Places</mat-label>
+          <input matInput type="number" min="0" max="10" formControlName="exportDecimals">
+          <mat-hint>Number of decimal places for exported data in CSV, XLS, and XLSX files</mat-hint>
+        </mat-form-field>
+        
+        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px;">
+          <p style="margin: 8px 0;"><strong>Note:</strong> This setting controls the precision of numeric values in all exported files.</p>
+          <ul style="margin: 4px 0; padding-left: 20px;">
+            <li>Default: 6 decimal places (matches ThingsBoard standard)</li>
+            <li>Trailing zeros are automatically removed</li>
+            <li>Applies to CSV, XLS, and XLSX formats</li>
+          </ul>
+        </div>
+      </div>
+    </mat-expansion-panel>
+
     <!-- Debug Settings -->
     <mat-expansion-panel>
       <mat-expansion-panel-header>

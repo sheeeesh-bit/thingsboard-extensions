@@ -159,9 +159,16 @@ When working with this codebase, these linting issues commonly appear:
 5. **Unused variables in catch**: Use `catch {` instead of `catch(error) {`
 
 #### Export Functionality
-- CSV export filename: "Hello_Thomas.csv"
-- Excel exports include proper metadata and formatting
+- Dynamic filenames: `<sensor-label>_YYYY-MM-DD_HH-mm-ss-SSS.<ext>`
+- Fetches sensor label from SERVER_SCOPE attributes
+- Falls back to entity name if label unavailable
 - Three export formats supported: CSV, XLS, XLSX
+- Excel exports include proper metadata and formatting
+- CSV exports use semicolon separator to match ThingsBoard
+- **Export Decimal Places Setting**: 
+  - All formats (CSV, XLS, XLSX) use `ctx.settings.exportDecimals` (default: 6)
+  - Falls back to series-specific decimals, then `ctx.decimals` if not set
+  - Trailing zeros are automatically removed (e.g., 22.393000 → 22.393, 5.000 → 5)
 
 ## Important Development Notes
 
@@ -187,13 +194,81 @@ When working with this codebase, these linting issues commonly appear:
   }, 50);
   ```
 
+## Critical ThingsBoard Integration
+
+### Widget Bridge Communication
+The Angular component MUST expose itself to ThingsBoard's widget.js bridge:
+
+```typescript
+ngAfterViewInit(): void {
+  setTimeout(() => {
+    this.initChart();
+    this.setupResizeObserver();
+    
+    // CRITICAL: Expose component to ThingsBoard's widget.js bridge
+    if (this.ctx.$scope) {
+      this.ctx.$scope.echartsLineChartComponent = this;
+      
+      // Flush any pending updates from widget.js
+      if (typeof this.ctx.$scope.componentReady === 'function') {
+        this.ctx.$scope.componentReady();
+      }
+    }
+  }, 100);
+}
+```
+
+### Data Update Guards
+ALWAYS check for real data before updating the chart:
+
+```typescript
+public onDataUpdated(): void {
+  // Check if we have real data with actual points
+  const totalDataPoints = this.ctx.data.reduce((sum, series) => 
+    sum + (series.data?.length || 0), 0);
+  
+  if (totalDataPoints === 0) {
+    // Keep showing loading spinner
+    this.chart.showLoading({ text: 'Waiting for data...' });
+    return;
+  }
+  
+  // Process data update...
+}
+```
+
+### State Change Detection
+Subscribe to dashboard state changes to handle navigation:
+
+```typescript
+private subscribeToStateChanges(): void {
+  if (this.ctx.stateController) {
+    this.stateChangeSubscription = this.ctx.stateController
+      .stateChanged()
+      .subscribe(() => this.handleStateChange());
+  }
+  
+  // Fallback: Poll for state changes
+  const stateCheckInterval = setInterval(() => {
+    const newStateId = this.ctx.stateController?.getStateId();
+    if (newStateId !== lastStateId) {
+      this.handleStateChange();
+    }
+  }, 1000);
+}
+```
+
 ## Testing Checklist
 When making changes, verify:
-1. ✅ DataZoom is visible and not cut off at bottom
-2. ✅ Chart height fits within widget bounds
-3. ✅ Data points are clearly visible (2.5x base size)
-4. ✅ Font sizes scale correctly with container size
-5. ✅ Multiple grids display correctly without overlap
-6. ✅ Export functions work (CSV, XLS, XLSX)
-7. ✅ Legend selection/deselection works properly
-8. ✅ Resize behavior maintains proportions
+1. ✅ Chart renders immediately without legend interaction
+2. ✅ Data persists across dashboard state changes
+3. ✅ Empty data doesn't block subsequent updates
+4. ✅ DataZoom is visible and not cut off at bottom
+5. ✅ Chart height fits within widget bounds
+6. ✅ Data points are clearly visible (2.5x base size)
+7. ✅ Font sizes scale correctly with container size
+8. ✅ Multiple grids display correctly without overlap
+9. ✅ Export functions work with dynamic filenames
+10. ✅ Legend selection/deselection works properly
+11. ✅ Resize behavior maintains proportions
+12. ✅ Loading spinner shows when waiting for data

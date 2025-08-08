@@ -27,6 +27,9 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   showDataPoints?: boolean;
   symbolSize_data?: number;
   
+  // Export Settings
+  exportDecimals?: number;
+  
   // Pan and Zoom
   showPanZoomTool?: boolean;
   
@@ -86,6 +89,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       yAxisRightColorChoser: '#F44336',
       showDataPoints: false,
       symbolSize_data: 5,
+      exportDecimals: 6,
       showPanZoomTool: true,
       grid_layout_right: 40,
       grid_layout_left: 130,
@@ -118,6 +122,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       yAxisRightColorChoser: [settings.yAxisRightColorChoser || '#F44336'],
       showDataPoints: [settings.showDataPoints],
       symbolSize_data: [settings.symbolSize_data || 5],
+      exportDecimals: [settings.exportDecimals || 6],
       showPanZoomTool: [settings.showPanZoomTool !== false],
       grid_layout_right: [settings.grid_layout_right || 40],
       grid_layout_left: [settings.grid_layout_left || 130],
