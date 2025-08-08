@@ -185,8 +185,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('Chart instance exists:', !!this.chart);
     this.LOG('Data series count:', this.ctx.data?.length || 0);
     
-    if (!this.chart || !this.ctx.data) {
-      this.LOG('ERROR: Missing chart instance or data');
+    if (!this.ctx.data) {
+      this.LOG('ERROR: No data available');
+      return;
+    }
+    
+    // If chart is not initialized yet, just return
+    // The data will be loaded when the chart initializes in ngAfterViewInit
+    if (!this.chart) {
+      this.LOG('Chart not initialized yet, will load data after initialization');
       return;
     }
 
@@ -247,9 +254,22 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     myNewOptions.grid = this.currentGridArray();
     myNewOptions.dataZoom = this.getDataZoomConfig(); // Update datazoom based on current grid config
     
+    // Update legend configuration with current size settings
+    myNewOptions.legend = {
+      type: "scroll",
+      textStyle: {
+        color: this.ctx.settings.legendcolortext || '#000000',
+        fontWeight: this.currentConfig.option.legend.textStyle.fontWeight,
+        fontSize: this.currentConfig.option.legend.textStyle.fontSize
+      },
+      itemWidth: this.currentConfig.option.legend.itemWidth,
+      itemHeight: this.currentConfig.option.legend.itemHeight,
+      itemGap: this.currentConfig.option.legend.itemGap
+    };
+    
     this.LOG("myNewOptions:", myNewOptions);
     
-    // Initialize the chart
+    // Initialize the chart with series data
     this.chart.setOption(myNewOptions);
     
     if (this.resetGrid) {
@@ -323,6 +343,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     this.setTimeFormatter();
     this.initChartAndGrid();
+    
+    // Immediately load data if available
+    if (this.ctx.data && this.ctx.data.length > 0) {
+      this.LOG('[ECharts Line Chart] Loading initial data after chart grid setup');
+      this.onDataUpdated();
+    }
   }
 
   private initChartAndGrid(): void {
