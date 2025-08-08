@@ -21,6 +21,8 @@ import {
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import * as XLSX from 'xlsx';
+import { Observable, of } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 
 // Register required components
 echarts.use([
@@ -647,6 +649,86 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('[HEIGHT DEBUG] ResizeObserver attached to chart container');
   }
 
+  /**
+   * Fetch the sensor's "label" attribute from SERVER_SCOPE
+   */
+  private getSensorLabel(): Observable<string> {
+    if (!this.ctx.datasources || this.ctx.datasources.length === 0) {
+      this.LOG('No datasources available, using default label');
+      return of('sensor');
+    }
+    
+    // Get the first datasource entity
+    const datasource = this.ctx.datasources[0];
+    if (!datasource || !datasource.entity) {
+      this.LOG('No entity in datasource, using default label');
+      return of('sensor');
+    }
+    
+    const entity = {
+      entityType: datasource.entityType,
+      id: datasource.entityId
+    };
+    
+    this.LOG('Fetching label for entity:', entity);
+    
+    // Check if attributeService is available
+    if (!this.ctx.attributeService) {
+      this.LOG('AttributeService not available, using entity name');
+      return of(datasource.entityName || 'sensor');
+    }
+    
+    return this.ctx.attributeService
+      .getEntityAttributes(entity, 'SERVER_SCOPE', ['label'])
+      .pipe(
+        map(attrs => {
+          const attr = attrs.find((a: any) => a.key === 'label');
+          const label = attr ? String(attr.value) : (datasource.entityName || 'sensor');
+          this.LOG('Retrieved label:', label);
+          return label.replace(/[^a-zA-Z0-9-_]/g, '_'); // Sanitize for filename
+        }),
+        catchError(error => {
+          this.LOG('Error fetching label:', error);
+          return of(datasource.entityName || 'sensor');
+        })
+      );
+  }
+
+  /**
+   * Build a filename: "<label>_YYYY-MM-DDThh-mm-ss-SSSZ.<ext>"
+   */
+  private makeFilename(ext: string): Observable<string> {
+    return this.getSensorLabel().pipe(
+      map(label => {
+        // e.g. 2025-01-08T14-23-45-123Z
+        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `${label}_${ts}.${ext}`;
+        this.LOG('Generated filename:', filename);
+        return filename;
+      })
+    );
+  }
+
+  /**
+   * Download helper that uses the dynamic filename
+   */
+  private downloadFileWithDynamicName(blob: Blob, ext: string): void {
+    this.makeFilename(ext).subscribe(filename => {
+      const link = document.createElement('a');
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        this.LOG(`Downloaded file: ${filename}`);
+      }
+    });
+  }
+
   private downloadChartImage(): void {
     const img = new Image();
     img.src = this.chart.getDataURL({
@@ -655,12 +737,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       backgroundColor: '#fff'
     });
 
-    const link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'chart-image.png';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Use dynamic filename for image
+    this.makeFilename('png').subscribe(filename => {
+      const link = document.createElement('a');
+      link.href = img.src;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      this.LOG(`Downloaded chart image: ${filename}`);
+    });
   }
 
   private exportDataToCsv(): void {
@@ -724,23 +810,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       csvContent += row.join(',') + '\n';
     });
     
-    // Create blob and download
+    // Create blob and download with dynamic filename
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const filename = 'Hello_Thomas.csv';
+    this.downloadFileWithDynamicName(blob, 'csv');
     
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', filename);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }
-    
-    this.LOG('[Chart Widget] CSV export completed with filename:', filename);
+    this.LOG('[Chart Widget] CSV export initiated');
   }
 
   public exportData(format: 'csv' | 'xls' | 'xlsx'): void {
@@ -800,8 +874,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       dataRows.push(row);
     });
     
-    const filename = 'Hello_Thomas';
-    
     if (format === 'csv') {
       // Export as CSV with semicolon separator (ThingsBoard format)
       let csvContent = headers.join(';') + '\n';
@@ -810,11 +882,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       });
       
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      this.downloadFile(blob, `${filename}.csv`);
+      this.downloadFileWithDynamicName(blob, 'csv');
       
     } else if (format === 'xls') {
       // Export as HTML table with Excel markup (ThingsBoard style)
-      const sheetName = filename.replace(/[^a-zA-Z0-9_]/g, '_');
+      const sheetName = 'ChartData'; // Use generic name for sheet
       
       let htmlContent = '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
                        'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
@@ -838,7 +910,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // Add data rows
       dataRows.forEach(row => {
         htmlContent += '<tr>\n';
-        row.forEach(cell => {
+        row.forEach((cell: any) => {
           htmlContent += `                <td>${cell}</td>`;
         });
         htmlContent += '\n            </tr>';
@@ -847,7 +919,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       htmlContent += '</table></body></html>';
       
       const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel' });
-      this.downloadFile(blob, `${filename}.xls`);
+      this.downloadFileWithDynamicName(blob, 'xls');
       
     } else if (format === 'xlsx') {
       // Export as modern Excel with binary format matching ThingsBoard
@@ -951,25 +1023,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const blob = new Blob([excelBuffer], { 
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
       });
-      this.downloadFile(blob, `${filename}.xlsx`);
+      this.downloadFileWithDynamicName(blob, 'xlsx');
     }
     
-    this.LOG(`[Chart Widget] Export completed: ${filename}.${format}`);
+    this.LOG(`[Chart Widget] Export initiated for format: ${format}`);
   }
   
-  private downloadFile(blob: Blob, filename: string): void {
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', filename);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }
-  }
 
   private overrideCsvExport(): void {
     // Monitor for dynamic saveAs calls
