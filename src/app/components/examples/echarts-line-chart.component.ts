@@ -66,6 +66,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   private chart: echarts.ECharts;
   private resizeObserver: ResizeObserver;
+  private stateChangeSubscription: any;
   
   // ThingsBoard example properties
   private DEBUG = true;
@@ -149,6 +150,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('- currentGridNames:', this.currentGridNames);
     this.LOG('- maxGrids:', this.maxGrids);
     this.LOG('- currentGrids:', this.currentGrids);
+    
+    // Subscribe to ThingsBoard state changes
+    this.subscribeToStateChanges();
+    
     this.LOG(`=== CHART VERSION ${this.CHART_VERSION} INITIALIZATION END ===`);
   }
 
@@ -167,6 +172,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   ngOnDestroy(): void {
+    // Clean up state subscriptions
+    if (this.stateChangeSubscription) {
+      this.stateChangeSubscription.unsubscribe();
+    }
+    
+    // Clean up state check interval if it exists
+    if ((this as any).stateCheckInterval) {
+      clearInterval((this as any).stateCheckInterval);
+    }
+    
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
     }
@@ -272,6 +287,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Initialize the chart with series data
     this.chart.setOption(myNewOptions);
     
+    // Hide the loading spinner after data is rendered
+    this.chart.hideLoading();
+    
     if (this.resetGrid) {
       // Workaround for grid update
       const myTemp = this.chart.getOption() as any;
@@ -341,6 +359,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.chart = echarts.init(containerElement);
     this.LOG('[ECharts Line Chart] Chart instance created:', !!this.chart);
     
+    // Show loading spinner immediately
+    this.chart.showLoading({
+      text: 'Loading...',
+      color: '#1976d2',  // ThingsBoard primary blue
+      textColor: '#000',
+      maskColor: 'rgba(255, 255, 255, 0.8)',
+      zlevel: 0,
+      fontSize: 14,
+      showSpinner: true,
+      spinnerRadius: 10,
+      lineWidth: 2
+    });
+    
     this.setTimeFormatter();
     this.initChartAndGrid();
     
@@ -348,6 +379,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     if (this.ctx.data && this.ctx.data.length > 0) {
       this.LOG('[ECharts Line Chart] Loading initial data after chart grid setup');
       this.onDataUpdated();
+    } else {
+      // No data yet - keep showing loading until data arrives
+      this.LOG('[ECharts Line Chart] No data available yet, keeping loading spinner');
     }
   }
 
@@ -424,6 +458,127 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
   }
 
+  private subscribeToStateChanges(): void {
+    this.LOG('[ECharts Line Chart] Setting up state change detection');
+    
+    // Method 1: Subscribe to dashboard state controller changes
+    if (this.ctx.stateController) {
+      this.LOG('[State Detection] StateController found, subscribing to state changes');
+      
+      try {
+        // Subscribe to state change events using the correct method
+        this.stateChangeSubscription = this.ctx.stateController.stateChanged().subscribe(() => {
+          this.LOG('[State Detection] Dashboard state changed, refreshing chart');
+          this.handleStateChange();
+        });
+      } catch (error) {
+        this.LOG('[State Detection] Error subscribing to state changes:', error);
+      }
+    }
+    
+    // Method 2: Store initial state and check periodically for changes
+    // This is a fallback method when other APIs aren't available
+    let lastStateId: string | null = null;
+    if (this.ctx.stateController) {
+      try {
+        const currentState = this.ctx.stateController.getStateId();
+        lastStateId = currentState;
+        
+        // Check periodically for state changes
+        const stateCheckInterval = setInterval(() => {
+          if (!this.ctx || !this.ctx.stateController) {
+            clearInterval(stateCheckInterval);
+            return;
+          }
+          
+          const newStateId = this.ctx.stateController.getStateId();
+          if (newStateId !== lastStateId) {
+            this.LOG('[State Detection] State ID changed from', lastStateId, 'to', newStateId);
+            lastStateId = newStateId;
+            this.handleStateChange();
+          }
+        }, 1000); // Check every second
+        
+        // Store interval ID for cleanup
+        (this as any).stateCheckInterval = stateCheckInterval;
+      } catch (error) {
+        this.LOG('[State Detection] Error setting up state polling:', error);
+      }
+    }
+    
+    // Method 3: Subscribe to widget lifecycle events if $scope.$on is available
+    if (this.ctx.$scope && this.ctx.$scope.$on) {
+      this.LOG('[State Detection] Checking for scope event listeners');
+      
+      try {
+        // Only set up listeners if $on is actually a function
+        if (typeof this.ctx.$scope.$on === 'function') {
+          // Watch for data source changes
+          this.ctx.$scope.$on('widgetConfigUpdated', () => {
+            this.LOG('[State Detection] Widget config updated, refreshing chart');
+            this.handleStateChange();
+          });
+          
+          // Listen for dashboard state updates
+          this.ctx.$scope.$on('dashboardPageChanged', () => {
+            this.LOG('[State Detection] Dashboard page changed, refreshing chart');
+            setTimeout(() => this.handleStateChange(), 300);
+          });
+          
+          // Listen for mobile/desktop view changes
+          this.ctx.$scope.$on('mobileModeChanged', () => {
+            this.LOG('[State Detection] Mobile mode changed, refreshing chart');
+            setTimeout(() => this.handleStateChange(), 300);
+          });
+        }
+      } catch (error) {
+        this.LOG('[State Detection] Error setting up scope listeners:', error);
+      }
+    }
+  }
+  
+  private handleStateChange(): void {
+    this.LOG('[State Change Handler] Processing state change');
+    
+    // Only refresh if chart is initialized
+    if (!this.chart) {
+      this.LOG('[State Change Handler] Chart not initialized, skipping refresh');
+      return;
+    }
+    
+    // Use setTimeout to ensure DOM is ready after state change
+    setTimeout(() => {
+      this.LOG('[State Change Handler] Refreshing chart after state change');
+      
+      // Force resize to recalculate dimensions
+      if (this.chart) {
+        this.chart.resize();
+      }
+      
+      // Update data if available
+      if (this.ctx.data && this.ctx.data.length > 0) {
+        this.onDataUpdated();
+      } else {
+        this.LOG('[State Change Handler] No data available, showing loading');
+        this.chart.showLoading({
+          text: 'Loading...',
+          color: '#1976d2',
+          textColor: '#000',
+          maskColor: 'rgba(255, 255, 255, 0.8)',
+          fontSize: 14,
+          showSpinner: true,
+          spinnerRadius: 10,
+          lineWidth: 2
+        });
+      }
+      
+      // Trigger Angular change detection
+      if (this.ctx.detectChanges) {
+        this.ctx.detectChanges();
+      }
+    }, 200);
+  }
+  
   private setupResizeObserver(): void {
     this.LOG('[HEIGHT DEBUG] Setting up ResizeObserver');
     this.resizeObserver = new ResizeObserver((entries) => {
@@ -798,6 +953,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   private resetChartCompletely(keepGrids = false): void {
     this.chart.clear();
+    
+    // Show loading during reset
+    this.chart.showLoading({
+      text: 'Resetting...',
+      color: '#1976d2',
+      textColor: '#000',
+      maskColor: 'rgba(255, 255, 255, 0.8)',
+      fontSize: 14,
+      showSpinner: true,
+      spinnerRadius: 10,
+      lineWidth: 2
+    });
+    
     if (!keepGrids) {
       this.currentGrids = this.maxGrids;
     }
