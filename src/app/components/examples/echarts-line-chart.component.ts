@@ -998,20 +998,28 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
     } else if (format === 'xlsx') {
       // Export as modern Excel with binary format matching ThingsBoard
-      // Create numeric data for XLSX (not formatted strings)
+      // Create numeric data for XLSX with proper decimal precision
       const xlsxDataRows: any[] = [];
       sortedTimestamps.forEach((timestamp) => {
         const dataPoint = timestampMap.get(timestamp)!;
         const row: any[] = [this.formatLocalTimestamp(timestamp)];
         
-        // Add numeric values (not formatted strings) for XLSX
+        // Add numeric values with proper decimal precision for XLSX
         dataKeyOrder.forEach((key) => {
           const value = dataPoint[key];
-          // Convert to number for XLSX, keep as number (not string)
+          const series = this.ctx.data.find(s => 
+            (s.dataKey.label || s.dataKey.name) === key
+          );
+          // Use exportDecimals setting for XLSX too
+          const decimals = this.ctx.settings?.exportDecimals ?? series?.dataKey?.decimals ?? this.ctx.decimals ?? 6;
+          
+          // Convert to number and round to specified decimals
           const numValue = Number(value);
           if (isFinite(numValue)) {
-            // Store as actual number, Excel will handle display
-            row.push(numValue);
+            // Round to specified decimals and store as number
+            // parseFloat removes trailing zeros from toFixed
+            const roundedValue = parseFloat(numValue.toFixed(decimals));
+            row.push(roundedValue);
           } else {
             row.push(''); // Empty cell for non-numeric values
           }
