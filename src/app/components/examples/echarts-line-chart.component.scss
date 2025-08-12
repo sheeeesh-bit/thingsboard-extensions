@@ -3,7 +3,8 @@
   min-width: 400px; 
   /* Removed min-height to allow dynamic height scaling */
   overflow-x: auto;
-  overflow-y: auto;
+  /* overflow-y handled dynamically in TypeScript based on subplot count */
+  position: relative;
 }
 
 .container {
@@ -111,10 +112,9 @@ div[fxFlex] {
 
 #echartContainer {
   min-width: 600px;
-  /* Removed min-height to allow dynamic height scaling */
-
+  /* Height set dynamically in TypeScript */
   width: 100%;
-  height: 100%;
-  overflow: scroll;
-  scrollbar-gutter: stable both-edges;
+  /* Remove individual scrolling - handled by parent container */
+  overflow: hidden;
+  position: relative;
 }

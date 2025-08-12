@@ -43,6 +43,10 @@ const AXIS_POSITION_NAMES = {
   TOP: "Top",
   MIDDLE: "Middle",
   BOTTOM: "Bottom",
+  PLOT4: "Plot4",
+  PLOT5: "Plot5",
+  PLOT6: "Plot6",
+  PLOT7: "Plot7"
 };
 
 const SIZE_NAMES = {
@@ -51,10 +55,22 @@ const SIZE_NAMES = {
   HUGE: "huge",
 };
 
-const axisPositionMap = {
+// Standard 3-subplot mapping (original)
+const axisPositionMapStandard = {
   Top: 0,
   Middle: 1,
   Bottom: 2
+};
+
+// Extended 7-subplot mapping (multiple devices mode)
+const axisPositionMapExtended = {
+  Top: 0,
+  Middle: 1,
+  Bottom: 2,
+  Plot4: 3,
+  Plot5: 4,
+  Plot6: 5,
+  Plot7: 6
 };
 
 @Component({
@@ -83,6 +99,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private currentGridNames: string[] = [];
   private resetGrid = false;
   private usedFormatter: any;
+  private legendOverridesGrids = false;
+  private lastDataLengths: number[] = [];
   
   // Time formatters
   private zoomTimeWithSeconds = 60 * 60 * 1000;       // 1 day
@@ -93,7 +111,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private browserLocale = Intl.DateTimeFormat().resolvedOptions().timeZone.startsWith('Europe/') ? "en-GB" : navigator.language || (navigator as any).userLanguage;
   private datePipe: DatePipe;
   
+  // Helper method to get the correct axis position map
+  private getAxisPositionMap(): any {
+    return this.ctx.settings?.multipleDevices ? axisPositionMapExtended : axisPositionMapStandard;
+  }
+  
+  // Helper method to get max allowed grids
+  private getMaxAllowedGrids(): number {
+    return this.ctx.settings?.multipleDevices ? 7 : 3;
+  }
+
   ngOnInit(): void {
+    this.LOG(this.ctx);
     this.LOG(`=== CHART VERSION ${this.CHART_VERSION} INITIALIZATION START ===`);
     this.LOG('Component initialized');
     this.LOG('Widget context:', this.ctx);
@@ -108,6 +137,32 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Log data series details
     this.LOG('=== DATA SERIES ANALYSIS ===');
     this.LOG('Total data series:', this.ctx.data?.length || 0);
+    
+    // Log first few series for debugging
+    if (this.ctx.data && this.ctx.data.length > 0) {
+      this.LOG('First 5 data series structure:');
+      for (let i = 0; i < Math.min(5, this.ctx.data.length); i++) {
+        this.LOG(`Series[${i}]:`, {
+          dataKey: this.ctx.data[i].dataKey,
+          dataLength: this.ctx.data[i].data?.length || 0,
+          firstDataPoint: this.ctx.data[i].data?.[0]
+        });
+      }
+    }
+    
+    // Log datasources information
+    this.LOG('=== DATASOURCES INFO ===');
+    this.LOG('Total datasources:', this.ctx.datasources?.length || 0);
+    if (this.ctx.datasources) {
+      this.ctx.datasources.forEach((ds, idx) => {
+        this.LOG(`Datasource[${idx}]:`, {
+          entityName: ds.entityName,
+          entityType: ds.entityType,
+          name: ds.name,
+          dataKeysCount: ds.dataKeys?.length || 0
+        });
+      });
+    }
     
     if (this.ctx.data && this.ctx.data.length > 0) {
       this.ctx.data.forEach((item: any, index: number) => {
@@ -145,6 +200,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Count grids by settings
     this.LOG('=== GRID CALCULATION ===');
+    const axisPositionMap = this.getAxisPositionMap();
     this.LOG('axisPositionMap:', axisPositionMap);
     this.setGrids = this.countGridsBySettings(Object.keys(axisPositionMap));
     this.LOG('setGrids (unique axis assignments):', Array.from(this.setGrids));
@@ -225,6 +281,30 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG(`=== DATA UPDATE (v${this.CHART_VERSION}) ===`);
     this.LOG('Chart instance exists:', !!this.chart);
     this.LOG('Data series count:', this.ctx.data?.length || 0);
+    this.LOG('Legend overrides active:', this.legendOverridesGrids);
+    
+    // Clear legend override if this is fresh data from ThingsBoard
+    const hasNewData = this.ctx.data?.some((series, idx) => 
+      series.data?.length !== this.lastDataLengths?.[idx]
+    );
+    
+    if (hasNewData) {
+      this.LOG('New data detected, clearing legend override');
+      this.legendOverridesGrids = false;
+      this.lastDataLengths = this.ctx.data?.map(s => s.data?.length || 0) || [];
+    }
+    
+    // Debug: Log detailed data structure
+    if (this.ctx.data) {
+      this.ctx.data.forEach((series, idx) => {
+        this.LOG(`Series[${idx}]:`, {
+          label: series.dataKey?.label,
+          dataLength: series.data?.length || 0,
+          firstDataPoint: series.data?.[0],
+          axisAssignment: series.dataKey?.settings?.axisAssignment
+        });
+      });
+    }
     
     if (!this.ctx.data || this.ctx.data.length === 0) {
       this.LOG('ERROR: No data available');
@@ -264,6 +344,34 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
     this.currentConfig = this.isContainerHeight();
     
+    // Only recalculate grids from data if legend is not overriding
+    if (!this.legendOverridesGrids) {
+      this.LOG('=== RECALCULATING GRID CONFIGURATION FROM DATA ===');
+      const axisPositionMap = this.getAxisPositionMap();
+      this.LOG('axisPositionMap:', axisPositionMap);
+      
+      const previousGridCount = this.currentGrids;
+      this.setGrids = this.countGridsBySettings(Object.keys(axisPositionMap));
+      this.LOG('Updated setGrids (unique axis assignments):', Array.from(this.setGrids));
+      
+      this.currentGridNames = Array.from(this.setGrids);
+      this.maxGrids = this.setGrids.size;
+      this.currentGrids = this.maxGrids;
+      
+      this.LOG('GRID RESULTS FROM DATA:');
+      this.LOG('- currentGridNames:', this.currentGridNames);
+      this.LOG('- maxGrids:', this.maxGrids);
+      this.LOG('- currentGrids:', this.currentGrids);
+      
+      if (previousGridCount !== this.currentGrids) {
+        this.LOG(`Grid count changed from ${previousGridCount} to ${this.currentGrids}`);
+        this.resetGrid = true;
+      }
+    } else {
+      this.LOG('Using legend-selected grids:', this.currentGridNames);
+      this.LOG('Current grid count:', this.currentGrids);
+    }
+    
     const myNewOptions: any = {};
     myNewOptions.series = [];
     
@@ -274,19 +382,26 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       currentGridNames: this.currentGridNames
     });
     
-    // Process each data series
+    // Build dynamic axis map based on current grids
+    const dynamicAxisMap = this.getDynamicAxisIndexMap();
+    
+    // Process each data series - create ALL series regardless of legend selection
     for (let i = 0; i < this.ctx.data.length; i++) {
       // Default to 'Top' if axisAssignment is not set
       const axisAssignment = this.ctx.data[i].dataKey?.settings?.axisAssignment || 'Top';
-      const gridIndex = axisPositionMap[axisAssignment];
-      const actualXAxisIndex = gridIndex > (this.currentGrids - 1) ? (this.currentGrids - 1) : gridIndex;
-      const actualYAxisIndex = gridIndex > (this.currentGrids - 1) ? (this.currentGrids - 1) : gridIndex;
+      
+      // Use dynamic map to get grid index, default to 0 if not in active grids
+      let gridIndex = dynamicAxisMap[axisAssignment];
+      
+      // If assignment not in current grids, use grid 0 (series will be hidden by legend selection)
+      if (gridIndex === undefined) {
+        this.LOG(`Series[${i}] "${this.ctx.data[i].dataKey.label}" with assignment "${axisAssignment}" not in active grids, assigning to grid 0`);
+        gridIndex = 0;
+      }
       
       this.LOG(`Series[${i}] "${this.ctx.data[i].dataKey.label}":`, {
-        axisAssignment: axisAssignment || 'UNDEFINED',
-        mappedGridIndex: gridIndex !== undefined ? gridIndex : 'UNDEFINED',
-        actualXAxisIndex: actualXAxisIndex,
-        actualYAxisIndex: actualYAxisIndex,
+        axisAssignment: axisAssignment,
+        dynamicGridIndex: gridIndex,
         dataPoints: this.ctx.data[i].data?.length || 0
       });
       
@@ -303,8 +418,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             : this.currentConfig.seriesElement.lineStyle.width
         },
         type: 'line',
-        xAxisIndex: actualXAxisIndex,
-        yAxisIndex: actualYAxisIndex,
+        xAxisIndex: gridIndex,
+        yAxisIndex: gridIndex,
         data: this.ctx.data[i].data,
         symbol: (this.ctx.settings.showDataPoints) ? 'circle' : 'none',
         symbolSize: (this.ctx.settings.symbolSize_data || 5) * 2.5, // Increase size by 2.5x to match original
@@ -319,9 +434,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     myNewOptions.grid = this.currentGridArray();
     myNewOptions.dataZoom = this.getDataZoomConfig(); // Update datazoom based on current grid config
     
-    // Update legend configuration with current size settings
+    // Update legend configuration with preserved state
+    const legendState = this.getLegendState();
+    
     myNewOptions.legend = {
       type: "scroll",
+      data: legendState.data,          // Keep all series items
+      selected: legendState.selected,  // Preserve selection state
       textStyle: {
         color: this.ctx.settings.legendcolortext || '#000000',
         fontWeight: this.currentConfig.option.legend.textStyle.fontWeight,
@@ -334,25 +453,32 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     this.LOG("myNewOptions:", myNewOptions);
     
-    // Initialize the chart with series data
-    this.chart.setOption(myNewOptions);
+    // Apply options with proper merge strategy
+    const needsFullReset = this.resetGrid || this.legendOverridesGrids;
+    
+    if (needsFullReset) {
+      this.LOG('Applying full reset with notMerge and replaceMerge');
+      // Complete reset to avoid stale axis state
+      this.chart.setOption(myNewOptions, {
+        notMerge: true,
+        replaceMerge: ['grid', 'xAxis', 'yAxis', 'series', 'dataZoom']
+      });
+      this.resetGrid = false;
+    } else {
+      // Normal update for data changes only
+      this.chart.setOption(myNewOptions);
+    }
     
     // Hide the loading spinner after data is rendered
     this.chart.hideLoading();
     
-    if (this.resetGrid) {
-      // Workaround for grid update
-      const myTemp = this.chart.getOption() as any;
-      this.LOG("Reseting GRID:", myTemp);
-      myTemp.xAxis[this.currentGrids - 1].show = true;
-      myTemp.xAxis[this.currentGrids - 1].splitLine.show = true;
-      
-      const tempUnits = this.getGridUnitsByData();
-      for(let i = 0; i < myTemp.yAxis.length; i++){
-        myTemp.yAxis[i].axisLabel.formatter = ('{value} ' + tempUnits[i]) || '';
-      }
-      this.chart.setOption(myTemp);
-      this.resetGrid = false;
+    // Force resize after grid changes
+    if (needsFullReset) {
+      setTimeout(() => {
+        if (this.chart && !this.chart.isDisposed()) {
+          this.chart.resize();
+        }
+      }, 100);
     }
   }
 
@@ -367,8 +493,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     if (containerElement && this.ctx.height) {
       const buttonBarHeight = 50; // Button container takes about 50px
       const availableHeight = this.ctx.height - buttonBarHeight;
-      containerElement.style.height = `${availableHeight}px`;
-      this.LOG(`[HEIGHT DEBUG] Resized chart container to ${availableHeight}px`);
+      
+      // Apply same scrolling logic as in initChart
+      if (this.maxGrids > 3) {
+        container.style.overflowY = 'auto';
+        container.style.maxHeight = `${availableHeight}px`;
+        const scrollHeight = availableHeight * (this.maxGrids / 3);
+        containerElement.style.height = `${scrollHeight}px`;
+        this.LOG(`[HEIGHT DEBUG] Resized scrollable: ${this.maxGrids} subplots, scroll height: ${scrollHeight}px`);
+      } else {
+        containerElement.style.height = `${availableHeight}px`;
+        container.style.overflowY = 'hidden';
+        this.LOG(`[HEIGHT DEBUG] Resized normal: ${availableHeight}px`);
+      }
     }
     
     if (this.chart) {
@@ -401,9 +538,23 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     if (this.ctx.height) {
       const buttonBarHeight = 50; // Button container takes about 50px
       const availableHeight = this.ctx.height - buttonBarHeight;
+      
+      // Always use the available height, grids will be sized accordingly
       containerElement.style.height = `${availableHeight}px`;
       containerElement.style.width = '100%';
-      this.LOG(`[HEIGHT DEBUG] Set chart container height to ${availableHeight}px (ctx.height: ${this.ctx.height} - buttonBar: ${buttonBarHeight})`);
+      
+      // Enable scrolling for more than 3 subplots
+      if (this.maxGrids > 3) {
+        container.style.overflowY = 'auto';
+        container.style.maxHeight = `${availableHeight}px`;
+        // Make the inner container taller to accommodate all grids
+        const scrollHeight = availableHeight * (this.maxGrids / 3);
+        containerElement.style.height = `${scrollHeight}px`;
+        this.LOG(`[HEIGHT DEBUG] Scrollable mode: ${this.maxGrids} subplots, scroll height: ${scrollHeight}px`);
+      } else {
+        container.style.overflowY = 'hidden';
+        this.LOG(`[HEIGHT DEBUG] Normal mode: ${this.maxGrids} subplots, height: ${availableHeight}px`);
+      }
     }
     
     this.chart = echarts.init(containerElement);
@@ -477,14 +628,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const selected = event.selected;
     const selectedKeys = Object.keys(selected).filter(key => selected[key]);
     
-    this.LOG("selected:", selected);
-    this.LOG("selectedKeys:", selectedKeys);
+    this.LOG("Legend selection changed:", selected);
+    this.LOG("Active series:", selectedKeys);
     
     // Ensure at least one entry is selected
     if (selectedKeys.length === 0) {
       const lastSelected = event.name;
       const updatedSelected = { ...selected, [lastSelected]: true };
       
+      // Just update the selection state, don't rebuild
       this.chart.setOption({
         legend: {
           selected: updatedSelected
@@ -492,10 +644,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       });
       return;
     }
-
+    
+    // Persist the selection state (legend items stay visible but grayed out)
+    this.chart.setOption({
+      legend: {
+        selected: selected
+      }
+    });
+    
+    // Check if we need to update grids based on active selection
     if (!this.checkDataGridByName(selectedKeys).has(AXIS_POSITION_NAMES['TOP'])) {
-      const lastSelected = event.name;
-      const updatedSelected = { ...selected, [lastSelected]: true };
+      // Must have at least Top grid, revert selection
+      const updatedSelected = { ...selected, [event.name]: true };
       
       this.chart.setOption({
         legend: {
@@ -505,13 +665,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
     
+    // Set flag to indicate legend is overriding grid calculation
+    this.legendOverridesGrids = true;
+    
     const oldGridNr = this.currentGrids;
     this.setDataGridByNames(selectedKeys);
     
     if (oldGridNr != this.currentGrids) {
-      this.LOG("Different Grid number --> RESET CHART!!!!");
+      this.LOG("Grid count changed from", oldGridNr, "to", this.currentGrids);
       this.resetGrid = true;
-      this.onResize();
+      
+      // Trigger update to rebuild grids
+      this.onDataUpdated();
     }
   }
 
@@ -657,17 +822,21 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   /**
    * Fetch the sensor's "label" attribute from SERVER_SCOPE
    */
-  private getSensorLabel(): Observable<string> {
+  /**
+   * Fetch both label and deviceName attributes for export filename
+   * Returns format: "label[deviceName]" or appropriate fallback
+   */
+  private getExportMetadata(): Observable<string> {
     if (!this.ctx.datasources || this.ctx.datasources.length === 0) {
       this.LOG('No datasources available, using default label');
-      return of('sensor');
+      return of('sensor[unknown]');
     }
     
     // Get the first datasource entity
     const datasource = this.ctx.datasources[0];
     if (!datasource || !datasource.entity) {
       this.LOG('No entity in datasource, using default label');
-      return of('sensor');
+      return of('sensor[unknown]');
     }
     
     const entity = {
@@ -675,28 +844,44 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       id: datasource.entityId
     };
     
-    this.LOG('Fetching label for entity:', entity);
+    this.LOG('Fetching label and deviceName for entity:', entity);
     
     // Check if attributeService is available
     if (!this.ctx.attributeService) {
       this.LOG('AttributeService not available, using entity name');
-      return of(datasource.entityName || 'sensor');
+      const entityName = datasource.entityName || 'sensor';
+      return of(`${entityName}[unknown]`);
     }
     
     return this.ctx.attributeService
-      .getEntityAttributes(entity, 'SERVER_SCOPE' as any, ['label'])
+      .getEntityAttributes(entity, 'SERVER_SCOPE' as any, ['label', 'deviceName'])
       .pipe(
         map(attrs => {
-          const attr = attrs.find((a: any) => a.key === 'label');
-          const label = attr ? String(attr.value) : (datasource.entityName || 'sensor');
-          this.LOG('Retrieved label:', label);
-          return label.replace(/[^a-zA-Z0-9-_]/g, '_'); // Sanitize for filename
+          // Find label and deviceName attributes
+          const labelAttr = attrs.find((a: any) => a.key === 'label');
+          const deviceNameAttr = attrs.find((a: any) => a.key === 'deviceName');
+          
+          // Extract values with fallbacks
+          const label = labelAttr ? String(labelAttr.value) : (datasource.entityName || 'sensor');
+          const deviceName = deviceNameAttr ? String(deviceNameAttr.value) : (datasource.name || 'unknown');
+          
+          this.LOG('Retrieved label:', label, 'deviceName:', deviceName);
+          
+          // Format as "label[deviceName]" and sanitize for filename
+          const combined = `${label}[${deviceName}]`;
+          return combined.replace(/[^a-zA-Z0-9-_[\]]/g, '_'); // Sanitize but keep brackets
         }),
         catchError(error => {
-          this.LOG('Error fetching label:', error);
-          return of(datasource.entityName || 'sensor');
+          this.LOG('Error fetching attributes:', error);
+          const entityName = datasource.entityName || 'sensor';
+          return of(`${entityName}[unknown]`);
         })
       );
+  }
+  
+  // Keep the old method for backward compatibility, redirecting to new one
+  private getSensorLabel(): Observable<string> {
+    return this.getExportMetadata();
   }
 
   /**
@@ -748,11 +933,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   /**
-   * Build a filename: "<label>_YYYY-MM-DDThh-mm-ss-SSSZ.<ext>"
+   * Build a filename: "label[deviceName]_YYYY-MM-DD_HH-mm-ss-SSS.<ext>"
+   * Example: "Temperature_Sensor[Device_01]_2025-01-08_14-30-45-123.csv"
    */
   private makeFilename(ext: string): Observable<string> {
     return this.getSensorLabel().pipe(
-      map(label => {
+      map(labelWithDevice => {
         // Use local time for filename to match export content
         const now = new Date();
         const year = now.getFullYear();
@@ -763,9 +949,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         const seconds = String(now.getSeconds()).padStart(2, '0');
         const ms = String(now.getMilliseconds()).padStart(3, '0');
         
-        // Format: label_YYYY-MM-DD_HH-mm-ss-SSS.ext
+        // Format: label[deviceName]_YYYY-MM-DD_HH-mm-ss-SSS.ext
         const ts = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}-${ms}`;
-        const filename = `${label}_${ts}.${ext}`;
+        const filename = `${labelWithDevice}_${ts}.${ext}`;
         this.LOG('Generated filename:', filename);
         return filename;
       })
@@ -1241,20 +1427,72 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('currentGridArray called with currentGrids:', this.currentGrids, 'currentSize:', this.currentSize);
     let gridArray = [];
     
+    // Use predefined configurations where available, or calculate dynamically for > 7 grids
+    const gridConfigs = this.gridConfig();
+    
     switch(this.currentGrids) {
       case 1:
-        gridArray = this.gridConfig().singleGrid[this.currentSize].map(entry => ({ ...entry }));
+        gridArray = gridConfigs.singleGrid[this.currentSize].map((entry: any) => ({ ...entry }));
         break;
       case 2:
-        gridArray = this.gridConfig().doubleGrid[this.currentSize].map(entry => ({ ...entry }));
+        gridArray = gridConfigs.doubleGrid[this.currentSize].map((entry: any) => ({ ...entry }));
         break;
       case 3:
-        gridArray = this.gridConfig().tripleGrid[this.currentSize].map(entry => ({ ...entry }));
+        gridArray = gridConfigs.tripleGrid[this.currentSize].map((entry: any) => ({ ...entry }));
+        break;
+      case 4:
+        gridArray = gridConfigs.quadGrid[this.currentSize].map((entry: any) => ({ ...entry }));
+        break;
+      case 5:
+        gridArray = gridConfigs.quintGrid[this.currentSize].map((entry: any) => ({ ...entry }));
+        break;
+      case 6:
+        gridArray = gridConfigs.hexGrid[this.currentSize].map((entry: any) => ({ ...entry }));
+        break;
+      case 7:
+        gridArray = gridConfigs.septGrid[this.currentSize].map((entry: any) => ({ ...entry }));
+        break;
+      default:
+        // For more than 7 grids, calculate dynamically
+        if (this.currentGrids > 7) {
+          gridArray = this.calculateScrollableGrids(this.currentGrids);
+        }
         break;
     }
     
     this.LOG('Grid array configuration:', gridArray);
     return gridArray;
+  }
+  
+  private calculateScrollableGrids(numGrids: number): any[] {
+    const grids = [];
+    const leftMargin = this.currentSize === 'small' ? '12%' : '10%';
+    const rightMargin = '1%';
+    
+    // Reserve space for legend at top and datazoom at bottom
+    const topReserved = 8; // % for legend
+    const bottomReserved = 10; // % for datazoom
+    const availableHeight = 100 - topReserved - bottomReserved; // 82% available
+    
+    // Calculate height for each grid
+    const gridHeight = (availableHeight / numGrids) * 0.85; // 85% of allocated space
+    const gapBetweenGrids = (availableHeight / numGrids) * 0.15; // 15% for gaps
+    
+    for (let i = 0; i < numGrids; i++) {
+      const topPosition = topReserved + (i * (gridHeight + gapBetweenGrids));
+      const grid: any = {
+        id: i === 0 ? 'main' : `sub${i}`,
+        top: `${topPosition}%`,
+        left: leftMargin,
+        right: rightMargin,
+        height: `${gridHeight}%`
+      };
+      
+      grids.push(grid);
+    }
+    
+    this.LOG('Calculated scrollable grids:', grids);
+    return grids;
   }
 
   private currentXAxisArray(): any[] {
@@ -1303,43 +1541,40 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       max: this.ctx.timeWindow.maxTime,
     });
     
-    if (this.maxGrids > 1) {
+    // Add X axes for additional grids - all visible but without labels
+    for (let i = 1; i < this.currentGrids; i++) {
+      const isLast = i === this.currentGrids - 1;
+      
       myXAxisArray.push({
         type: 'time',
-        gridIndex: 1,
-        show: false
-      });
-    }
-    if (this.maxGrids > 2) {
-      myXAxisArray.push({
-        type: 'time',
-        gridIndex: 2,
-        show: false
-      });
-    }
-    
-    if (this.currentGrids > 1) {
-      myXAxisArray[1] = {...myXAxisArray[0]};
-      myXAxisArray[1].gridIndex = 1;
-    }
-    if (this.currentGrids > 2) {
-      myXAxisArray[2] = {
-        type: 'time',
-        show: true,
-        gridIndex: 2,
-        axisTick: { alignWithLabel: true },
+        gridIndex: i,
+        show: true, // IMPORTANT: Always show axis
         splitLine: {
-          show: true,
+          show: true, // IMPORTANT: Always show split lines
           lineStyle: {
-            width: this.currentConfig.option.xAxis.splitLine.lineStyle.width
+            width: this.currentConfig.option.xAxis.splitLine?.lineStyle?.width || this.currentConfig.option.yAxis.splitLine.lineStyle.width,
+            color: '#e0e0e0',
+            type: 'solid'
           }
         },
-        axisLabel: { show: false },
-        axisLine: { onZero: false },
-        position: 'top',
+        axisLine: { 
+          onZero: false,
+          show: true,
+          lineStyle: {
+            color: '#999'
+          }
+        },
+        axisTick: { 
+          show: true,
+          alignWithLabel: true 
+        },
+        position: isLast ? 'top' : 'bottom',
+        axisLabel: {
+          show: false // Hide labels on all non-first grids
+        },
         min: this.ctx.timeWindow.minTime,
         max: this.ctx.timeWindow.maxTime,
-      };
+      });
     }
     return myXAxisArray;
   }
@@ -1371,31 +1606,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       gridIndex: 0,
     });
     
-    if (this.maxGrids > 1) {
+    // Add Y axes for all grids
+    for (let i = 1; i < this.currentGrids; i++) {
       myYAxisArray.push({
         type: 'value',
-        gridIndex: 1,
-        show: false
-      });
-    }
-    if (this.maxGrids > 2) {
-      myYAxisArray.push({
-        type: 'value',
-        gridIndex: 2,
-        show: false
-      });
-    }
-    
-    if (this.currentGrids > 1) {
-      myYAxisArray[1] = {
-        type: 'value',
-        scale: true,
         show: true,
+        scale: true,
         splitNumber: this.currentConfig.option.yAxis.splitNumber,
         alignTicks: true,
-        name: this.ctx.settings.yAxisRightTitle || '',
+        name: i === 1 ? (this.ctx.settings.yAxisRightTitle || '') : '',
         axisLabel: {
-          formatter: '{value} ' + (tempUnits[1] || ''),
+          formatter: '{value} ' + (tempUnits[i] || ''),
           fontSize: this.currentConfig.option.yAxis.axisLabel.fontSize,
           fontWeight: this.currentConfig.option.yAxis.axisLabel.fontWeight,
           show: true,
@@ -1407,32 +1628,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             width: this.currentConfig.option.yAxis.splitLine.lineStyle.width
           }
         },
-        gridIndex: 1
-      };
-    }
-    if (this.currentGrids > 2) {
-      myYAxisArray[2] = {
-        type: 'value',
-        show: true,
-        scale: true,
-        splitNumber: this.currentConfig.option.yAxis.splitNumber,
-        alignTicks: true,
-        name: this.ctx.settings.yAxisRightTitle || '',
-        axisLabel: {
-          formatter: '{value} ' + (tempUnits[2] || ""),
-          fontSize: this.currentConfig.option.yAxis.axisLabel.fontSize,
-          fontWeight: this.currentConfig.option.yAxis.axisLabel.fontWeight,
-          show: true,
-          showMaxLabel: true,
-        },
-        splitLine: {
-          show: true,
-          lineStyle: {
-            width: this.currentConfig.option.yAxis.splitLine.lineStyle.width
-          }
-        },
-        gridIndex: 2
-      };
+        gridIndex: i
+      });
     }
     return myYAxisArray;
   }
@@ -1445,19 +1642,31 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     });
     this.LOG("matchedValues:", matchedValues);
     
+    const axisPositionMap = this.getAxisPositionMap();
     const uniqueMatches = new Set(matchedValues.filter(item => item && Object.prototype.hasOwnProperty.call(axisPositionMap, item)));
     this.LOG("uniqueMatches:", uniqueMatches, ", len:", uniqueMatches.size);
     return uniqueMatches;
   }
 
   private setDataGridByNames(selectedKeys: string[]): void {
-    this.currentGridNames = Array.from(this.checkDataGridByName(selectedKeys));
-    this.currentGrids = this.currentGridNames.length;
-    this.LOG("setDataGridByNames:", this.currentGrids, " -> ", this.currentGridNames);
+    this.LOG('setDataGridByNames called with:', selectedKeys);
+    
+    // Get unique axis assignments from selected series
+    const selectedGrids = this.checkDataGridByName(selectedKeys);
+    
+    // Update current grid configuration
+    this.currentGridNames = Array.from(selectedGrids);
+    this.currentGrids = selectedGrids.size;
+    
+    this.LOG('Updated grid configuration from legend:');
+    this.LOG('- currentGridNames:', this.currentGridNames);
+    this.LOG('- currentGrids:', this.currentGrids);
   }
 
   private countGridsBySettings(selectedKeys: string[]): Set<string> {
     this.LOG('countGridsBySettings called with keys:', selectedKeys);
+    
+    const axisPositionMap = this.getAxisPositionMap();
     
     // Collect all unique axisAssignment values from the data
     const axisAssignments = this.ctx.data
@@ -1475,6 +1684,50 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('Unique assignments:', Array.from(uniqueAssignments));
     
     return uniqueAssignments;
+  }
+  
+  private getDynamicAxisIndexMap(): Record<string, number> {
+    // If no grids are set, fall back to standard map
+    if (!this.currentGridNames || this.currentGridNames.length === 0) {
+      return this.getAxisPositionMap();
+    }
+    
+    // Build dynamic map based on currently active grids
+    const dynamicMap: Record<string, number> = {};
+    this.currentGridNames.forEach((gridName, index) => {
+      dynamicMap[gridName] = index;
+    });
+    
+    this.LOG('Dynamic axis index map:', dynamicMap);
+    return dynamicMap;
+  }
+  
+  private getLegendState(): { data: string[]; selected: Record<string, boolean> } {
+    // Get all series labels from data
+    const data = (this.ctx.data || [])
+      .map(s => s?.dataKey?.label)
+      .filter(Boolean);
+    
+    // Try to preserve existing legend selection state
+    let selected: Record<string, boolean> = {};
+    try {
+      const opt: any = this.chart?.getOption?.();
+      if (opt?.legend && opt.legend[0]?.selected) {
+        selected = { ...opt.legend[0].selected };
+      }
+    } catch (e) {
+      this.LOG('Could not retrieve existing legend state:', e);
+    }
+    
+    // Default new series to ON if not in existing selection
+    for (const name of data) {
+      if (!(name in selected)) {
+        selected[name] = true;
+      }
+    }
+    
+    this.LOG('Legend state:', { data, selected });
+    return { data, selected };
   }
 
   private getGridUnitsByData(): string[] {
@@ -1520,9 +1773,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private getInitConfig(): any {
+    // Get legend state to preserve selection
+    const legendState = this.getLegendState();
+    
     return {
       legend: {
         type: "scroll",
+        data: legendState.data,          // Include all series items
+        selected: legendState.selected,  // Set initial selection state
         textStyle: {
           color: this.ctx.settings.legendcolortext || '#000000',
           fontWeight: this.currentConfig.option.legend.textStyle.fontWeight,
@@ -1539,7 +1797,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           },
           borderColor: '#fff',
           borderWidth: 1,
-          formatter: (params) => {
+          formatter: (params: any) => {
             return `Click "${params.name}" to hide or show data.`;
           }
         }
@@ -1613,13 +1871,21 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private getDataZoomConfig(): any[] {
-    // DataZoom always at 92% as in original
+    // For scrollable layouts with more than 3 grids, adjust datazoom position
+    let dataZoomTop = '92%';
+    
+    if (this.currentGrids > 3) {
+      // When we have scrollable content, position datazoom at the bottom of visible area
+      // This keeps it visible without needing to scroll
+      dataZoomTop = '92%';
+    }
+    
     return [
       {
         show: true,
         xAxisIndex: 'all',
         type: 'slider',
-        top: '92%',
+        top: dataZoomTop,
         start: 0,
         end: 100
       },
@@ -1798,6 +2064,104 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             "bottom": "10%",
             "height": "20%"
           }
+        ]
+      },
+      "quadGrid": {
+        "small": [
+          { "id": "main", "top": "3%", "left": "12%", "right": "1%", "height": "15%" },
+          { "id": "sub1", "top": "25%", "left": "12%", "right": "1%", "height": "15%" },
+          { "id": "sub2", "top": "47%", "left": "12%", "right": "1%", "height": "15%" },
+          { "id": "sub3", "top": "69%", "left": "12%", "right": "1%", "height": "15%" }
+        ],
+        "large": [
+          { "id": "main", "top": "3%", "left": "10%", "right": "1%", "height": "17%" },
+          { "id": "sub1", "top": "25%", "left": "10%", "right": "1%", "height": "17%" },
+          { "id": "sub2", "top": "47%", "left": "10%", "right": "1%", "height": "17%" },
+          { "id": "sub3", "top": "69%", "left": "10%", "right": "1%", "bottom": "2%", "height": "17%" }
+        ],
+        "huge": [
+          { "id": "main", "top": "3%", "left": "10%", "right": "1%", "height": "18%" },
+          { "id": "sub1", "top": "24%", "left": "10%", "right": "1%", "height": "18%" },
+          { "id": "sub2", "top": "45%", "left": "10%", "right": "1%", "height": "18%" },
+          { "id": "sub3", "top": "66%", "left": "10%", "right": "1%", "bottom": "10%", "height": "18%" }
+        ]
+      },
+      "quintGrid": {
+        "small": [
+          { "id": "main", "top": "2%", "left": "12%", "right": "1%", "height": "12%" },
+          { "id": "sub1", "top": "19%", "left": "12%", "right": "1%", "height": "12%" },
+          { "id": "sub2", "top": "36%", "left": "12%", "right": "1%", "height": "12%" },
+          { "id": "sub3", "top": "53%", "left": "12%", "right": "1%", "height": "12%" },
+          { "id": "sub4", "top": "70%", "left": "12%", "right": "1%", "height": "12%" }
+        ],
+        "large": [
+          { "id": "main", "top": "2%", "left": "10%", "right": "1%", "height": "14%" },
+          { "id": "sub1", "top": "19%", "left": "10%", "right": "1%", "height": "14%" },
+          { "id": "sub2", "top": "36%", "left": "10%", "right": "1%", "height": "14%" },
+          { "id": "sub3", "top": "53%", "left": "10%", "right": "1%", "height": "14%" },
+          { "id": "sub4", "top": "70%", "left": "10%", "right": "1%", "bottom": "2%", "height": "14%" }
+        ],
+        "huge": [
+          { "id": "main", "top": "2%", "left": "10%", "right": "1%", "height": "15%" },
+          { "id": "sub1", "top": "19%", "left": "10%", "right": "1%", "height": "15%" },
+          { "id": "sub2", "top": "36%", "left": "10%", "right": "1%", "height": "15%" },
+          { "id": "sub3", "top": "53%", "left": "10%", "right": "1%", "height": "15%" },
+          { "id": "sub4", "top": "70%", "left": "10%", "right": "1%", "bottom": "10%", "height": "15%" }
+        ]
+      },
+      "hexGrid": {
+        "small": [
+          { "id": "main", "top": "2%", "left": "12%", "right": "1%", "height": "10%" },
+          { "id": "sub1", "top": "16%", "left": "12%", "right": "1%", "height": "10%" },
+          { "id": "sub2", "top": "30%", "left": "12%", "right": "1%", "height": "10%" },
+          { "id": "sub3", "top": "44%", "left": "12%", "right": "1%", "height": "10%" },
+          { "id": "sub4", "top": "58%", "left": "12%", "right": "1%", "height": "10%" },
+          { "id": "sub5", "top": "72%", "left": "12%", "right": "1%", "height": "10%" }
+        ],
+        "large": [
+          { "id": "main", "top": "2%", "left": "10%", "right": "1%", "height": "12%" },
+          { "id": "sub1", "top": "16%", "left": "10%", "right": "1%", "height": "12%" },
+          { "id": "sub2", "top": "30%", "left": "10%", "right": "1%", "height": "12%" },
+          { "id": "sub3", "top": "44%", "left": "10%", "right": "1%", "height": "12%" },
+          { "id": "sub4", "top": "58%", "left": "10%", "right": "1%", "height": "12%" },
+          { "id": "sub5", "top": "72%", "left": "10%", "right": "1%", "bottom": "2%", "height": "12%" }
+        ],
+        "huge": [
+          { "id": "main", "top": "2%", "left": "10%", "right": "1%", "height": "13%" },
+          { "id": "sub1", "top": "16%", "left": "10%", "right": "1%", "height": "13%" },
+          { "id": "sub2", "top": "30%", "left": "10%", "right": "1%", "height": "13%" },
+          { "id": "sub3", "top": "44%", "left": "10%", "right": "1%", "height": "13%" },
+          { "id": "sub4", "top": "58%", "left": "10%", "right": "1%", "height": "13%" },
+          { "id": "sub5", "top": "72%", "left": "10%", "right": "1%", "bottom": "10%", "height": "13%" }
+        ]
+      },
+      "septGrid": {
+        "small": [
+          { "id": "main", "top": "2%", "left": "12%", "right": "1%", "height": "9%" },
+          { "id": "sub1", "top": "14%", "left": "12%", "right": "1%", "height": "9%" },
+          { "id": "sub2", "top": "26%", "left": "12%", "right": "1%", "height": "9%" },
+          { "id": "sub3", "top": "38%", "left": "12%", "right": "1%", "height": "9%" },
+          { "id": "sub4", "top": "50%", "left": "12%", "right": "1%", "height": "9%" },
+          { "id": "sub5", "top": "62%", "left": "12%", "right": "1%", "height": "9%" },
+          { "id": "sub6", "top": "74%", "left": "12%", "right": "1%", "height": "9%" }
+        ],
+        "large": [
+          { "id": "main", "top": "2%", "left": "10%", "right": "1%", "height": "10%" },
+          { "id": "sub1", "top": "14%", "left": "10%", "right": "1%", "height": "10%" },
+          { "id": "sub2", "top": "26%", "left": "10%", "right": "1%", "height": "10%" },
+          { "id": "sub3", "top": "38%", "left": "10%", "right": "1%", "height": "10%" },
+          { "id": "sub4", "top": "50%", "left": "10%", "right": "1%", "height": "10%" },
+          { "id": "sub5", "top": "62%", "left": "10%", "right": "1%", "height": "10%" },
+          { "id": "sub6", "top": "74%", "left": "10%", "right": "1%", "bottom": "2%", "height": "10%" }
+        ],
+        "huge": [
+          { "id": "main", "top": "2%", "left": "10%", "right": "1%", "height": "11%" },
+          { "id": "sub1", "top": "14%", "left": "10%", "right": "1%", "height": "11%" },
+          { "id": "sub2", "top": "26%", "left": "10%", "right": "1%", "height": "11%" },
+          { "id": "sub3", "top": "38%", "left": "10%", "right": "1%", "height": "11%" },
+          { "id": "sub4", "top": "50%", "left": "10%", "right": "1%", "height": "11%" },
+          { "id": "sub5", "top": "62%", "left": "10%", "right": "1%", "height": "11%" },
+          { "id": "sub6", "top": "74%", "left": "10%", "right": "1%", "bottom": "10%", "height": "11%" }
         ]
       }
     };

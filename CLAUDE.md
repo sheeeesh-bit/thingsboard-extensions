@@ -159,9 +159,13 @@ When working with this codebase, these linting issues commonly appear:
 5. **Unused variables in catch**: Use `catch {` instead of `catch(error) {`
 
 #### Export Functionality
-- Dynamic filenames: `<sensor-label>_YYYY-MM-DD_HH-mm-ss-SSS.<ext>`
-- Fetches sensor label from SERVER_SCOPE attributes
-- Falls back to entity name if label unavailable
+- Dynamic filenames: `label[deviceName]_YYYY-MM-DD_HH-mm-ss-SSS.<ext>`
+- Example: `Temperature_Sensor[Device_01]_2025-01-08_14-30-45-123.csv`
+- Fetches both `label` and `deviceName` from SERVER_SCOPE attributes
+- Fallback strategies:
+  - Both missing: `entityName[unknown]`
+  - Only label missing: `sensor[deviceName]`
+  - Only deviceName missing: `label[unknown]`
 - Three export formats supported: CSV, XLS, XLSX
 - Excel exports include proper metadata and formatting
 - CSV exports use semicolon separator to match ThingsBoard

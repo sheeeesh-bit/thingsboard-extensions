@@ -30,6 +30,9 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   // Export Settings
   exportDecimals?: number;
   
+  // Multiple Devices Mode
+  multipleDevices?: boolean;
+  
   // Pan and Zoom
   showPanZoomTool?: boolean;
   
@@ -90,6 +93,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       showDataPoints: false,
       symbolSize_data: 5,
       exportDecimals: 6,
+      multipleDevices: false,
       showPanZoomTool: true,
       grid_layout_right: 40,
       grid_layout_left: 130,
@@ -123,6 +127,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       showDataPoints: [settings.showDataPoints],
       symbolSize_data: [settings.symbolSize_data || 5],
       exportDecimals: [settings.exportDecimals || 6],
+      multipleDevices: [settings.multipleDevices || false],
       showPanZoomTool: [settings.showPanZoomTool !== false],
       grid_layout_right: [settings.grid_layout_right || 40],
       grid_layout_left: [settings.grid_layout_left || 130],
