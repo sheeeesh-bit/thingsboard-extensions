@@ -86,6 +86,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private chart: echarts.ECharts;
   private resizeObserver: ResizeObserver;
   private stateChangeSubscription: any;
+  private resizeDebounceTimer: any;
   
   // ThingsBoard example properties
   private DEBUG = true;
@@ -252,6 +253,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     if (this.ctx.$scope && this.ctx.$scope.echartsLineChartComponent === this) {
       this.LOG('[ECharts Line Chart] Removing component from ThingsBoard scope');
       delete this.ctx.$scope.echartsLineChartComponent;
+    }
+    
+    // Clean up resize debounce timer
+    if (this.resizeDebounceTimer) {
+      clearTimeout(this.resizeDebounceTimer);
     }
     
     // Clean up state subscriptions
@@ -486,41 +492,59 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG("ONRESIZE!!!");
     this.LOG(`[HEIGHT DEBUG] onResize triggered - ctx.height: ${this.ctx.height}, ctx.width: ${this.ctx.width}`);
     
-    // Update chart container height, not the outer container
+    // Debounce resize to prevent thrashing
+    if (this.resizeDebounceTimer) {
+      clearTimeout(this.resizeDebounceTimer);
+    }
+    
+    this.resizeDebounceTimer = setTimeout(() => {
+      // Apply correct scroll height based on current active grids
+      this.applyScrollableHeight();
+      
+      if (this.chart) {
+        this.LOG(`[HEIGHT DEBUG] Calling chart.resize()`);
+        this.chart.resize();
+      }
+      
+      const oldSize = this.currentSize;
+      this.currentConfig = this.isContainerHeight();
+      
+      if (oldSize !== this.currentSize) {
+        this.LOG(`[HEIGHT DEBUG] Size changed from ${oldSize} to ${this.currentSize} - updating chart`);
+      }
+      
+      this.onDataUpdated();
+    }, 50); // 50ms debounce
+  }
+
+  /**
+   * Helper method to apply correct scroll height based on current active grids
+   */
+  private applyScrollableHeight(): void {
     const container = this.chartContainer.nativeElement;
     const containerElement = container.querySelector('#echartContainer') as HTMLElement;
     
-    if (containerElement && this.ctx.height) {
-      const buttonBarHeight = 50; // Button container takes about 50px
-      const availableHeight = this.ctx.height - buttonBarHeight;
-      
-      // Apply same scrolling logic as in initChart
-      if (this.maxGrids > 3) {
-        container.style.overflowY = 'auto';
-        container.style.maxHeight = `${availableHeight}px`;
-        const scrollHeight = availableHeight * (this.maxGrids / 3);
-        containerElement.style.height = `${scrollHeight}px`;
-        this.LOG(`[HEIGHT DEBUG] Resized scrollable: ${this.maxGrids} subplots, scroll height: ${scrollHeight}px`);
-      } else {
-        containerElement.style.height = `${availableHeight}px`;
-        container.style.overflowY = 'hidden';
-        this.LOG(`[HEIGHT DEBUG] Resized normal: ${availableHeight}px`);
-      }
+    if (!containerElement || !this.ctx.height) {
+      return;
     }
     
-    if (this.chart) {
-      this.LOG(`[HEIGHT DEBUG] Calling chart.resize()`);
-      this.chart.resize();
+    const buttonBarHeight = 50; // Button container takes about 50px
+    const availableHeight = this.ctx.height - buttonBarHeight;
+    
+    // Use currentGrids (active grids) instead of maxGrids (historical max)
+    if (this.currentGrids > 3) {
+      container.style.overflowY = 'auto';
+      container.style.maxHeight = `${availableHeight}px`;
+      // Calculate scroll height based on CURRENT active grids, not max
+      const scrollHeight = availableHeight * (this.currentGrids / 3);
+      containerElement.style.height = `${scrollHeight}px`;
+      this.LOG(`[HEIGHT DEBUG] Applied scrollable height for ${this.currentGrids} active grids: ${scrollHeight}px`);
+    } else {
+      container.style.overflowY = 'hidden';
+      container.style.maxHeight = '';
+      containerElement.style.height = `${availableHeight}px`;
+      this.LOG(`[HEIGHT DEBUG] Applied normal height for ${this.currentGrids} grids: ${availableHeight}px`);
     }
-    
-    const oldSize = this.currentSize;
-    this.currentConfig = this.isContainerHeight();
-    
-    if (oldSize !== this.currentSize) {
-      this.LOG(`[HEIGHT DEBUG] Size changed from ${oldSize} to ${this.currentSize} - updating chart`);
-    }
-    
-    this.onDataUpdated();
   }
 
   private initChart(): void {
@@ -536,25 +560,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Set height for chart container to account for button bar
     if (this.ctx.height) {
-      const buttonBarHeight = 50; // Button container takes about 50px
-      const availableHeight = this.ctx.height - buttonBarHeight;
-      
-      // Always use the available height, grids will be sized accordingly
-      containerElement.style.height = `${availableHeight}px`;
       containerElement.style.width = '100%';
       
-      // Enable scrolling for more than 3 subplots
-      if (this.maxGrids > 3) {
-        container.style.overflowY = 'auto';
-        container.style.maxHeight = `${availableHeight}px`;
-        // Make the inner container taller to accommodate all grids
-        const scrollHeight = availableHeight * (this.maxGrids / 3);
-        containerElement.style.height = `${scrollHeight}px`;
-        this.LOG(`[HEIGHT DEBUG] Scrollable mode: ${this.maxGrids} subplots, scroll height: ${scrollHeight}px`);
-      } else {
-        container.style.overflowY = 'hidden';
-        this.LOG(`[HEIGHT DEBUG] Normal mode: ${this.maxGrids} subplots, height: ${availableHeight}px`);
-      }
+      // Apply correct scroll height based on current active grids
+      this.applyScrollableHeight();
     }
     
     this.chart = echarts.init(containerElement);
@@ -675,7 +684,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.LOG("Grid count changed from", oldGridNr, "to", this.currentGrids);
       this.resetGrid = true;
       
-      // Trigger update to rebuild grids
+      // Immediately recalculate container height with new grid count
+      this.applyScrollableHeight();
+      
+      // Trigger update to rebuild grids with notMerge
       this.onDataUpdated();
     }
   }
@@ -1427,37 +1439,24 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('currentGridArray called with currentGrids:', this.currentGrids, 'currentSize:', this.currentSize);
     let gridArray = [];
     
-    // Use predefined configurations where available, or calculate dynamically for > 7 grids
-    const gridConfigs = this.gridConfig();
-    
-    switch(this.currentGrids) {
-      case 1:
-        gridArray = gridConfigs.singleGrid[this.currentSize].map((entry: any) => ({ ...entry }));
-        break;
-      case 2:
-        gridArray = gridConfigs.doubleGrid[this.currentSize].map((entry: any) => ({ ...entry }));
-        break;
-      case 3:
-        gridArray = gridConfigs.tripleGrid[this.currentSize].map((entry: any) => ({ ...entry }));
-        break;
-      case 4:
-        gridArray = gridConfigs.quadGrid[this.currentSize].map((entry: any) => ({ ...entry }));
-        break;
-      case 5:
-        gridArray = gridConfigs.quintGrid[this.currentSize].map((entry: any) => ({ ...entry }));
-        break;
-      case 6:
-        gridArray = gridConfigs.hexGrid[this.currentSize].map((entry: any) => ({ ...entry }));
-        break;
-      case 7:
-        gridArray = gridConfigs.septGrid[this.currentSize].map((entry: any) => ({ ...entry }));
-        break;
-      default:
-        // For more than 7 grids, calculate dynamically
-        if (this.currentGrids > 7) {
-          gridArray = this.calculateScrollableGrids(this.currentGrids);
-        }
-        break;
+    // For more than 3 grids, always use dynamic calculation for consistent spacing
+    if (this.currentGrids > 3) {
+      gridArray = this.calculateScrollableGrids(this.currentGrids);
+    } else {
+      // Use predefined configurations only for 1-3 grids
+      const gridConfigs = this.gridConfig();
+      
+      switch(this.currentGrids) {
+        case 1:
+          gridArray = gridConfigs.singleGrid[this.currentSize].map((entry: any) => ({ ...entry }));
+          break;
+        case 2:
+          gridArray = gridConfigs.doubleGrid[this.currentSize].map((entry: any) => ({ ...entry }));
+          break;
+        case 3:
+          gridArray = gridConfigs.tripleGrid[this.currentSize].map((entry: any) => ({ ...entry }));
+          break;
+      }
     }
     
     this.LOG('Grid array configuration:', gridArray);
@@ -1471,8 +1470,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Reserve space for legend at top and datazoom at bottom
     const topReserved = 8; // % for legend
-    const bottomReserved = 10; // % for datazoom
-    const availableHeight = 100 - topReserved - bottomReserved; // 82% available
+    const bottomReserved = 8; // % for datazoom (match with getDataZoomConfig 92%)
+    const availableHeight = 100 - topReserved - bottomReserved; // 84% available
     
     // Calculate height for each grid
     const gridHeight = (availableHeight / numGrids) * 0.85; // 85% of allocated space
