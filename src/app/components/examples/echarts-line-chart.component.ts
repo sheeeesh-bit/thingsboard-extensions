@@ -55,9 +55,14 @@ const SIZE_NAMES = {
   HUGE: "huge",
 };
 
-// DataZoom geometry constants - single source of truth
-const DATAZOOM_HEIGHT_PCT = 2;   // slider bar height in %
-const DATAZOOM_BOTTOM_PCT = 1.8; // extra clearance from bottom edge in %
+// DataZoom geometry constants - fixed pixel dimensions for consistent appearance
+const DATAZOOM_HEIGHT_PX = 28;      // height of the slider track in pixels
+const DATAZOOM_BOTTOM_PX = 40;       // gap between slider and container bottom in pixels
+const GAP_BEFORE_DATAZOOM_PX = 14;   // gap between last plot and slider in pixels
+
+// Grid spacing constants - unified pixel-based spacing
+const GAP_BETWEEN_GRIDS_PX = 74;    // consistent visual gap between stacked plots in pixels
+const GAP_TOP_RESERVED_PCT = 3;     // % reserved for legend at top
 
 // Standard 3-subplot mapping (original)
 const axisPositionMapStandard = {
@@ -569,6 +574,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
       this.LOG(`[HEIGHT DEBUG] Normal: ${this.currentGrids} grids, container: ${availableHeight}px`);
     }
+  }
+
+  // Convert px to % based on the current inner chart height
+  private pxToPct(px: number): number {
+    const el = this.chartContainer?.nativeElement?.querySelector('#echartContainer') as HTMLElement;
+    const h = el?.clientHeight || this.ctx.height || 0;
+    return h ? (px / h) * 100 : 0;
+  }
+
+  // Get the gap between grids as a percentage, converted from pixels
+  private getGapPct(): number {
+    return this.pxToPct(GAP_BETWEEN_GRIDS_PX);
   }
 
   private initChart(): void {
@@ -1463,24 +1480,46 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('currentGridArray called with currentGrids:', this.currentGrids, 'currentSize:', this.currentSize);
     let gridArray = [];
     
-    // For more than 3 grids, always use dynamic calculation for consistent spacing
+    // Use unified calculation for all grid counts to ensure consistent spacing
     if (this.currentGrids > 3) {
+      // For scrollable layouts, use the existing calculation
       gridArray = this.calculateScrollableGrids(this.currentGrids);
     } else {
-      // Use predefined configurations only for 1-3 grids
-      const gridConfigs = this.gridConfig();
+      // For 1-3 grids, use the same unified spacing calculation
+      const grids = [];
+      const leftMargin = this.currentSize === 'small' ? '12%' : '10%';
+      const rightMargin = '1%';
       
-      switch(this.currentGrids) {
-        case 1:
-          gridArray = gridConfigs.singleGrid[this.currentSize].map((entry: any) => ({ ...entry }));
-          break;
-        case 2:
-          gridArray = gridConfigs.doubleGrid[this.currentSize].map((entry: any) => ({ ...entry }));
-          break;
-        case 3:
-          gridArray = gridConfigs.tripleGrid[this.currentSize].map((entry: any) => ({ ...entry }));
-          break;
+      // Use consistent top reserve
+      const topReserved = GAP_TOP_RESERVED_PCT;
+      
+      // Convert total pixel reserve to percentage
+      const totalBottomPixels = DATAZOOM_HEIGHT_PX + DATAZOOM_BOTTOM_PX + GAP_BEFORE_DATAZOOM_PX;
+      const bottomReservedPct = this.pxToPct(totalBottomPixels);
+      
+      // Get unified gap between grids
+      const gapPct = this.getGapPct();
+      
+      // Calculate available height
+      const availableHeight = 100 - topReserved - bottomReservedPct;
+      
+      // Calculate gaps and grid height
+      const totalGaps = this.currentGrids > 1 ? gapPct * (this.currentGrids - 1) : 0;
+      const gridHeight = (availableHeight - totalGaps) / this.currentGrids;
+      
+      // Build grids with consistent spacing
+      for (let i = 0; i < this.currentGrids; i++) {
+        const topPosition = topReserved + i * (gridHeight + gapPct);
+        grids.push({
+          id: i === 0 ? 'main' : `sub${i}`,
+          top: `${topPosition}%`,
+          left: leftMargin,
+          right: rightMargin,
+          height: `${gridHeight}%`
+        });
       }
+      
+      gridArray = grids;
     }
     
     this.LOG('Grid array configuration:', gridArray);
@@ -1492,19 +1531,28 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const leftMargin = this.currentSize === 'small' ? '12%' : '10%';
     const rightMargin = '1%';
     
-    // Reserve space for legend at top and datazoom at bottom
-    const topReserved = 3; // % for legend  
-    const bottomReserved = DATAZOOM_HEIGHT_PCT + DATAZOOM_BOTTOM_PCT; // MUST match dataZoom config
+    // Reserve space for legend at top
+    const topReserved = GAP_TOP_RESERVED_PCT; // Use constant for legend space
+    
+    // Convert pixel reserves to percentages for consistent math
+    const totalBottomPixels = DATAZOOM_HEIGHT_PX + DATAZOOM_BOTTOM_PX + GAP_BEFORE_DATAZOOM_PX;
+    const bottomReserved = this.pxToPct(totalBottomPixels);
+    
+    // Get gap between grids as percentage from pixels
+    const gapPct = this.getGapPct();
+    
+    // Total vertical budget for plots + their gaps
     const availableHeight = 100 - topReserved - bottomReserved;
     
-    // Calculate exact grid height to fill available space
-    // Fixed readable gaps between grids
-    const gapPercent = 2; // Fixed 2% gap between grids
-    const totalGaps = numGrids > 1 ? gapPercent * (numGrids - 1) : 0;
-    const gridHeight = (availableHeight - totalGaps) / numGrids;
+    // Calculate total gaps between plots
+    const gapsBetweenPlots = numGrids > 1 ? gapPct * (numGrids - 1) : 0;
+    
+    // Height each plot can use
+    const gridHeight = (availableHeight - gapsBetweenPlots) / numGrids;
     
     for (let i = 0; i < numGrids; i++) {
-      const topPosition = topReserved + (i * (gridHeight + gapPercent));
+      // Accumulate top by adding plot heights and the inter-plot gaps only
+      const topPosition = topReserved + i * (gridHeight + gapPct);
       const grid: any = {
         id: i === 0 ? 'main' : `sub${i}`,
         top: `${topPosition}%`,
@@ -1896,14 +1944,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private getDataZoomConfig(): any[] {
-    // DataZoom positioned using shared constants to avoid clipping
+    // DataZoom using fixed pixel dimensions for consistent appearance
     return [
       {
         show: true,
         xAxisIndex: 'all',
         type: 'slider',
-        bottom: `${DATAZOOM_BOTTOM_PCT}%`,  // Small offset avoids clipping
-        height: `${DATAZOOM_HEIGHT_PCT}%`,  // Explicit height
+        bottom: DATAZOOM_BOTTOM_PX,         // Fixed pixel gap from bottom
+        height: DATAZOOM_HEIGHT_PX,         // Fixed pixel height
         handleSize: '70%',                  // Slimmer handles help visual fit
         moveHandleSize: 5,
         start: 0,
