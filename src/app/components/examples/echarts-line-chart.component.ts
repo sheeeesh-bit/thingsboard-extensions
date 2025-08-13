@@ -58,10 +58,10 @@ const SIZE_NAMES = {
 // DataZoom geometry constants - fixed pixel dimensions for consistent appearance
 const DATAZOOM_HEIGHT_PX = 28;      // height of the slider track in pixels
 const DATAZOOM_BOTTOM_PX = 40;       // gap between slider and container bottom in pixels
-const GAP_BEFORE_DATAZOOM_PX = 14;   // gap between last plot and slider in pixels
+const GAP_BEFORE_DATAZOOM_PX = 70;   // gap between last plot and slider in pixels
 
 // Grid spacing constants - unified pixel-based spacing
-const GAP_BETWEEN_GRIDS_PX = 74;    // consistent visual gap between stacked plots in pixels
+const GAP_BETWEEN_GRIDS_PX = 70;    // consistent visual gap between stacked plots in pixels
 const GAP_TOP_RESERVED_PCT = 3;     // % reserved for legend at top
 
 // Standard 3-subplot mapping (original)
@@ -1571,6 +1571,31 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private currentXAxisArray(): any[] {
     const myXAxisArray = [];
     
+    // Common formatter function that can be reused for all axes
+    const createAxisFormatter = (isFirstGrid: boolean) => {
+      return (value: any, index: any) => {
+        // Only apply special first label formatting for the first grid
+        const useFirstLabelFormat = isFirstGrid && index === 0;
+        
+        switch (this.usedFormatter.id) {
+          case 'months':
+          case 'days':
+            return useFirstLabelFormat
+              ? this.firstLabelFormatterWithDays().format(value).replace(",", ",\n") 
+              : this.usedFormatter.formatter.format(value).replace(",", ",\n");
+          case 'minutes':
+            return useFirstLabelFormat
+              ? this.firstLabelFormatterWithMinutes().format(value).replace(",", ",\n") 
+              : this.usedFormatter.formatter.format(value).replace(",", ",\n");
+          case 'seconds':
+            return useFirstLabelFormat
+              ? this.firstLabelFormatterWithSeconds().format(value).replace(",", ",\n") 
+              : this.usedFormatter.formatter.format(value).replace(",", ",\n");
+        }
+      };
+    };
+    
+    // First x-axis (for grid 0)
     myXAxisArray.push({
       type: 'time',
       gridIndex: 0,
@@ -1587,23 +1612,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         fontSize: this.currentConfig.option.xAxis.axisLabel.fontSize,
         fontWeight: this.currentConfig.option.xAxis.axisLabel.fontWeight,
         hideOverlap: true,
-        formatter: (value, index) => {
-          switch (this.usedFormatter.id) {
-            case 'months':
-            case 'days':
-              return index === 0 
-                ? this.firstLabelFormatterWithDays().format(value).replace(",", ",\n") 
-                : this.usedFormatter.formatter.format(value).replace(",", ",\n");
-            case 'minutes':
-              return index === 0 
-                ? this.firstLabelFormatterWithMinutes().format(value).replace(",", ",\n") 
-                : this.usedFormatter.formatter.format(value).replace(",", ",\n");
-            case 'seconds':
-              return index === 0 
-                ? this.firstLabelFormatterWithSeconds().format(value).replace(",", ",\n") 
-                : this.usedFormatter.formatter.format(value).replace(",", ",\n");
-          }
-        },
+        interval: 'auto',
+        formatter: createAxisFormatter(true), // First grid gets special first label
         rotate: this.currentConfig.option.xAxis.rotate,
         align: 'right',
         margin: this.currentConfig.option.xAxis.margin,
@@ -1614,16 +1624,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       max: this.ctx.timeWindow.maxTime,
     });
     
-    // Add X axes for additional grids - all visible but without labels
+    // Add X axes for additional grids - now WITH visible labels
     for (let i = 1; i < this.currentGrids; i++) {
-      const isLast = i === this.currentGrids - 1;
-      
       myXAxisArray.push({
         type: 'time',
         gridIndex: i,
-        show: true, // IMPORTANT: Always show axis
+        show: true,
         splitLine: {
-          show: true, // IMPORTANT: Always show split lines
+          show: true,
           lineStyle: {
             width: this.currentConfig.option.xAxis.splitLine?.lineStyle?.width || this.currentConfig.option.yAxis.splitLine.lineStyle.width,
             color: '#e0e0e0',
@@ -1641,9 +1649,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           show: true,
           alignWithLabel: true 
         },
-        position: isLast ? 'top' : 'bottom',
+        position: 'bottom', // Always position at bottom for all grids
         axisLabel: {
-          show: false // Hide labels on all non-first grids
+          show: true, // NOW SHOWING LABELS ON ALL GRIDS
+          fontSize: this.currentConfig.option.xAxis.axisLabel.fontSize,
+          fontWeight: this.currentConfig.option.xAxis.axisLabel.fontWeight,
+          hideOverlap: true,
+          interval: 'auto', // Auto interval to prevent overcrowding
+          formatter: createAxisFormatter(false), // Other grids don't get special first label
+          rotate: this.currentConfig.option.xAxis.rotate,
+          align: 'right',
+          margin: this.currentConfig.option.xAxis.margin,
+          showMinLabel: true,
+          showMaxLabel: true
         },
         min: this.ctx.timeWindow.minTime,
         max: this.ctx.timeWindow.maxTime,
