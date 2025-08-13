@@ -55,6 +55,10 @@ const SIZE_NAMES = {
   HUGE: "huge",
 };
 
+// DataZoom geometry constants - single source of truth
+const DATAZOOM_HEIGHT_PCT = 2;   // slider bar height in %
+const DATAZOOM_BOTTOM_PCT = 1.8; // extra clearance from bottom edge in %
+
 // Standard 3-subplot mapping (original)
 const axisPositionMapStandard = {
   Top: 0,
@@ -372,6 +376,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       if (previousGridCount !== this.currentGrids) {
         this.LOG(`Grid count changed from ${previousGridCount} to ${this.currentGrids}`);
         this.resetGrid = true;
+        // Keep DOM height in sync on data-driven grid changes
+        this.applyScrollableHeight();
       }
     } else {
       this.LOG('Using legend-selected grids:', this.currentGridNames);
@@ -1488,11 +1494,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Reserve space for legend at top and datazoom at bottom
     const topReserved = 3; // % for legend  
-    const bottomReserved = 7; // % for datazoom (matches height in getDataZoomConfig)
-    const availableHeight = 100 - topReserved - bottomReserved; // 90% available
+    const bottomReserved = DATAZOOM_HEIGHT_PCT + DATAZOOM_BOTTOM_PCT; // MUST match dataZoom config
+    const availableHeight = 100 - topReserved - bottomReserved;
     
     // Calculate exact grid height to fill available space
-    // For consistent spacing: total_height = gridHeight * numGrids + gap * (numGrids - 1)
+    // Fixed readable gaps between grids
     const gapPercent = 2; // Fixed 2% gap between grids
     const totalGaps = numGrids > 1 ? gapPercent * (numGrids - 1) : 0;
     const gridHeight = (availableHeight - totalGaps) / numGrids;
@@ -1890,15 +1896,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private getDataZoomConfig(): any[] {
-    // DataZoom is always anchored to bottom with fixed height
-    // This matches the bottomReserved space in calculateScrollableGrids
+    // DataZoom positioned using shared constants to avoid clipping
     return [
       {
         show: true,
         xAxisIndex: 'all',
         type: 'slider',
-        bottom: 0,      // Anchor to bottom edge
-        height: '7%',   // Fixed height matching bottomReserved
+        bottom: `${DATAZOOM_BOTTOM_PCT}%`,  // Small offset avoids clipping
+        height: `${DATAZOOM_HEIGHT_PCT}%`,  // Explicit height
+        handleSize: '70%',                  // Slimmer handles help visual fit
+        moveHandleSize: 5,
         start: 0,
         end: 100
       },
