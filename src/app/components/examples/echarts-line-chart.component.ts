@@ -519,6 +519,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   /**
    * Helper method to apply correct scroll height based on current active grids
+   * Mathematical model: 
+   * - For <=3 grids: container = available height (fits exactly)
+   * - For >3 grids: container = available height * scale factor for scrolling
+   * 
+   * Key insight: ECharts % calculations are relative to container height.
+   * So for N grids to display properly with scroll:
+   * - Container height must scale proportionally to grid count
+   * - We use 3 grids as baseline (fits in 100% height)
+   * - For N>3: height = availableHeight * (N/3) to maintain same grid size
    */
   private applyScrollableHeight(): void {
     const container = this.chartContainer.nativeElement;
@@ -531,19 +540,28 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const buttonBarHeight = 50; // Button container takes about 50px
     const availableHeight = this.ctx.height - buttonBarHeight;
     
-    // Use currentGrids (active grids) instead of maxGrids (historical max)
+    containerElement.style.width = '100%';
+    
     if (this.currentGrids > 3) {
-      container.style.overflowY = 'auto';
+      // Scale container height proportionally to grid count
+      // This ensures each grid maintains consistent size
+      const scaleFactor = this.currentGrids / 3;
+      const scrollHeight = Math.ceil(availableHeight * scaleFactor);
+      
+      container.style.overflowY = 'auto'; 
       container.style.maxHeight = `${availableHeight}px`;
-      // Calculate scroll height based on CURRENT active grids, not max
-      const scrollHeight = availableHeight * (this.currentGrids / 3);
+      container.style.height = `${availableHeight}px`;
       containerElement.style.height = `${scrollHeight}px`;
-      this.LOG(`[HEIGHT DEBUG] Applied scrollable height for ${this.currentGrids} active grids: ${scrollHeight}px`);
+      
+      this.LOG(`[HEIGHT DEBUG] Scrollable: ${this.currentGrids} grids, viewport: ${availableHeight}px, container: ${scrollHeight}px`);
     } else {
+      // Container fills available height exactly
       container.style.overflowY = 'hidden';
       container.style.maxHeight = '';
+      container.style.height = '';
       containerElement.style.height = `${availableHeight}px`;
-      this.LOG(`[HEIGHT DEBUG] Applied normal height for ${this.currentGrids} grids: ${availableHeight}px`);
+      
+      this.LOG(`[HEIGHT DEBUG] Normal: ${this.currentGrids} grids, container: ${availableHeight}px`);
     }
   }
 
@@ -1469,16 +1487,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const rightMargin = '1%';
     
     // Reserve space for legend at top and datazoom at bottom
-    const topReserved = 8; // % for legend
-    const bottomReserved = 8; // % for datazoom (match with getDataZoomConfig 92%)
-    const availableHeight = 100 - topReserved - bottomReserved; // 84% available
+    const topReserved = 3; // % for legend  
+    const bottomReserved = 7; // % for datazoom (matches height in getDataZoomConfig)
+    const availableHeight = 100 - topReserved - bottomReserved; // 90% available
     
-    // Calculate height for each grid
-    const gridHeight = (availableHeight / numGrids) * 0.85; // 85% of allocated space
-    const gapBetweenGrids = (availableHeight / numGrids) * 0.15; // 15% for gaps
+    // Calculate exact grid height to fill available space
+    // For consistent spacing: total_height = gridHeight * numGrids + gap * (numGrids - 1)
+    const gapPercent = 2; // Fixed 2% gap between grids
+    const totalGaps = numGrids > 1 ? gapPercent * (numGrids - 1) : 0;
+    const gridHeight = (availableHeight - totalGaps) / numGrids;
     
     for (let i = 0; i < numGrids; i++) {
-      const topPosition = topReserved + (i * (gridHeight + gapBetweenGrids));
+      const topPosition = topReserved + (i * (gridHeight + gapPercent));
       const grid: any = {
         id: i === 0 ? 'main' : `sub${i}`,
         top: `${topPosition}%`,
@@ -1870,21 +1890,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private getDataZoomConfig(): any[] {
-    // For scrollable layouts with more than 3 grids, adjust datazoom position
-    let dataZoomTop = '92%';
-    
-    if (this.currentGrids > 3) {
-      // When we have scrollable content, position datazoom at the bottom of visible area
-      // This keeps it visible without needing to scroll
-      dataZoomTop = '92%';
-    }
-    
+    // DataZoom is always anchored to bottom with fixed height
+    // This matches the bottomReserved space in calculateScrollableGrids
     return [
       {
         show: true,
         xAxisIndex: 'all',
         type: 'slider',
-        top: dataZoomTop,
+        bottom: 0,      // Anchor to bottom edge
+        height: '7%',   // Fixed height matching bottomReserved
         start: 0,
         end: 100
       },
