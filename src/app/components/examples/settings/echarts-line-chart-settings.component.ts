@@ -54,6 +54,11 @@ export interface EchartsLineChartSettings extends WidgetSettings {
     axisAssignment: 'Left' | 'Right';
   }>;
   
+  // Tooltip Settings
+  tooltipOnlyHoveredGrid?: boolean;
+  tooltipMaxItems?: number;
+  tooltipShowAllIfSeriesCountLTE?: number;
+  
   // Debug
   debugOutput?: boolean;
 }
@@ -101,6 +106,9 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       grid_layout_bottom: 240,
       markline_layout_left_or_right: 285,
       annotations: [],
+      tooltipOnlyHoveredGrid: false,
+      tooltipMaxItems: 10,
+      tooltipShowAllIfSeriesCountLTE: 0,
       debugOutput: false
     };
   }
@@ -137,6 +145,11 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       
       // Annotations
       annotations: this.fb.array(this.createAnnotations(settings.annotations || [])),
+      
+      // Tooltip Settings
+      tooltipOnlyHoveredGrid: [settings.tooltipOnlyHoveredGrid || false],
+      tooltipMaxItems: [settings.tooltipMaxItems || 10],
+      tooltipShowAllIfSeriesCountLTE: [settings.tooltipShowAllIfSeriesCountLTE || 0],
       
       // Debug
       debugOutput: [settings.debugOutput]

@@ -96,6 +96,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private resizeObserver: ResizeObserver;
   private stateChangeSubscription: any;
   private resizeDebounceTimer: any;
+  // Track which grid is currently hovered for tooltip filtering
+  private hoveredGridIndex: number | null = null;
   
   // ThingsBoard example properties
   private DEBUG = true;
@@ -298,6 +300,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('Data series count:', this.ctx.data?.length || 0);
     this.LOG('Legend overrides active:', this.legendOverridesGrids);
     
+    // Reset hovered grid index to avoid stale references
+    this.hoveredGridIndex = null;
+    
     // Clear legend override if this is fresh data from ThingsBoard
     const hasNewData = this.ctx.data?.some((series, idx) => 
       series.data?.length !== this.lastDataLengths?.[idx]
@@ -470,14 +475,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     this.LOG("myNewOptions:", myNewOptions);
     
-    // Apply options with proper merge strategy
+    // Apply options without notMerge to preserve tooltip state
     const needsFullReset = this.resetGrid || this.legendOverridesGrids;
     
     if (needsFullReset) {
-      this.LOG('Applying full reset with notMerge and replaceMerge');
-      // Complete reset to avoid stale axis state
+      this.LOG('Applying full reset with replaceMerge only (no notMerge)');
+      // Replace structural parts while preserving tooltip and other settings
       this.chart.setOption(myNewOptions, {
-        notMerge: true,
         replaceMerge: ['grid', 'xAxis', 'yAxis', 'series', 'dataZoom']
       });
       this.resetGrid = false;
@@ -588,6 +592,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return this.pxToPct(GAP_BETWEEN_GRIDS_PX);
   }
 
+  // Helper to check if tooltip should only show hovered grid
+  private onlyShowHoveredGrid(): boolean {
+    return !!this.ctx.settings?.tooltipOnlyHoveredGrid; // default off
+  }
+
   private initChart(): void {
     this.LOG('[ECharts Line Chart] Initializing chart');
     
@@ -675,6 +684,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private onLegendSelectChanged(event: any): void {
+    // Reset hovered grid index to avoid stale references
+    this.hoveredGridIndex = null;
+    
     const selected = event.selected;
     const selectedKeys = Object.keys(selected).filter(key => selected[key]);
     
@@ -1895,6 +1907,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       },
       tooltip: {
         trigger: 'axis',
+        triggerOn: 'mousemove|click',
+        confine: true,
         axisPointer: {
           type: 'cross',
           snap: true,
@@ -1902,54 +1916,96 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             xAxisIndex: 'all'
           }]
         },
-        formatter: (params) => {
-          let result = '';
-          const legendOrder = this.ctx.data.map(item => item.dataKey.label);
-          
-          const paramsMap = {};
-          params.forEach(item => {
-            paramsMap[item.seriesName] = item;
-          });
-          
-          let gridName = this.ctx.data[0].dataKey.settings.axisAssignment;
-          
-          try {
-            for (let i = 0; i < legendOrder.length; i++) {
-              const seriesName = legendOrder[i];
-              
-              if (i === 0) {
-                if (paramsMap[seriesName]) {
-                  result += `${this.firstLabelFormatterWithSeconds().format(paramsMap[seriesName].value[0])}<br>`;
-                }
-                result += `<table style="border-collapse: collapse; width: 100%; font-size: 12px;">`;
-              }
-              
-              if (gridName != this.ctx.data[i].dataKey.settings.axisAssignment) {
-                result += `<tr>
-                            <td style="text-align: left; padding: 2px;"> </td>
-                            <td style="text-align: right; padding: 2px;"> </td>
-                            <td style="text-align: right; padding: 2px;"> <br> </td>
-                          </tr>`;
-                gridName = this.ctx.data[i].dataKey.settings.axisAssignment;
-              }
-              
-              if (paramsMap[seriesName]) {
-                const item = paramsMap[seriesName];
-                const unit = this.ctx.data[i].dataKey?.units || "";
-                const value = Number(item.value[1]).toFixed(this.ctx.decimals);
-                
-                result += `<tr>
-                    <td style="text-align: left; padding: 2px;">${item.marker} ${item.seriesName}</td>
-                    <td style="text-align: right; padding: 2px;">${value}</td>
-                     <td style="text-align: right; padding: 2px;">${unit}</td>
-                </tr>`;
+        // Track which grid the mouse is over
+        position: (point: number[]) => {
+          // Detect which grid contains the mouse position
+          if (this.chart) {
+            for (let i = 0; i < this.currentGrids; i++) {
+              if (this.chart.containPixel({ gridIndex: i }, point)) {
+                this.hoveredGridIndex = i;
+                break;
               }
             }
-          } catch {
-            result = "";
+          }
+          // Return null to use default positioning
+          return null;
+        },
+        formatter: (params: any[]) => {
+          if (!params?.length) return '';
+
+          // Filter to hovered grid if option enabled
+          let list = params;
+          if (this.onlyShowHoveredGrid() && this.hoveredGridIndex !== null) {
+            const filtered = params.filter(
+              p => (p.axisIndex ?? p.axis?.axisIndex ?? 0) === this.hoveredGridIndex
+            );
+            
+            // Check if we should show all series based on threshold
+            const threshold = this.ctx.settings?.tooltipShowAllIfSeriesCountLTE || 0;
+            if (threshold > 0) {
+              // Count TOTAL visible series across ALL grids
+              const opt: any = this.chart?.getOption?.();
+              const selected = opt?.legend?.[0]?.selected || {};
+              
+              // Count total visible series across all grids
+              const totalVisibleSeries = params.filter(p => selected[p.seriesName] !== false).length;
+              
+              // If total visible series <= threshold, show all series from all grids
+              if (totalVisibleSeries <= threshold) {
+                list = params;
+              } else {
+                // Otherwise use filtered list (fallback to all if empty)
+                list = filtered.length > 0 ? filtered : params;
+              }
+            } else {
+              // No threshold - use normal behavior
+              list = filtered.length > 0 ? filtered : params;
+            }
+          }
+
+          // Get timestamp - always show header even if no items
+          const ts = list[0]?.value?.[0];
+          const tsStr = this.firstLabelFormatterWithSeconds().format(ts);
+
+          // Respect legend selection
+          const opt: any = this.chart?.getOption?.();
+          const selected = opt?.legend?.[0]?.selected || {};
+          const visible = list.filter(p => selected[p.seriesName] !== false);
+
+          // Sort and cap (user setting or default 10)
+          const MAX_ITEMS = this.ctx.settings?.tooltipMaxItems ?? 10;
+          visible.sort((a, b) => Math.abs(b.value[1]) - Math.abs(a.value[1]));
+          const items = visible.slice(0, MAX_ITEMS);
+          const hiddenCount = Math.max(visible.length - items.length, 0);
+
+          // Get unit for the current grid
+          const gridIdx = this.hoveredGridIndex ?? 
+            (items[0]?.axisIndex ?? items[0]?.axis?.axisIndex ?? 0);
+          const unit = (this.getGridUnitsByData()[gridIdx] || '').trim();
+
+          // Always return at least the header to keep crosshair visible
+          let html = `<div style="min-width:190px">
+            <div style="margin-bottom:4px;font-weight:600">${tsStr}</div>`;
+
+          if (items.length > 0) {
+            html += `<table style="border-collapse:collapse;font-size:12px;width:100%">`;
+            
+            const decimals = this.ctx.decimals ?? 2;
+            for (const it of items) {
+              const val = Number(it.value[1]);
+              html += `<tr>
+                <td style="padding:2px 6px 2px 0;white-space:nowrap">${it.marker} ${it.seriesName}</td>
+                <td style="padding:2px 0;text-align:right">${isFinite(val) ? val.toFixed(decimals) : ''}${unit ? ' ' + unit : ''}</td>
+              </tr>`;
+            }
+            if (hiddenCount > 0) {
+              html += `<tr><td colspan="2" style="padding-top:4px;opacity:.7">+ ${hiddenCount} more…</td></tr>`;
+            }
+            html += `</table>`;
           }
           
-          return result;
+          html += `</div>`;
+          return html;
         }
       },
       axisPointer: {

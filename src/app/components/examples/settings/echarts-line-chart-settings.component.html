@@ -234,6 +234,34 @@
       </div>
     </mat-expansion-panel>
 
+    <!-- Tooltip Settings -->
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>Tooltip Settings</mat-panel-title>
+      </mat-expansion-panel-header>
+      
+      <div fxLayout="column" fxLayoutGap="16px">
+        <mat-checkbox formControlName="tooltipOnlyHoveredGrid">
+          Show Only Hovered Grid Series
+        </mat-checkbox>
+        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
+          When enabled, tooltip will only display series from the grid/subplot that the mouse is hovering over.
+        </div>
+        
+        <mat-form-field class="mat-block" appearance="outline">
+          <mat-label>Maximum Tooltip Items</mat-label>
+          <input matInput type="number" min="1" max="50" formControlName="tooltipMaxItems">
+          <mat-hint>Maximum number of series to display in tooltip (1-50)</mat-hint>
+        </mat-form-field>
+        
+        <mat-form-field class="mat-block" appearance="outline" *ngIf="echartsLineChartSettingsForm.get('tooltipOnlyHoveredGrid')?.value">
+          <mat-label>Show All Tooltip If Total Series Count ≤</mat-label>
+          <input matInput type="number" min="0" max="50" formControlName="tooltipShowAllIfSeriesCountLTE">
+          <mat-hint>Show all series from all grids if the total visible series count across all grids is ≤ this value (0 = disabled)</mat-hint>
+        </mat-form-field>
+      </div>
+    </mat-expansion-panel>
+
     <!-- Debug Settings -->
     <mat-expansion-panel>
       <mat-expansion-panel-header>
