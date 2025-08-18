@@ -54,9 +54,52 @@
       </table>
     </aside>
     
-    <!-- Chart wrapper (right side) -->
-    <div #chartContainer class="echart-wrapper">
+    <!-- Chart wrapper (right side) with positioned parent -->
+    <div #chartContainer class="chart-wrap">
+      <!-- ECharts container -->
       <div id="echartContainer"></div>
+      
+      <!-- Legend overlay aligned to plot margins -->
+      <nav class="legend-overlay" aria-label="Series legend">
+        <!-- Previous page button -->
+        <button type="button"
+                class="legend-pager legend-pager--prev"
+                [disabled]="legendCurrentPage === 0"
+                (click)="legendPrevPage()"
+                aria-label="Previous legend items">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        
+        <!-- Legend viewport (constrained view) -->
+        <div class="legend-viewport" #legendViewport>
+          <div class="legend-track" #legendTrack>
+            <button *ngFor="let item of legendPageItems"
+                    type="button"
+                    class="legend-chip"
+                    [class.is-off]="!item.selected"
+                    [class.pulse]="lastPulsedLabel === item.label"
+                    (click)="toggleLabel(item)"
+                    [attr.aria-pressed]="item.selected"
+                    [title]="!canTurnOff(item.label) ? 'At least one series must remain visible' : item.label">
+              <span class="dot" [style.backgroundColor]="item.color"></span>
+              <span class="label-text">{{ item.label }}</span>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Next page button -->
+        <button type="button"
+                class="legend-pager legend-pager--next"
+                [disabled]="!legendHasMorePages"
+                (click)="legendNextPage()"
+                aria-label="Next legend items">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </nav>
     </div>
   </div>
 

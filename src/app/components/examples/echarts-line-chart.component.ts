@@ -62,7 +62,7 @@ const GAP_BEFORE_DATAZOOM_PX = 70;   // gap between last plot and slider in pixe
 
 // Grid spacing constants - unified pixel-based spacing
 const GAP_BETWEEN_GRIDS_PX = 70;    // consistent visual gap between stacked plots in pixels
-const GAP_TOP_RESERVED_PCT = 3;     // % reserved for legend at top
+const GAP_TOP_RESERVED_PCT = 8;     // % reserved at top for legend space (even though overlay doesn't use it)
 
 // Standard 3-subplot mapping (original)
 const axisPositionMapStandard = {
@@ -139,6 +139,29 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     '#9c27b0', '#e91e63', '#795548', '#9e9e9e', '#607d8b',
     '#78909c', '#90a4ae', '#b0bec5', '#cfd8dc', '#eceff1'
   ];
+  
+  // Custom legend overlay state
+  public legendItems: Array<{
+    label: string;
+    color: string;
+    selected: boolean;
+  }> = [];
+  public lastPulsedLabel: string | null = null;
+  
+  // Pagination state
+  public legendCurrentPage = 0;
+  public legendItemsPerPage = 8; // Will be calculated dynamically
+  public legendPageItems: Array<{
+    label: string;
+    color: string;
+    selected: boolean;
+  }> = [];
+  public legendTotalPages = 1;
+  public legendHasMorePages = false;
+  
+  // DOM refs for measuring
+  @ViewChild('legendViewport', { static: false }) legendViewport: ElementRef;
+  @ViewChild('legendTrack', { static: false }) legendTrack: ElementRef;
   
   // ThingsBoard example properties
   private DEBUG = true;
@@ -475,11 +498,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // Get entity name for color grouping
       const entityName = this.ctx.data[i].datasource?.entityName || '';
       const entityColor = this.getColorForEntity(entityName);
+      const label = this.ctx.data[i].dataKey.label;
+      const seriesKey = this.buildSeriesKey(entityName, label);
       
-      this.LOG(`Series[${i}] "${this.ctx.data[i].dataKey.label}" entity="${entityName}" color="${entityColor}"`);
+      this.LOG(`Series[${i}] key="${seriesKey}" entity="${entityName}" color="${entityColor}"`);
       
       const seriesElement = {
-        name: this.ctx.data[i].dataKey.label,
+        name: seriesKey,  // Use unique key instead of just label
         itemStyle: {
           normal: {
             color: entityColor,  // Use entity-based color instead of series-specific color
@@ -508,33 +533,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     myNewOptions.grid = this.currentGridArray();
     myNewOptions.dataZoom = this.getDataZoomConfig(); // Update datazoom based on current grid config
     
-    // Update legend configuration with preserved state
-    const legendState = this.getLegendState();
-    
-    myNewOptions.legend = {
-      show: true,
+    // Hidden controller legend - maintains selection state but not visible
+    // The custom HTML toolbar will control this via dispatchAction
+    myNewOptions.legend = [{
+      id: 'controllerLegend',
+      show: false,  // Hidden from view
       type: 'scroll',
-      data: legendState.data,
-      selected: legendState.selected,
-      selectedMode: true,
-      icon: 'none',  // No icons, text only
-      itemWidth: 0,   // No icon width
-      itemHeight: 0,  // No icon height
-      itemGap: this.currentConfig.option.legend.itemGap,
-      textStyle: {
-        color: this.ctx.settings.legendcolortext || '#000000',
-        fontWeight: this.currentConfig.option.legend.textStyle.fontWeight,
-        fontSize: this.currentConfig.option.legend.textStyle.fontSize
-      },
-      tooltip: {
-        show: true,
-        backgroundColor: 'rgba(50, 50, 50, 0.8)',
-        textStyle: { color: '#fff' },
-        borderColor: '#fff',
-        borderWidth: 1,
-        formatter: (p: any) => `Click "${p.name}" to hide or show data.`
-      }
-    };
+      data: this.getLegendState().data,
+      selected: this.getLegendState().selected,
+      selectedMode: true
+    }];
     
     this.LOG("myNewOptions:", myNewOptions);
     
@@ -556,8 +564,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Hide the loading spinner after data is rendered
     this.chart.hideLoading();
     
-    // Refresh entity list for sidebar
-    setTimeout(() => this.refreshEntityList(), 100);
+    // Refresh entity list for sidebar and sync custom legend
+    setTimeout(() => {
+      this.refreshEntityList();
+      this.syncCustomLegendFromChart();
+    }, 100);
     
     // Force resize after grid changes
     if (needsFullReset) {
@@ -595,6 +606,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
       
       this.onDataUpdated();
+      
+      // Recalculate legend pagination on resize
+      this.calculateItemsPerPage();
     }, 50); // 50ms debounce
   }
 
@@ -679,6 +693,67 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return this.entityColorMap[entityName];
   }
   
+  // Helper functions for unique series keys
+  private buildSeriesKey(entityName: string, label: string): string {
+    // Create unique key: "entityName :: label"
+    return `${entityName || 'Unknown'} :: ${label}`;
+  }
+  
+  private extractLabelFromKey(key: string): string {
+    // Extract label from "entityName :: label"
+    const parts = key.split(' :: ');
+    return parts.length > 1 ? parts[1] : key;
+  }
+  
+  private extractEntityFromKey(key: string): string {
+    // Extract entity from "entityName :: label"
+    const parts = key.split(' :: ');
+    return parts.length > 0 ? parts[0] : 'Unknown';
+  }
+  
+  // Get grouped legend state (unique labels only)
+  private getGroupLegendState(): { data: string[]; selected: Record<string, boolean> } {
+    // Get unique labels from all series
+    const uniqueLabels = new Set<string>();
+    (this.ctx.data || []).forEach(s => {
+      if (s?.dataKey?.label) {
+        uniqueLabels.add(s.dataKey.label);
+      }
+    });
+    
+    const data = Array.from(uniqueLabels).sort();
+    
+    // Get controller legend selection state
+    let controllerSelected: Record<string, boolean> = {};
+    try {
+      const opt: any = this.chart?.getOption?.();
+      if (opt?.legend && opt.legend[0]?.selected) {
+        controllerSelected = opt.legend[0].selected;
+      }
+    } catch (e) {
+      this.LOG('Could not retrieve controller legend state:', e);
+    }
+    
+    // A label is selected if ANY series with that label is selected
+    const selected: Record<string, boolean> = {};
+    for (const label of data) {
+      let anySelected = false;
+      for (const s of this.ctx.data || []) {
+        if (s?.dataKey?.label === label) {
+          const entityName = s.datasource?.entityName || 'Unknown';
+          const seriesKey = this.buildSeriesKey(entityName, label);
+          if (controllerSelected[seriesKey] !== false) {
+            anySelected = true;
+            break;
+          }
+        }
+      }
+      selected[label] = anySelected;
+    }
+    
+    return { data, selected };
+  }
+  
   // Refresh entity list for sidebar
   public refreshEntityList(): void {
     if (!this.ctx?.data || !this.chart) {
@@ -687,19 +762,20 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     // Group series by entity
-    const entityGroups: Record<string, { series: string[], color: string }> = {};
+    const entityGroups: Record<string, { seriesKeys: string[], color: string }> = {};
     
     for (let i = 0; i < this.ctx.data.length; i++) {
       const entityName = this.ctx.data[i].datasource?.entityName || 'Unknown';
-      const seriesName = this.ctx.data[i].dataKey.label;
+      const label = this.ctx.data[i].dataKey.label;
+      const seriesKey = this.buildSeriesKey(entityName, label);
       
       if (!entityGroups[entityName]) {
         entityGroups[entityName] = {
-          series: [],
+          seriesKeys: [],
           color: this.getColorForEntity(entityName)
         };
       }
-      entityGroups[entityName].series.push(seriesName);
+      entityGroups[entityName].seriesKeys.push(seriesKey);
     }
     
     // Get current legend selection state
@@ -710,12 +786,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.entityList = Object.keys(entityGroups).map(entityName => {
       const group = entityGroups[entityName];
       // Entity is visible if any of its series are visible
-      const visible = group.series.some(seriesName => selected[seriesName] !== false);
+      const visible = group.seriesKeys.some(seriesKey => selected[seriesKey] !== false);
       
       return {
         name: entityName,
         color: group.color,
-        count: group.series.length,
+        count: group.seriesKeys.length,
         visible: visible
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
@@ -727,34 +803,37 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public toggleEntityVisibility(entityName: string): void {
     if (!this.ctx?.data || !this.chart) return;
     
-    // Find all series for this entity
-    const seriesNames: string[] = [];
+    // Find all series keys for this entity
+    const seriesKeys: string[] = [];
     for (let i = 0; i < this.ctx.data.length; i++) {
       const currentEntityName = this.ctx.data[i].datasource?.entityName || 'Unknown';
       if (currentEntityName === entityName) {
-        seriesNames.push(this.ctx.data[i].dataKey.label);
+        const label = this.ctx.data[i].dataKey.label;
+        const seriesKey = this.buildSeriesKey(entityName, label);
+        seriesKeys.push(seriesKey);
       }
     }
     
-    if (seriesNames.length === 0) return;
+    if (seriesKeys.length === 0) return;
     
-    // Get current visibility state
+    // Get current visibility state from controller legend
     const opt: any = this.chart.getOption();
     const selected = opt?.legend?.[0]?.selected || {};
     
     // Check if any series is visible
-    const anyVisible = seriesNames.some(name => selected[name] !== false);
+    const anyVisible = seriesKeys.some(key => selected[key] !== false);
     
-    // Toggle all series for this entity
+    // Toggle all series for this entity on controller legend
     const action = anyVisible ? 'legendUnSelect' : 'legendSelect';
-    seriesNames.forEach(name => {
+    seriesKeys.forEach(key => {
       this.chart.dispatchAction({
         type: action,
-        name: name
+        name: key,
+        legendIndex: 0  // Target controller legend
       });
     });
     
-    // Refresh entity list to update visibility states
+    // Refresh entity list after toggling
     setTimeout(() => this.refreshEntityList(), 50);
   }
 
@@ -836,13 +915,32 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('Setting chart option with grid config...');
     this.chart.setOption(option);
     
-    // Register legend selection event listener
+    // Register legend selection event listener with guard
     this.chart.on('legendselectchanged', (event: any) => {
+      // Guard: prevent hiding all series
+      const selected = event?.selected || {};
+      const visibleCount = Object.values(selected).filter(v => v !== false).length;
+      
+      if (visibleCount === 0) {
+        // Re-enable the last clicked item
+        this.chart.dispatchAction({ 
+          type: 'legendSelect', 
+          name: event.name, 
+          legendIndex: 0 
+        });
+        return;
+      }
+      
       this.onLegendSelectChanged(event);
+      // Sync custom legend toolbar when legend changes
+      this.syncCustomLegendFromChart();
     });
     
-    // Initial refresh of entity list
-    setTimeout(() => this.refreshEntityList(), 100);
+    // Initial refresh of entity list and sync custom legend
+    setTimeout(() => {
+      this.refreshEntityList();
+      this.syncCustomLegendFromChart();
+    }, 100);
     
     this.LOG('=== INIT CHART AND GRID COMPLETE ===');
   }
@@ -851,11 +949,59 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Reset hovered grid index to avoid stale references
     this.hoveredGridIndex = null;
     
+    const clickedLabel = event.name;
+    
+    // Check if this is a grouped label (not a series key)
+    if (!clickedLabel.includes(' :: ')) {
+      // This is a grouped label click
+      
+      // Build all series names that match this label
+      const seriesToToggle: string[] = [];
+      for (const s of this.ctx.data || []) {
+        if (s?.dataKey?.label === clickedLabel) {
+          const entityName = s.datasource?.entityName || 'Unknown';
+          const seriesKey = this.buildSeriesKey(entityName, clickedLabel);
+          seriesToToggle.push(seriesKey);
+        }
+      }
+      
+      // Toggle visibility of actual series (they're hidden but control visibility)
+      const action = event.selected[clickedLabel] ? 'legendSelect' : 'legendUnSelect';
+      seriesToToggle.forEach(seriesName => {
+        // Find the series and toggle its visibility
+        const seriesIndex = this.ctx.data.findIndex(s => {
+          const entityName = s.datasource?.entityName || 'Unknown';
+          const key = this.buildSeriesKey(entityName, s.dataKey.label);
+          return key === seriesName;
+        });
+        
+        if (seriesIndex >= 0) {
+          // Toggle series visibility directly
+          const series = this.chart.getOption().series[seriesIndex];
+          if (series) {
+            this.chart.setOption({
+              series: [{
+                name: seriesName,
+                lineStyle: {
+                  opacity: event.selected[clickedLabel] ? 1 : 0.1
+                },
+                itemStyle: {
+                  opacity: event.selected[clickedLabel] ? 1 : 0.1
+                }
+              }]
+            });
+          }
+        }
+      });
+      
+      // Refresh entity list
+      setTimeout(() => this.refreshEntityList(), 50);
+      return;
+    }
+    
+    // Handle actual series legend changes (if any)
     const selected = event.selected;
     const selectedKeys = Object.keys(selected).filter(key => selected[key]);
-    
-    // Refresh entity list when legend selection changes
-    setTimeout(() => this.refreshEntityList(), 50);
     
     this.LOG("Legend selection changed:", selected);
     this.LOG("Active series:", selectedKeys);
@@ -910,6 +1056,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // Trigger update to rebuild grids with notMerge
       this.onDataUpdated();
     }
+    
+    // Refresh entity list and sync custom legend after changes
+    setTimeout(() => {
+      this.refreshEntityList();
+      this.syncCustomLegendFromChart();
+    }, 50);
   }
 
   private subscribeToStateChanges(): void {
@@ -1659,6 +1811,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('currentGridArray called with currentGrids:', this.currentGrids, 'currentSize:', this.currentSize);
     let gridArray = [];
     
+    // Determine margins based on size
+    const leftMargin = this.currentSize === 'small' ? '12%' : '10%';
+    const rightMargin = '1%';
+    
+    // Sync legend overlay to use same margins as grids
+    this.syncLegendToGridMargins(leftMargin, rightMargin);
+    
     // Use unified calculation for all grid counts to ensure consistent spacing
     if (this.currentGrids > 3) {
       // For scrollable layouts, use the existing calculation
@@ -1666,8 +1825,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     } else {
       // For 1-3 grids, use the same unified spacing calculation
       const grids = [];
-      const leftMargin = this.currentSize === 'small' ? '12%' : '10%';
-      const rightMargin = '1%';
       
       // Use consistent top reserve
       const topReserved = GAP_TOP_RESERVED_PCT;
@@ -1906,7 +2063,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   private checkDataGridByName(selectedKeys: string[]): Set<string> {
     const matchedValues = selectedKeys.map(key => {
-      const foundObject = this.ctx.data.find(obj => obj.dataKey.label === key);
+      // Extract label from key to find the matching data object
+      const label = this.extractLabelFromKey(key);
+      const foundObject = this.ctx.data.find(obj => obj.dataKey.label === label);
       // Default to 'Top' if no assignment is set
       return foundObject ? (foundObject.dataKey.settings?.axisAssignment || 'Top') : null;
     });
@@ -1973,10 +2132,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   private getLegendState(): { data: string[]; selected: Record<string, boolean> } {
-    // Get all series labels from data
+    // Get all series keys from data
     const data = (this.ctx.data || [])
-      .map(s => s?.dataKey?.label)
-      .filter(Boolean);
+      .map(s => {
+        if (!s?.dataKey?.label) return null;
+        const entityName = s.datasource?.entityName || 'Unknown';
+        return this.buildSeriesKey(entityName, s.dataKey.label);
+      })
+      .filter(Boolean) as string[];
     
     // Try to preserve existing legend selection state
     let selected: Record<string, boolean> = {};
@@ -1990,9 +2153,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     // Default new series to ON if not in existing selection
-    for (const name of data) {
-      if (!(name in selected)) {
-        selected[name] = true;
+    for (const key of data) {
+      if (!(key in selected)) {
+        selected[key] = true;
       }
     }
     
@@ -2043,34 +2206,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private getInitConfig(): any {
-    // Get legend state to preserve selection
-    const legendState = this.getLegendState();
-    
     return {
-      legend: {
-        show: true,
+      // Hidden controller legend - maintains selection state but not visible
+      legend: [{
+        id: 'controllerLegend',
+        show: false,  // Hidden from view
         type: 'scroll',
-        data: legendState.data,
-        selected: legendState.selected,
-        selectedMode: true,
-        icon: 'none',  // No icons, text only
-        itemWidth: 0,   // No icon width
-        itemHeight: 0,  // No icon height
-        itemGap: this.currentConfig.option.legend.itemGap,
-        textStyle: {
-          color: this.ctx.settings.legendcolortext || '#000000',
-          fontWeight: this.currentConfig.option.legend.textStyle.fontWeight,
-          fontSize: this.currentConfig.option.legend.textStyle.fontSize
-        },
-        tooltip: {
-          show: true,
-          backgroundColor: 'rgba(50, 50, 50, 0.8)',
-          textStyle: { color: '#fff' },
-          borderColor: '#fff',
-          borderWidth: 1,
-          formatter: (p: any) => `Click "${p.name}" to hide or show data.`
-        }
-      },
+        data: this.getLegendState().data,
+        selected: this.getLegendState().selected,
+        selectedMode: true
+      }],
       tooltip: {
         trigger: 'axis',
         triggerOn: 'mousemove|click',
@@ -2159,8 +2304,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             const decimals = this.ctx.decimals ?? 2;
             for (const it of items) {
               const val = Number(it.value[1]);
+              // Extract user-friendly label from series key
+              const displayName = this.extractLabelFromKey(it.seriesName);
               html += `<tr>
-                <td style="padding:2px 6px 2px 0;white-space:nowrap">${it.marker} ${it.seriesName}</td>
+                <td style="padding:2px 6px 2px 0;white-space:nowrap">${it.marker} ${displayName}</td>
                 <td style="padding:2px 0;text-align:right">${isFinite(val) ? val.toFixed(decimals) : ''}${unit ? ' ' + unit : ''}</td>
               </tr>`;
             }
@@ -2704,4 +2851,263 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
     };
   }
+
+  // ===== Custom Legend Toolbar Methods =====
+  
+  // Get count of visible labels
+  private getVisibleLabelCount(): number {
+    const group = this.getGroupLegendState();
+    return Object.values(group.selected).filter(v => v !== false).length;
+  }
+
+  // Check if a label can be turned off (at least one must remain visible)
+  public canTurnOff(label: string): boolean {
+    const group = this.getGroupLegendState();
+    const isOn = group.selected[label] !== false;
+    if (!isOn) return true; // turning on is always fine
+    const visible = this.getVisibleLabelCount();
+    return visible > 1; // can only turn off if there would still be >=1 left
+  }
+
+  // Visual feedback when action is blocked
+  private pulseChip(label: string): void {
+    this.lastPulsedLabel = label;
+    setTimeout(() => {
+      this.lastPulsedLabel = null;
+      if (this.ctx?.detectChanges) {
+        this.ctx.detectChanges();
+      }
+    }, 250);
+  }
+  
+  // Get representative color for a label (first visible series with this label)
+  private pickRepresentativeColor(label: string): string {
+    // Find first series with this label
+    for (let i = 0; i < this.ctx.data.length; i++) {
+      const series = this.ctx.data[i];
+      if (series?.dataKey?.label === label) {
+        const entityName = series.datasource?.entityName || 'Unknown';
+        // Return the entity color if we have it
+        if (this.entityColorMap[entityName]) {
+          return this.entityColorMap[entityName];
+        }
+      }
+    }
+    // Fallback to a default color
+    return '#999999';
+  }
+  
+  // Build/update the legend items from the grouped legend state
+  private syncCustomLegendFromChart(): void {
+    if (!this.chart) return;
+    
+    const group = this.getGroupLegendState();
+    
+    // Build legend items with colors and plot positions
+    const itemsWithPosition = group.data.map(label => {
+      // Find the first series with this label to get its axis position
+      let axisPosition = 999; // Default for items without position
+      for (const series of (this.ctx.data || [])) {
+        if (series?.dataKey?.label === label) {
+          const axisAssignment = series.dataKey?.settings?.axisAssignment || 'Bottom';
+          // Get numeric position from axis assignment
+          const axisMap = this.getAxisPositionMap();
+          axisPosition = axisMap[axisAssignment] ?? 999;
+          break; // Use first match
+        }
+      }
+      
+      return {
+        label,
+        color: this.pickRepresentativeColor(label),
+        selected: group.selected[label] !== false,
+        position: axisPosition
+      };
+    });
+    
+    // Sort by position (top to bottom order)
+    this.legendItems = itemsWithPosition
+      .sort((a, b) => a.position - b.position)
+      .map(({ label, color, selected }) => ({ label, color, selected }));
+    
+    // Update pagination
+    this.updateLegendPagination();
+    
+    // Trigger change detection
+    if (this.ctx?.detectChanges) {
+      this.ctx.detectChanges();
+    }
+  }
+  
+  // Sync legend overlay position with grid margins
+  private syncLegendToGridMargins(leftPct: string, rightPct: string): void {
+    if (this.chartContainer?.nativeElement) {
+      const chartEl = this.chartContainer.nativeElement;
+      chartEl.style.setProperty('--plot-left', leftPct);
+      chartEl.style.setProperty('--plot-right', rightPct);
+    }
+  }
+  
+  // Measure actual legend and chip widths from DOM
+  private measureLegendWidths(): { viewportWidth: number; avgChipWidth: number } {
+    if (!this.legendViewport?.nativeElement || !this.legendTrack?.nativeElement) {
+      return { viewportWidth: 600, avgChipWidth: 100 }; // Fallback values
+    }
+    
+    const viewport = this.legendViewport.nativeElement;
+    const track = this.legendTrack.nativeElement;
+    const chips = track.querySelectorAll('.legend-chip');
+    
+    // Get viewport width
+    const viewportWidth = viewport.offsetWidth;
+    
+    // Calculate average chip width
+    let totalWidth = 0;
+    let chipCount = 0;
+    chips.forEach((chip: HTMLElement) => {
+      totalWidth += chip.offsetWidth;
+      chipCount++;
+    });
+    
+    const avgChipWidth = chipCount > 0 ? totalWidth / chipCount : 100;
+    
+    return { viewportWidth, avgChipWidth };
+  }
+  
+  // Calculate items per page based on measured widths
+  private calculateItemsPerPage(): void {
+    // Use setTimeout to ensure DOM is rendered
+    setTimeout(() => {
+      const { viewportWidth, avgChipWidth } = this.measureLegendWidths();
+      const gap = 8; // Gap between chips in pixels
+      const pagerWidth = 28 * 2 + 16; // Two pager buttons plus gaps
+      const availableWidth = viewportWidth - pagerWidth;
+      
+      // Calculate how many chips fit
+      const itemsPerPage = Math.max(3, Math.floor(availableWidth / (avgChipWidth + gap)));
+      
+      // Only update if changed
+      if (this.legendItemsPerPage !== itemsPerPage) {
+        this.legendItemsPerPage = itemsPerPage;
+        this.updateLegendPagination();
+      }
+    }, 0);
+  }
+  
+  // Update pagination based on current items
+  private updateLegendPagination(): void {
+    // Recalculate items per page
+    this.calculateItemsPerPage();
+    
+    // Calculate total pages
+    this.legendTotalPages = Math.ceil(this.legendItems.length / this.legendItemsPerPage);
+    
+    // Ensure current page is valid
+    if (this.legendCurrentPage >= this.legendTotalPages) {
+      this.legendCurrentPage = Math.max(0, this.legendTotalPages - 1);
+    }
+    
+    // Calculate page items
+    const startIdx = this.legendCurrentPage * this.legendItemsPerPage;
+    const endIdx = Math.min(startIdx + this.legendItemsPerPage, this.legendItems.length);
+    this.legendPageItems = this.legendItems.slice(startIdx, endIdx);
+    
+    // Update pagination flags
+    this.legendHasMorePages = (this.legendCurrentPage + 1) < this.legendTotalPages;
+  }
+  
+  // Navigate to previous page
+  public legendPrevPage(): void {
+    if (this.legendCurrentPage > 0) {
+      this.legendCurrentPage--;
+      this.updateLegendPagination();
+      if (this.ctx?.detectChanges) {
+        this.ctx.detectChanges();
+      }
+    }
+  }
+  
+  // Navigate to next page
+  public legendNextPage(): void {
+    if (this.legendCurrentPage < this.legendTotalPages - 1) {
+      this.legendCurrentPage++;
+      this.updateLegendPagination();
+      if (this.ctx?.detectChanges) {
+        this.ctx.detectChanges();
+      }
+    }
+  }
+
+  // New toggleLabel method for legend chip items
+  public toggleLabel(item: { label: string; selected: boolean }): void {
+    if (!this.chart) return;
+    
+    // Find the actual item in the main array
+    const mainItem = this.legendItems.find(i => i.label === item.label);
+    if (!mainItem) return;
+    
+    // Count currently selected items
+    const selectedCount = this.legendItems.filter(i => i.selected).length;
+    
+    // Guard: prevent hiding the last visible series
+    if (mainItem.selected && selectedCount === 1) {
+      this.pulseChip(mainItem.label);
+      return;
+    }
+    
+    // Toggle the selection in both main and page item
+    mainItem.selected = !mainItem.selected;
+    item.selected = mainItem.selected;
+    
+    // Dispatch actions to toggle all series for this label
+    this.toggleAllSeriesForLabel(mainItem.label, mainItem.selected);
+  }
+  
+  // Helper to toggle all series belonging to a label
+  private toggleAllSeriesForLabel(label: string, shouldSelect: boolean): void {
+    if (!this.chart) return;
+    
+    const action = shouldSelect ? 'legendSelect' : 'legendUnSelect';
+    
+    // Build all controller legend keys for this label
+    const keys: string[] = [];
+    for (const series of (this.ctx.data || [])) {
+      if (series?.dataKey?.label === label) {
+        const entityName = series.datasource?.entityName || 'Unknown';
+        const seriesKey = this.buildSeriesKey(entityName, label);
+        keys.push(seriesKey);
+      }
+    }
+    
+    // Dispatch actions for all matching series
+    keys.forEach(key => {
+      this.chart.dispatchAction({ 
+        type: action, 
+        name: key, 
+        legendIndex: 0 
+      });
+    });
+    
+    // Re-sync UI & possibly recompute grids
+    setTimeout(() => {
+      this.syncCustomLegendFromChart();
+      this.refreshEntityList();
+      
+      // Check if grid layout needs to change
+      this.legendOverridesGrids = true;
+      const chartOption: any = this.chart.getOption();
+      const legendSelected = (chartOption?.legend?.[0]?.selected) || {};
+      const activeSeriesKeys = Object.keys(legendSelected).filter(k => legendSelected[k] !== false);
+      
+      const previousGridCount = this.currentGrids;
+      this.setDataGridByNames(activeSeriesKeys);
+      
+      if (previousGridCount !== this.currentGrids) {
+        this.resetGrid = true;
+        this.applyScrollableHeight();
+        this.onDataUpdated();
+      }
+    }, 50);
+  }
+
 }

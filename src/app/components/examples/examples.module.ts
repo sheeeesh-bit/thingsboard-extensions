@@ -1,5 +1,6 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { SharedModule } from '@shared/public-api';
 import {
   BasicWidgetConfigModule,
@@ -19,6 +20,7 @@ import { EchartsLineChartDataKeySettingsComponent } from './data-key-settings/ec
   ],
   imports: [
     CommonModule,
+    FormsModule,
     SharedModule,
     HomeComponentsModule,
     BasicWidgetConfigModule,
