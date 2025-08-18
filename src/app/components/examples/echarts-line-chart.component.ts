@@ -91,6 +91,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   @ViewChild('chartContainer', {static: false}) chartContainer: ElementRef<HTMLElement>;
   @Input() ctx: WidgetContext;
+  
+  // Entity sidebar model
+  public entityList: Array<{
+    name: string;
+    color: string;
+    count: number;
+    visible: boolean;
+  }> = [];
 
   private chart: echarts.ECharts;
   private resizeObserver: ResizeObserver;
@@ -98,6 +106,39 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private resizeDebounceTimer: any;
   // Track which grid is currently hovered for tooltip filtering
   private hoveredGridIndex: number | null = null;
+  
+  // Entity-based color mapping
+  private entityColorMap: Record<string, string> = {};
+  private nextColorIndex = 0;
+  // Extended color palette for 100+ devices
+  private colorPalette = [
+    // ECharts default colors (20)
+    '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de',
+    '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc', '#ff9f7f',
+    '#ffdb5c', '#95e1d3', '#ff6b6b', '#4ecdc4', '#a8e6cf',
+    '#ffd3b6', '#ffaaa5', '#ff8b94', '#dcedc1', '#ffeaa7',
+    // Additional distinct colors (80 more for total of 100)
+    '#2e7d32', '#1976d2', '#d32f2f', '#f57c00', '#7b1fa2',
+    '#c2185b', '#0288d1', '#388e3c', '#fbc02d', '#512da8',
+    '#00796b', '#5d4037', '#616161', '#455a64', '#e64a19',
+    '#afb42b', '#689f38', '#00897b', '#0097a7', '#1565c0',
+    '#283593', '#6a1b9a', '#8e24aa', '#ad1457', '#d81b60',
+    '#00695c', '#00838f', '#0277bd', '#01579b', '#4527a0',
+    '#311b92', '#880e4f', '#b71c1c', '#bf360c', '#e65100',
+    '#ff6f00', '#f57f17', '#f9a825', '#827717', '#558b2f',
+    '#33691e', '#2e7d32', '#1b5e20', '#004d40', '#006064',
+    '#01579b', '#0d47a1', '#1a237e', '#4a148c', '#880e4f',
+    '#ff1744', '#d50000', '#ff3d00', '#dd2c00', '#ff6d00',
+    '#ffab00', '#ffd600', '#aeea00', '#64dd17', '#00c853',
+    '#00bfa5', '#00b8d4', '#00b0ff', '#2979ff', '#3d5afe',
+    '#651fff', '#6200ea', '#aa00ff', '#d500f9', '#e91e63',
+    '#f50057', '#ff4081', '#ff80ab', '#ff1744', '#f44336',
+    '#ff5252', '#ff5722', '#ff6e40', '#ff9800', '#ffc107',
+    '#ffeb3b', '#cddc39', '#8bc34a', '#4caf50', '#009688',
+    '#00bcd4', '#03a9f4', '#2196f3', '#3f51b5', '#673ab7',
+    '#9c27b0', '#e91e63', '#795548', '#9e9e9e', '#607d8b',
+    '#78909c', '#90a4ae', '#b0bec5', '#cfd8dc', '#eceff1'
+  ];
   
   // ThingsBoard example properties
   private DEBUG = true;
@@ -139,6 +180,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('Component initialized');
     this.LOG('Widget context:', this.ctx);
     this.LOG('Widget settings:', this.ctx.settings);
+    
+    // Reset entity color mapping on initialization
+    this.entityColorMap = {};
+    this.nextColorIndex = 0;
     
     // Initialize DatePipe with user's locale
     this.datePipe = new DatePipe(this.browserLocale);
@@ -427,14 +472,21 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         dataPoints: this.ctx.data[i].data?.length || 0
       });
       
+      // Get entity name for color grouping
+      const entityName = this.ctx.data[i].datasource?.entityName || '';
+      const entityColor = this.getColorForEntity(entityName);
+      
+      this.LOG(`Series[${i}] "${this.ctx.data[i].dataKey.label}" entity="${entityName}" color="${entityColor}"`);
+      
       const seriesElement = {
         name: this.ctx.data[i].dataKey.label,
         itemStyle: {
           normal: {
-            color: this.ctx.data[i].dataKey.color,
+            color: entityColor,  // Use entity-based color instead of series-specific color
           }
         },
         lineStyle: {
+          color: entityColor,  // Also set line color to entity color
           width: (axisAssignment === 'Middle') 
             ? this.currentConfig.seriesElement.lineStyle.widthMiddle 
             : this.currentConfig.seriesElement.lineStyle.width
@@ -460,17 +512,28 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const legendState = this.getLegendState();
     
     myNewOptions.legend = {
-      type: "scroll",
-      data: legendState.data,          // Keep all series items
-      selected: legendState.selected,  // Preserve selection state
+      show: true,
+      type: 'scroll',
+      data: legendState.data,
+      selected: legendState.selected,
+      selectedMode: true,
+      icon: 'none',  // No icons, text only
+      itemWidth: 0,   // No icon width
+      itemHeight: 0,  // No icon height
+      itemGap: this.currentConfig.option.legend.itemGap,
       textStyle: {
         color: this.ctx.settings.legendcolortext || '#000000',
         fontWeight: this.currentConfig.option.legend.textStyle.fontWeight,
         fontSize: this.currentConfig.option.legend.textStyle.fontSize
       },
-      itemWidth: this.currentConfig.option.legend.itemWidth,
-      itemHeight: this.currentConfig.option.legend.itemHeight,
-      itemGap: this.currentConfig.option.legend.itemGap
+      tooltip: {
+        show: true,
+        backgroundColor: 'rgba(50, 50, 50, 0.8)',
+        textStyle: { color: '#fff' },
+        borderColor: '#fff',
+        borderWidth: 1,
+        formatter: (p: any) => `Click "${p.name}" to hide or show data.`
+      }
     };
     
     this.LOG("myNewOptions:", myNewOptions);
@@ -492,6 +555,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Hide the loading spinner after data is rendered
     this.chart.hideLoading();
+    
+    // Refresh entity list for sidebar
+    setTimeout(() => this.refreshEntityList(), 100);
     
     // Force resize after grid changes
     if (needsFullReset) {
@@ -596,6 +662,101 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private onlyShowHoveredGrid(): boolean {
     return !!this.ctx.settings?.tooltipOnlyHoveredGrid; // default off
   }
+  
+  // Helper to get consistent color for an entity
+  private getColorForEntity(entityName: string): string {
+    if (!entityName) {
+      // Fallback for series without entity name
+      entityName = '_unknown_' + this.nextColorIndex;
+    }
+    
+    if (!this.entityColorMap[entityName]) {
+      // Assign next color from palette
+      this.entityColorMap[entityName] = this.colorPalette[this.nextColorIndex % this.colorPalette.length];
+      this.nextColorIndex++;
+    }
+    
+    return this.entityColorMap[entityName];
+  }
+  
+  // Refresh entity list for sidebar
+  public refreshEntityList(): void {
+    if (!this.ctx?.data || !this.chart) {
+      this.entityList = [];
+      return;
+    }
+    
+    // Group series by entity
+    const entityGroups: Record<string, { series: string[], color: string }> = {};
+    
+    for (let i = 0; i < this.ctx.data.length; i++) {
+      const entityName = this.ctx.data[i].datasource?.entityName || 'Unknown';
+      const seriesName = this.ctx.data[i].dataKey.label;
+      
+      if (!entityGroups[entityName]) {
+        entityGroups[entityName] = {
+          series: [],
+          color: this.getColorForEntity(entityName)
+        };
+      }
+      entityGroups[entityName].series.push(seriesName);
+    }
+    
+    // Get current legend selection state
+    const opt: any = this.chart.getOption();
+    const selected = opt?.legend?.[0]?.selected || {};
+    
+    // Build entity list
+    this.entityList = Object.keys(entityGroups).map(entityName => {
+      const group = entityGroups[entityName];
+      // Entity is visible if any of its series are visible
+      const visible = group.series.some(seriesName => selected[seriesName] !== false);
+      
+      return {
+        name: entityName,
+        color: group.color,
+        count: group.series.length,
+        visible: visible
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+    
+    this.ctx.detectChanges();
+  }
+  
+  // Toggle visibility for all series of an entity
+  public toggleEntityVisibility(entityName: string): void {
+    if (!this.ctx?.data || !this.chart) return;
+    
+    // Find all series for this entity
+    const seriesNames: string[] = [];
+    for (let i = 0; i < this.ctx.data.length; i++) {
+      const currentEntityName = this.ctx.data[i].datasource?.entityName || 'Unknown';
+      if (currentEntityName === entityName) {
+        seriesNames.push(this.ctx.data[i].dataKey.label);
+      }
+    }
+    
+    if (seriesNames.length === 0) return;
+    
+    // Get current visibility state
+    const opt: any = this.chart.getOption();
+    const selected = opt?.legend?.[0]?.selected || {};
+    
+    // Check if any series is visible
+    const anyVisible = seriesNames.some(name => selected[name] !== false);
+    
+    // Toggle all series for this entity
+    const action = anyVisible ? 'legendUnSelect' : 'legendSelect';
+    seriesNames.forEach(name => {
+      this.chart.dispatchAction({
+        type: action,
+        name: name
+      });
+    });
+    
+    // Refresh entity list to update visibility states
+    setTimeout(() => this.refreshEntityList(), 50);
+  }
 
   private initChart(): void {
     this.LOG('[ECharts Line Chart] Initializing chart');
@@ -680,6 +841,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.onLegendSelectChanged(event);
     });
     
+    // Initial refresh of entity list
+    setTimeout(() => this.refreshEntityList(), 100);
+    
     this.LOG('=== INIT CHART AND GRID COMPLETE ===');
   }
 
@@ -689,6 +853,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     const selected = event.selected;
     const selectedKeys = Object.keys(selected).filter(key => selected[key]);
+    
+    // Refresh entity list when legend selection changes
+    setTimeout(() => this.refreshEntityList(), 50);
     
     this.LOG("Legend selection changed:", selected);
     this.LOG("Active series:", selectedKeys);
@@ -1881,28 +2048,27 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     return {
       legend: {
-        type: "scroll",
-        data: legendState.data,          // Include all series items
-        selected: legendState.selected,  // Set initial selection state
+        show: true,
+        type: 'scroll',
+        data: legendState.data,
+        selected: legendState.selected,
+        selectedMode: true,
+        icon: 'none',  // No icons, text only
+        itemWidth: 0,   // No icon width
+        itemHeight: 0,  // No icon height
+        itemGap: this.currentConfig.option.legend.itemGap,
         textStyle: {
           color: this.ctx.settings.legendcolortext || '#000000',
           fontWeight: this.currentConfig.option.legend.textStyle.fontWeight,
           fontSize: this.currentConfig.option.legend.textStyle.fontSize
         },
-        itemWidth: this.currentConfig.option.legend.itemWidth,
-        itemHeight: this.currentConfig.option.legend.itemHeight,
-        itemGap: this.currentConfig.option.legend.itemGap,
         tooltip: {
           show: true,
           backgroundColor: 'rgba(50, 50, 50, 0.8)',
-          textStyle: {
-            color: '#fff'
-          },
+          textStyle: { color: '#fff' },
           borderColor: '#fff',
           borderWidth: 1,
-          formatter: (params: any) => {
-            return `Click "${params.name}" to hide or show data.`;
-          }
+          formatter: (p: any) => `Click "${p.name}" to hide or show data.`
         }
       },
       tooltip: {

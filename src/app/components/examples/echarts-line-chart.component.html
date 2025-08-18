@@ -29,9 +29,34 @@
         <button mat-icon-button (click)="menuButtons('reset')" class="tb-button" matTooltipPosition="above" matTooltip="Reset Zoom" matTooltipClass="custom-tooltip"><i class="material-icons">restore_page</i></button> 
     </div>
   
-  <!-- Chart container -->
-  <div #chartContainer fxFlex fxLayout="row" style="graph-container">
-    <div id="echartContainer">
+  <!-- Chart and sidebar container -->
+  <div fxFlex class="echarts-layout">
+    <!-- Entity sidebar (left side) -->
+    <aside class="entity-sidebar">
+      <table class="entity-table">
+        <thead>
+          <tr>
+            <th colspan="3">Entities</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let entity of entityList" 
+              class="entity-row" 
+              [class.entity-row--disabled]="!entity.visible"
+              (click)="toggleEntityVisibility(entity.name)">
+            <td class="swatch-cell">
+              <div class="swatch-box" [style.background-color]="entity.color"></div>
+            </td>
+            <td class="entity-name" [title]="entity.name">{{ entity.name }}</td>
+            <td class="entity-count">{{ entity.count }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </aside>
+    
+    <!-- Chart wrapper (right side) -->
+    <div #chartContainer class="echart-wrapper">
+      <div id="echartContainer"></div>
     </div>
   </div>
 
