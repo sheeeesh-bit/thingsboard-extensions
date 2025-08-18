@@ -90,7 +90,13 @@ const axisPositionMapExtended = {
 export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @ViewChild('chartContainer', {static: false}) chartContainer: ElementRef<HTMLElement>;
+  @ViewChild('legendOverlay', { static: false }) legendOverlay: ElementRef<HTMLDivElement>;
+  @ViewChild('zoomOverlay', { static: false }) zoomOverlay: ElementRef<HTMLDivElement>;
   @Input() ctx: WidgetContext;
+  
+  // External zoom state (percents)
+  public zoomStart = 0;
+  public zoomEnd = 100;
   
   // Entity sidebar model
   public entityList: Array<{
@@ -312,6 +318,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.initChart();
       this.setupResizeObserver();
       
+      // Initialize zoom overlay positions
+      this.updateZoomOverlay();
+      
       // CRITICAL: Expose component to ThingsBoard's widget.js bridge
       // This allows TB to call our methods and flush pending updates
       if (this.ctx.$scope) {
@@ -325,6 +334,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         }
       }
     }, 100);
+  }
+
+  // [CLAUDE EDIT] Helper to compute grid order for a label
+  private gridOrderIndexOfLabel(label: string): number {
+    const dyn = this.getDynamicAxisIndexMap();
+    let best = Number.POSITIVE_INFINITY;
+    for (const s of (this.ctx.data || [])) {
+      if (s?.dataKey?.label === label) {
+        const asg = s.dataKey?.settings?.axisAssignment || 'Top';
+        if (dyn[asg] !== undefined) best = Math.min(best, dyn[asg]);
+      }
+    }
+    return Number.isFinite(best) ? best : 999;
   }
 
   ngOnDestroy(): void {
@@ -503,26 +525,40 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
       this.LOG(`Series[${i}] key="${seriesKey}" entity="${entityName}" color="${entityColor}"`);
       
+      // [CLAUDE EDIT] Performance optimizations
+      const points = this.ctx.data[i].data?.length || 0;
+      const labelSelected = this.legendItems.find(item => item.label === label)?.selected !== false;
+      
       const seriesElement = {
         name: seriesKey,  // Use unique key instead of just label
         itemStyle: {
           normal: {
             color: entityColor,  // Use entity-based color instead of series-specific color
+            opacity: labelSelected ? 1 : 0.08  // [CLAUDE EDIT] Lower opacity when off
           }
         },
         lineStyle: {
           color: entityColor,  // Also set line color to entity color
           width: (axisAssignment === 'Middle') 
             ? this.currentConfig.seriesElement.lineStyle.widthMiddle 
-            : this.currentConfig.seriesElement.lineStyle.width
+            : this.currentConfig.seriesElement.lineStyle.width,
+          opacity: labelSelected ? 1 : 0.08  // [CLAUDE EDIT] Lower opacity when off
         },
         type: 'line',
         xAxisIndex: gridIndex,
         yAxisIndex: gridIndex,
         data: this.ctx.data[i].data,
-        symbol: (this.ctx.settings.showDataPoints) ? 'circle' : 'none',
+        // [CLAUDE EDIT] Performance: symbols only when not dense
+        symbol: (this.ctx.settings.showDataPoints && points <= 400) ? 'circle' : 'none',
         symbolSize: (this.ctx.settings.symbolSize_data || 5) * 2.5, // Increase size by 2.5x to match original
-        smooth: this.ctx.settings.smooth
+        smooth: this.ctx.settings.smooth,
+        // [CLAUDE EDIT] Performance optimizations
+        sampling: points > 800 ? 'lttb' : undefined,
+        progressive: 600,
+        progressiveThreshold: 4000,
+        large: points > 5000,
+        largeThreshold: 2000,
+        silent: !labelSelected  // [CLAUDE EDIT] Reduce interaction cost when off
       };
       myNewOptions.series.push(seriesElement);
     }
@@ -613,51 +649,38 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   /**
-   * Helper method to apply correct scroll height based on current active grids
-   * Mathematical model: 
-   * - For <=3 grids: container = available height (fits exactly)
-   * - For >3 grids: container = available height * scale factor for scrolling
-   * 
-   * Key insight: ECharts % calculations are relative to container height.
-   * So for N grids to display properly with scroll:
-   * - Container height must scale proportionally to grid count
-   * - We use 3 grids as baseline (fits in 100% height)
-   * - For N>3: height = availableHeight * (N/3) to maintain same grid size
+   * Helper method to apply correct scroll height with floating overlays
+   * The outer container gets paddings to prevent overlap with sticky bars
+   * The inner canvas height scales by grid count for scrolling
    */
   private applyScrollableHeight(): void {
-    const container = this.chartContainer.nativeElement;
-    const containerElement = container.querySelector('#echartContainer') as HTMLElement;
+    const outer = this.chartContainer?.nativeElement as HTMLElement; // wrapper
+    const inner = outer?.querySelector('#echartContainer') as HTMLElement;
+    if (!inner || !this.ctx.height) return;
+
+    const buttonBarHeight = 50;
+    const legendH = this.getLegendPx(); // floating
+    const zoomH = this.getZoomPx();   // floating
+
+    const viewport = Math.max(0, this.ctx.height - buttonBarHeight - legendH - zoomH);
+
+    // Scale plot canvas by grid count (scroll only the canvas area)
+    const scaleFactor = this.currentGrids > 3 ? (this.currentGrids / 3) : 1;
+    const innerHeight = Math.ceil(viewport * scaleFactor);
+
+    // Keep plots clear of floating bars
+    outer.style.paddingTop = `${legendH}px`;
+    outer.style.paddingBottom = `${zoomH}px`;
+
+    outer.style.height = `${viewport}px`;
+    outer.style.maxHeight = `${viewport}px`;
+    outer.style.overflowY = this.currentGrids > 3 ? 'auto' : 'hidden';
+    inner.style.height = `${innerHeight}px`;
+
+    // IMPORTANT: trigger resize so ECharts recomputes grids after height change
+    this.chart?.resize();
     
-    if (!containerElement || !this.ctx.height) {
-      return;
-    }
-    
-    const buttonBarHeight = 50; // Button container takes about 50px
-    const availableHeight = this.ctx.height - buttonBarHeight;
-    
-    containerElement.style.width = '100%';
-    
-    if (this.currentGrids > 3) {
-      // Scale container height proportionally to grid count
-      // This ensures each grid maintains consistent size
-      const scaleFactor = this.currentGrids / 3;
-      const scrollHeight = Math.ceil(availableHeight * scaleFactor);
-      
-      container.style.overflowY = 'auto'; 
-      container.style.maxHeight = `${availableHeight}px`;
-      container.style.height = `${availableHeight}px`;
-      containerElement.style.height = `${scrollHeight}px`;
-      
-      this.LOG(`[HEIGHT DEBUG] Scrollable: ${this.currentGrids} grids, viewport: ${availableHeight}px, container: ${scrollHeight}px`);
-    } else {
-      // Container fills available height exactly
-      container.style.overflowY = 'hidden';
-      container.style.maxHeight = '';
-      container.style.height = '';
-      containerElement.style.height = `${availableHeight}px`;
-      
-      this.LOG(`[HEIGHT DEBUG] Normal: ${this.currentGrids} grids, container: ${availableHeight}px`);
-    }
+    this.LOG(`[HEIGHT] viewport=${viewport}px inner=${innerHeight}px (legend=${legendH}px zoom=${zoomH}px scale=${scaleFactor})`);
   }
 
   // Convert px to % based on the current inner chart height
@@ -669,7 +692,37 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   // Get the gap between grids as a percentage, converted from pixels
   private getGapPct(): number {
-    return this.pxToPct(GAP_BETWEEN_GRIDS_PX);
+    return this.pxToPct(48); // Reduced from 70 to 48 for tighter spacing
+  }
+
+  // [CLAUDE] Get chart inner height in pixels
+  private getChartInnerHeightPx(): number {
+    const el = this.chartContainer?.nativeElement?.querySelector('#echartContainer') as HTMLElement;
+    return el?.clientHeight || this.ctx.height || 600;
+  }
+
+  // [CLAUDE] Measure actual legend height in pixels
+  private measureLegendHeightPx(): number {
+    const legendEl = this.legendViewport?.nativeElement;
+    return legendEl?.offsetHeight || 32; // Fallback to 32px if not found
+  }
+
+  // Floating overlays live outside the canvas, so don't reserve space in grids
+  private getTopReservePct(): number { 
+    return 0; 
+  }
+  
+  private getBottomReservePct(): number { 
+    return 0; 
+  }
+  
+  // Helper: heights of sticky bars
+  private getLegendPx(): number {
+    return this.legendOverlay?.nativeElement?.offsetHeight || 0;
+  }
+  
+  private getZoomPx(): number {
+    return this.zoomOverlay?.nativeElement?.offsetHeight || 0;
   }
 
   // Helper to check if tooltip should only show hovered grid
@@ -856,8 +909,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.applyScrollableHeight();
     }
     
-    this.chart = echarts.init(containerElement);
+    // [CLAUDE EDIT] Enable dirty-rect rendering for performance
+    this.chart = echarts.init(containerElement, undefined, { useDirtyRect: true });
     this.LOG('[ECharts Line Chart] Chart instance created:', !!this.chart);
+    
+    // [CLAUDE EDIT] Disable animations for performance
+    this.chart.setOption({ animation: false, animationDurationUpdate: 0 });
     
     // Show loading spinner immediately
     this.chart.showLoading({
@@ -934,6 +991,22 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.onLegendSelectChanged(event);
       // Sync custom legend toolbar when legend changes
       this.syncCustomLegendFromChart();
+    });
+    
+    // Keep zoom sliders in sync when user uses mousewheel/drag
+    this.chart.on('dataZoom', () => {
+      const dz = (this.chart.getOption().dataZoom || [])[0];
+      if (dz) {
+        const s = Math.round((dz.start as number) * 1000) / 1000;
+        const e = Math.round((dz.end as number) * 1000) / 1000;
+        if (s !== this.zoomStart || e !== this.zoomEnd) {
+          this.zoomStart = s;
+          this.zoomEnd = e;
+          // Update external bar positions (handles/window)
+          this.updateZoomOverlay();
+          this.ctx.detectChanges?.();
+        }
+      }
     });
     
     // Initial refresh of entity list and sync custom legend
@@ -1761,12 +1834,88 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.onDataUpdated();
   }
 
-  private resetZoom(): void {
+  public resetZoom(): void {
+    this.zoomStart = 0;
+    this.zoomEnd = 100;
+    if (this.chart) {
+      this.chart.dispatchAction({
+        type: 'dataZoom',
+        start: 0,
+        end: 100
+      });
+    }
+    this.updateZoomOverlay();
+  }
+  
+  // Hook the zoom sliders
+  public onZoomInput(): void {
+    // Enforce start <= end
+    if (this.zoomStart > this.zoomEnd) {
+      [this.zoomStart, this.zoomEnd] = [this.zoomEnd, this.zoomStart];
+    }
+
+    if (!this.chart) return;
     this.chart.dispatchAction({
       type: 'dataZoom',
-      start: 0,
-      end: 100
+      start: this.zoomStart,
+      end: this.zoomEnd
     });
+    
+    // Update external bar positions (handles/window)
+    this.updateZoomOverlay();
+  }
+  
+  // Update the visual position of zoom handles and window
+  private updateZoomOverlay(): void {
+    const track = this.zoomOverlay?.nativeElement?.querySelector('.zoom-track') as HTMLElement;
+    if (!track) return;
+    
+    const left = this.zoomStart;
+    const right = 100 - this.zoomEnd;
+
+    const win = track.querySelector('.zoom-window') as HTMLElement;
+    const hl = track.querySelector('.zoom-handle.left') as HTMLElement;
+    const hr = track.querySelector('.zoom-handle.right') as HTMLElement;
+
+    if (win) {
+      win.style.left = `${left}%`;
+      win.style.right = `${right}%`;
+    }
+    if (hl) hl.style.left = `calc(${left}% - 7px)`;
+    if (hr) hr.style.right = `calc(${right}% - 7px)`;
+  }
+  
+  // Handle dragging of zoom handles
+  public startDragHandle(event: MouseEvent | TouchEvent, handle: 'start' | 'end'): void {
+    event.preventDefault();
+    const track = this.zoomOverlay?.nativeElement?.querySelector('.zoom-track') as HTMLElement;
+    if (!track) return;
+    
+    const rect = track.getBoundingClientRect();
+    const isTouch = event.type.startsWith('touch');
+    
+    const moveHandler = (e: MouseEvent | TouchEvent) => {
+      const clientX = isTouch ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
+      const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+      
+      if (handle === 'start') {
+        this.zoomStart = Math.min(percent, this.zoomEnd);
+      } else {
+        this.zoomEnd = Math.max(percent, this.zoomStart);
+      }
+      
+      this.onZoomInput();
+    };
+    
+    const upHandler = () => {
+      document.removeEventListener('mousemove', moveHandler);
+      document.removeEventListener('mouseup', upHandler);
+      document.removeEventListener('touchmove', moveHandler);
+      document.removeEventListener('touchend', upHandler);
+    };
+    
+    document.addEventListener(isTouch ? 'touchmove' : 'mousemove', moveHandler);
+    document.addEventListener(isTouch ? 'touchend' : 'mouseup', upHandler);
   }
 
   // Helper methods from ThingsBoard example
@@ -1826,17 +1975,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // For 1-3 grids, use the same unified spacing calculation
       const grids = [];
       
-      // Use consistent top reserve
-      const topReserved = GAP_TOP_RESERVED_PCT;
+      // [CLAUDE] Use dynamic top reserve based on actual legend height
+      const topReserved = this.getTopReservePct();
       
-      // Convert total pixel reserve to percentage
-      const totalBottomPixels = DATAZOOM_HEIGHT_PX + DATAZOOM_BOTTOM_PX + GAP_BEFORE_DATAZOOM_PX;
-      const bottomReservedPct = this.pxToPct(totalBottomPixels);
+      // [CLAUDE] Use proper bottom reserve for dataZoom
+      const bottomReservedPct = this.getBottomReservePct();
       
       // Get unified gap between grids
       const gapPct = this.getGapPct();
       
-      // Calculate available height
+      // Calculate available height - more space without dataZoom reserve
       const availableHeight = 100 - topReserved - bottomReservedPct;
       
       // Calculate gaps and grid height
@@ -1867,17 +2015,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const leftMargin = this.currentSize === 'small' ? '12%' : '10%';
     const rightMargin = '1%';
     
-    // Reserve space for legend at top
-    const topReserved = GAP_TOP_RESERVED_PCT; // Use constant for legend space
+    // [CLAUDE] Use dynamic top reserve based on actual legend height
+    const topReserved = this.getTopReservePct();
     
-    // Convert pixel reserves to percentages for consistent math
-    const totalBottomPixels = DATAZOOM_HEIGHT_PX + DATAZOOM_BOTTOM_PX + GAP_BEFORE_DATAZOOM_PX;
-    const bottomReserved = this.pxToPct(totalBottomPixels);
+    // [CLAUDE] Use proper bottom reserve for dataZoom
+    const bottomReserved = this.getBottomReservePct();
     
     // Get gap between grids as percentage from pixels
     const gapPct = this.getGapPct();
     
-    // Total vertical budget for plots + their gaps
+    // Total vertical budget for plots + their gaps - more space available
     const availableHeight = 100 - topReserved - bottomReserved;
     
     // Calculate total gaps between plots
@@ -1938,16 +2085,26 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       splitLine: {
         show: true,
         lineStyle: {
-          width: this.currentConfig.option.yAxis.splitLine.lineStyle.width
+          color: '#e9edf2',  // [CLAUDE] Apple-style subtle grid lines
+          width: 1
         }
       },
-      axisLine: { onZero: false },
+      axisLine: { 
+        onZero: false,
+        lineStyle: {
+          color: '#cfd4dc'  // [CLAUDE] Apple-style axis line
+        }
+      },
+      axisTick: {
+        show: false  // [CLAUDE] Hide ticks for cleaner look
+      },
       position: 'bottom',
       axisLabel: {
         show: true,
         fontSize: this.currentConfig.option.xAxis.axisLabel.fontSize,
         fontWeight: this.currentConfig.option.xAxis.axisLabel.fontWeight,
         hideOverlap: true,
+        color: '#86868b',  // [CLAUDE] Apple-style muted labels
         interval: 'auto',
         formatter: createAxisFormatter(true), // First grid gets special first label
         rotate: this.currentConfig.option.xAxis.rotate,
@@ -1969,8 +2126,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         splitLine: {
           show: true,
           lineStyle: {
-            width: this.currentConfig.option.xAxis.splitLine?.lineStyle?.width || this.currentConfig.option.yAxis.splitLine.lineStyle.width,
-            color: '#e0e0e0',
+            color: '#e9edf2',  // [CLAUDE] Apple-style subtle grid lines
+            width: 1,
             type: 'solid'
           }
         },
@@ -1978,12 +2135,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           onZero: false,
           show: true,
           lineStyle: {
-            color: '#999'
+            color: '#cfd4dc'  // [CLAUDE] Apple-style axis line
           }
         },
-        axisTick: { 
-          show: true,
-          alignWithLabel: true 
+        axisTick: {
+          show: false  // [CLAUDE] Hide ticks for cleaner look
         },
         position: 'bottom', // Always position at bottom for all grids
         axisLabel: {
@@ -2016,21 +2172,27 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       scale: true,
       splitNumber: this.currentConfig.option.yAxis.splitNumber,
       name: this.ctx.settings.yAxisLeftTitle || '',
+      axisLine: {
+        show: false  // [CLAUDE] Hide y-axis line for cleaner look
+      },
+      axisTick: {
+        show: false  // [CLAUDE] Hide ticks
+      },
+      splitLine: {
+        lineStyle: {
+          color: '#e9edf2',  // [CLAUDE] Apple-style subtle grid lines
+          width: 1
+        }
+      },
       axisLabel: {
         formatter: '{value} ' + (tempUnits[0] || ""),
-        color: this.ctx.settings.legendcolortext,
+        color: '#86868b',  // [CLAUDE] Apple-style muted labels
         fontSize: this.currentConfig.option.yAxis.axisLabel.fontSize,
         fontWeight: this.currentConfig.option.yAxis.axisLabel.fontWeight,
         showMinLabel: true,
         showMaxLabel: true
       },
-      splitLine: {
-        show: true,
-        lineStyle: {
-          width: this.currentConfig.option.yAxis.splitLine.lineStyle.width
-        }
-      },
-      gridIndex: 0,
+      gridIndex: 0
     });
     
     // Add Y axes for all grids
@@ -2042,18 +2204,25 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         splitNumber: this.currentConfig.option.yAxis.splitNumber,
         alignTicks: true,
         name: i === 1 ? (this.ctx.settings.yAxisRightTitle || '') : '',
+        axisLine: {
+          show: false  // [CLAUDE] Hide y-axis line
+        },
+        axisTick: {
+          show: false  // [CLAUDE] Hide ticks
+        },
+        splitLine: {
+          lineStyle: {
+            color: '#e9edf2',  // [CLAUDE] Apple-style subtle grid lines
+            width: 1
+          }
+        },
         axisLabel: {
           formatter: '{value} ' + (tempUnits[i] || ''),
+          color: '#86868b',  // [CLAUDE] Apple-style muted labels
           fontSize: this.currentConfig.option.yAxis.axisLabel.fontSize,
           fontWeight: this.currentConfig.option.yAxis.axisLabel.fontWeight,
           show: true,
-          showMaxLabel: true,
-        },
-        splitLine: {
-          show: true,
-          lineStyle: {
-            width: this.currentConfig.option.yAxis.splitLine.lineStyle.width
-          }
+          showMaxLabel: true
         },
         gridIndex: i
       });
@@ -2207,6 +2376,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   private getInitConfig(): any {
     return {
+      // [CLAUDE EDIT] Disable animations at root level
+      animation: false,
+      animationDurationUpdate: 0,
+      // [CLAUDE] Apple-style system font
+      textStyle: {
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+      },
       // Hidden controller legend - maintains selection state but not visible
       legend: [{
         id: 'controllerLegend',
@@ -2220,6 +2396,20 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         trigger: 'axis',
         triggerOn: 'mousemove|click',
         confine: true,
+        animation: false,  // [CLAUDE EDIT] Disable tooltip animation
+        // [CLAUDE] Apple-style tooltip design
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderColor: 'rgba(0, 0, 0, 0.1)',
+        borderWidth: 1,
+        borderRadius: 12,
+        shadowBlur: 20,
+        shadowColor: 'rgba(0, 0, 0, 0.1)',
+        shadowOffsetY: 5,
+        textStyle: {
+          color: '#1d1d1f',
+          fontSize: 12,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial'
+        },
         axisPointer: {
           type: 'cross',
           snap: true,
@@ -2283,10 +2473,27 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           const selected = opt?.legend?.[0]?.selected || {};
           const visible = list.filter(p => selected[p.seriesName] !== false);
 
-          // Sort and cap (user setting or default 10)
+          // [CLAUDE] Sort by grid order (same as legend), then by value
           const MAX_ITEMS = this.ctx.settings?.tooltipMaxItems ?? 10;
-          visible.sort((a, b) => Math.abs(b.value[1]) - Math.abs(a.value[1]));
-          const items = visible.slice(0, MAX_ITEMS);
+          
+          // Add grid position to each item
+          const itemsWithPosition = visible.map(item => {
+            const label = this.extractLabelFromKey(item.seriesName);
+            const gridPos = this.gridOrderIndexOfLabel(label);
+            return { ...item, gridPos, label };
+          });
+          
+          // Sort by grid position first (like legend), then by value
+          itemsWithPosition.sort((a, b) => {
+            // First sort by grid position
+            if (a.gridPos !== b.gridPos) {
+              return a.gridPos - b.gridPos;
+            }
+            // Then by value (descending)
+            return Math.abs(b.value[1]) - Math.abs(a.value[1]);
+          });
+          
+          const items = itemsWithPosition.slice(0, MAX_ITEMS);
           const hiddenCount = Math.max(visible.length - items.length, 0);
 
           // Get unit for the current grid
@@ -2304,8 +2511,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             const decimals = this.ctx.decimals ?? 2;
             for (const it of items) {
               const val = Number(it.value[1]);
-              // Extract user-friendly label from series key
-              const displayName = this.extractLabelFromKey(it.seriesName);
+              // Use the label we already extracted (it has gridPos ordering)
+              const displayName = it.label || this.extractLabelFromKey(it.seriesName);
               html += `<tr>
                 <td style="padding:2px 6px 2px 0;white-space:nowrap">${it.marker} ${displayName}</td>
                 <td style="padding:2px 0;text-align:right">${isFinite(val) ? val.toFixed(decimals) : ''}${unit ? ' ' + unit : ''}</td>
@@ -2322,6 +2529,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         }
       },
       axisPointer: {
+        animation: false,  // [CLAUDE EDIT] Disable axisPointer animation
         link: [{
           xAxisIndex: 'all'
         }]
@@ -2331,24 +2539,26 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private getDataZoomConfig(): any[] {
-    // DataZoom using fixed pixel dimensions for consistent appearance
     return [
-      {
-        show: true,
-        xAxisIndex: 'all',
-        type: 'slider',
-        bottom: DATAZOOM_BOTTOM_PX,         // Fixed pixel gap from bottom
-        height: DATAZOOM_HEIGHT_PX,         // Fixed pixel height
-        handleSize: '70%',                  // Slimmer handles help visual fit
-        moveHandleSize: 5,
-        start: 0,
-        end: 100
+      // Keep the internal slider hidden — external bar controls start/end
+      { 
+        type: 'slider', 
+        show: false, 
+        xAxisIndex: 'all', 
+        start: this.zoomStart, 
+        end: this.zoomEnd 
       },
+      // INSIDE zoom: wheel & pinch should just work anywhere over the plots
       {
         type: 'inside',
         xAxisIndex: 'all',
-        start: 0,
-        end: 100
+        start: this.zoomStart,
+        end: this.zoomEnd,
+        zoomOnMouseWheel: true,   // ← allow wheel zoom
+        moveOnMouseWheel: false,  // wheel zooms, not pans
+        moveOnMouseMove: true,    // drag pans
+        zoomOnTouch: true,        // enable touch
+        throttle: 50
       }
     ];
   }
@@ -2897,41 +3107,29 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return '#999999';
   }
   
-  // Build/update the legend items from the grouped legend state
+  // [CLAUDE EDIT] Build/update the legend items from the grouped legend state
   private syncCustomLegendFromChart(): void {
     if (!this.chart) return;
     
     const group = this.getGroupLegendState();
     
-    // Build legend items with colors and plot positions
+    // Build legend items with colors and grid order positions
     const itemsWithPosition = group.data.map(label => {
-      // Find the first series with this label to get its axis position
-      let axisPosition = 999; // Default for items without position
-      for (const series of (this.ctx.data || [])) {
-        if (series?.dataKey?.label === label) {
-          const axisAssignment = series.dataKey?.settings?.axisAssignment || 'Bottom';
-          // Get numeric position from axis assignment
-          const axisMap = this.getAxisPositionMap();
-          axisPosition = axisMap[axisAssignment] ?? 999;
-          break; // Use first match
-        }
-      }
-      
       return {
         label,
         color: this.pickRepresentativeColor(label),
         selected: group.selected[label] !== false,
-        position: axisPosition
+        pos: this.gridOrderIndexOfLabel(label)  // [CLAUDE EDIT] Use grid order helper
       };
     });
     
-    // Sort by position (top to bottom order)
+    // [CLAUDE EDIT] Sort by grid order (pos), then by label for stability
     this.legendItems = itemsWithPosition
-      .sort((a, b) => a.position - b.position)
+      .sort((a, b) => a.pos - b.pos || a.label.localeCompare(b.label))
       .map(({ label, color, selected }) => ({ label, color, selected }));
     
-    // Update pagination
-    this.updateLegendPagination();
+    // [CLAUDE EDIT] Apply pagination without recalculating widths
+    this.applyLegendPagination();
     
     // Trigger change detection
     if (this.ctx?.detectChanges) {
@@ -2974,7 +3172,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return { viewportWidth, avgChipWidth };
   }
   
-  // Calculate items per page based on measured widths
+  // [CLAUDE EDIT] Calculate items per page based on measured widths
   private calculateItemsPerPage(): void {
     // Use setTimeout to ensure DOM is rendered
     setTimeout(() => {
@@ -2989,49 +3187,75 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // Only update if changed
       if (this.legendItemsPerPage !== itemsPerPage) {
         this.legendItemsPerPage = itemsPerPage;
-        this.updateLegendPagination();
+        this.applyLegendPagination();  // [CLAUDE EDIT] Use apply instead of update
       }
     }, 0);
   }
   
-  // Update pagination based on current items
-  private updateLegendPagination(): void {
-    // Recalculate items per page
-    this.calculateItemsPerPage();
+  // [CLAUDE EDIT] Apply pagination without recalculating widths - sequence never broken
+  private applyLegendPagination(): void {
+    // Always show items from the beginning to maintain sequence
+    // The first item should always be visible regardless of page
+    const itemsToShow = Math.min(this.legendItemsPerPage, this.legendItems.length);
     
-    // Calculate total pages
-    this.legendTotalPages = Math.ceil(this.legendItems.length / this.legendItemsPerPage);
+    // For pagination, we shift the window but always include earlier items if space allows
+    if (this.legendCurrentPage === 0) {
+      // First page: show first N items
+      this.legendPageItems = this.legendItems.slice(0, itemsToShow);
+    } else {
+      // Subsequent pages: always include first item, then show next items
+      const remainingSlots = itemsToShow - 1; // Reserve one slot for first item
+      const startIdx = 1 + (this.legendCurrentPage - 1) * remainingSlots;
+      const endIdx = Math.min(startIdx + remainingSlots, this.legendItems.length);
+      
+      // Combine first item with the page's items
+      this.legendPageItems = [
+        this.legendItems[0], // Always include first item
+        ...this.legendItems.slice(startIdx, endIdx)
+      ];
+    }
+    
+    // Calculate total pages with this new logic
+    if (this.legendItems.length <= this.legendItemsPerPage) {
+      this.legendTotalPages = 1;
+    } else {
+      // First page shows N items, subsequent pages show N-1 new items (plus first item)
+      const itemsAfterFirst = this.legendItems.length - this.legendItemsPerPage;
+      const subsequentPageSize = Math.max(1, this.legendItemsPerPage - 1);
+      this.legendTotalPages = 1 + Math.ceil(itemsAfterFirst / subsequentPageSize);
+    }
     
     // Ensure current page is valid
     if (this.legendCurrentPage >= this.legendTotalPages) {
       this.legendCurrentPage = Math.max(0, this.legendTotalPages - 1);
     }
     
-    // Calculate page items
-    const startIdx = this.legendCurrentPage * this.legendItemsPerPage;
-    const endIdx = Math.min(startIdx + this.legendItemsPerPage, this.legendItems.length);
-    this.legendPageItems = this.legendItems.slice(startIdx, endIdx);
-    
     // Update pagination flags
     this.legendHasMorePages = (this.legendCurrentPage + 1) < this.legendTotalPages;
   }
   
-  // Navigate to previous page
+  // [CLAUDE EDIT] Update pagination based on current items (kept for compatibility)
+  private updateLegendPagination(): void {
+    // First recalculate items per page if viewport changed
+    this.calculateItemsPerPage();
+  }
+  
+  // [CLAUDE EDIT] Navigate to previous page
   public legendPrevPage(): void {
     if (this.legendCurrentPage > 0) {
       this.legendCurrentPage--;
-      this.updateLegendPagination();
+      this.applyLegendPagination();  // [CLAUDE EDIT] Use apply instead of update
       if (this.ctx?.detectChanges) {
         this.ctx.detectChanges();
       }
     }
   }
   
-  // Navigate to next page
+  // [CLAUDE EDIT] Navigate to next page
   public legendNextPage(): void {
     if (this.legendCurrentPage < this.legendTotalPages - 1) {
       this.legendCurrentPage++;
-      this.updateLegendPagination();
+      this.applyLegendPagination();  // [CLAUDE EDIT] Use apply instead of update
       if (this.ctx?.detectChanges) {
         this.ctx.detectChanges();
       }

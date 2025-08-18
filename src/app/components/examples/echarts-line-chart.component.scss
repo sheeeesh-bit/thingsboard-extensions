@@ -206,39 +206,55 @@ div[fxFlex] {
   --plot-right: 1%;   // Default, will be updated dynamically
 }
 
-// Chart wrapper with relative positioning for overlay
-.chart-wrap {
+// New wrapper for floating overlays
+.chart-container-wrapper {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   position: relative;
-  overflow: hidden;
-}
-
-#echartContainer {
-  position: absolute;
-  inset: 0;
-  min-width: 600px;
-  width: 100%;
   height: 100%;
 }
 
-// Legend overlay aligned to plot margins - Apple-like design
+// Sticky floating overlays with Apple design
+.legend-overlay,
+.zoom-overlay {
+  position: sticky;
+  left: 0;
+  z-index: 40;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+}
+
 .legend-overlay {
-  position: absolute;
-  top: 8px;
-  left: var(--plot-left);
-  right: var(--plot-right);
-  z-index: 10;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 14px;
-  padding: 8px 10px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  top: 0;
+  padding: 8px var(--plot-right, 1%) 6px var(--plot-left, 10%);
+  border-bottom: 1px solid #e5e7eb;
   display: flex;
   align-items: center;
   gap: 8px;
-  pointer-events: auto;
-  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.zoom-overlay {
+  bottom: 0;
+  padding: 8px var(--plot-right, 1%) 8px var(--plot-left, 10%);
+  border-top: 1px solid #e5e7eb;
+}
+
+// Scrollable chart container
+.chart-outer {
+  position: relative;
+  overflow-y: auto;
+  width: 100%;
+  flex: 1;
+}
+
+#echartContainer {
+  position: relative;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  min-width: 600px;
 }
 
 // Legend viewport - constrained view window
@@ -375,4 +391,81 @@ div[fxFlex] {
 @keyframes chipPulse {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(0.96); background: rgba(255, 69, 58, 0.1); }
+}
+// ECharts-style zoom overlay
+.zoom-overlay {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-left: var(--plot-left, 10%);
+  padding-right: var(--plot-right, 1%);
+  background: transparent;
+
+  // The slider track
+  .zoom-track {
+    position: relative;
+    flex: 1 1 auto;
+    height: 28px;  // Same visual height as ECharts default
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.04);  // Light gray like ECharts' track
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+
+    // Selected window (filler)
+    .zoom-window {
+      position: absolute;
+      top: 6px;
+      bottom: 6px;
+      left: 0%;
+      right: 0%;
+      border-radius: 4px;
+      background: rgba(0, 122, 255, 0.15);  // Blue-ish like ECharts
+      box-shadow: inset 0 0 0 1px rgba(0, 122, 255, 0.45);
+      pointer-events: none;
+    }
+
+    // Handles
+    .zoom-handle {
+      position: absolute;
+      top: 2px;
+      width: 14px;
+      bottom: 2px;
+      border-radius: 6px;
+      background: #8e8e93;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+      cursor: ew-resize;
+      transition: background-color 0.2s;
+      
+      &:hover {
+        background: #636366;
+      }
+      
+      &.left {
+        left: calc(0% - 7px);
+      }
+      &.right {
+        right: calc(0% - 7px);
+      }
+    }
+  }
+
+  .zoom-reset {
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 12px;
+    padding: 6px 10px;
+    font-size: 12px;
+    background: #fff;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #007aff;
+    transition: all 0.2s;
+    
+    &:hover {
+      background: #f5f5f7;
+      border-color: rgba(0, 0, 0, 0.2);
+    }
+    
+    &:active {
+      transform: scale(0.95);
+    }
+  }
 }

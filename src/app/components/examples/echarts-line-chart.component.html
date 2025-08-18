@@ -54,13 +54,10 @@
       </table>
     </aside>
     
-    <!-- Chart wrapper (right side) with positioned parent -->
-    <div #chartContainer class="chart-wrap">
-      <!-- ECharts container -->
-      <div id="echartContainer"></div>
-      
-      <!-- Legend overlay aligned to plot margins -->
-      <nav class="legend-overlay" aria-label="Series legend">
+    <!-- Chart area with floating overlays -->
+    <div class="chart-container-wrapper">
+      <!-- Top floating legend overlay -->
+      <nav class="legend-overlay" #legendOverlay aria-label="Series legend">
         <!-- Previous page button -->
         <button type="button"
                 class="legend-pager legend-pager--prev"
@@ -100,6 +97,25 @@
           </svg>
         </button>
       </nav>
+
+      <!-- Scrollable chart container -->
+      <div #chartContainer class="chart-outer">
+        <div id="echartContainer"></div>
+      </div>
+
+      <!-- Bottom floating zoom overlay -->
+      <div class="zoom-overlay" #zoomOverlay>
+        <div class="zoom-track">
+          <div class="zoom-window"></div>
+          <div class="zoom-handle left" 
+               (mousedown)="startDragHandle($event, 'start')"
+               (touchstart)="startDragHandle($event, 'start')"></div>
+          <div class="zoom-handle right" 
+               (mousedown)="startDragHandle($event, 'end')"
+               (touchstart)="startDragHandle($event, 'end')"></div>
+        </div>
+        <button class="zoom-reset" (click)="resetZoom()">Reset</button>
+      </div>
     </div>
   </div>
 
