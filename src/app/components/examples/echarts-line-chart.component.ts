@@ -579,8 +579,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     myNewOptions.grid = this.currentGridArray();
     myNewOptions.dataZoom = this.getDataZoomConfig(); // Update datazoom based on current grid config
     
-    // Add plot numbers as graphic elements
-    myNewOptions.graphic = this.createPlotNumberGraphics();
+    // Plot numbers are now displayed as yAxis names instead of graphic elements
     
     // Hidden controller legend - maintains selection state but not visible
     // The custom HTML toolbar will control this via dispatchAction
@@ -602,7 +601,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.LOG('Applying full reset with replaceMerge');
       // Replace structural parts for grid changes
       this.chart.setOption(myNewOptions, {
-        replaceMerge: ['grid', 'xAxis', 'yAxis', 'series', 'dataZoom', 'graphic']
+        replaceMerge: ['grid', 'xAxis', 'yAxis', 'series', 'dataZoom']
       });
       this.resetGrid = false;
     } else {
@@ -966,9 +965,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     option.grid = this.currentGridArray();
     this.LOG('grid configuration:', option.grid);
     
-    // Add plot numbers as graphic elements
-    option.graphic = this.createPlotNumberGraphics();
-    this.LOG('graphic configuration:', option.graphic);
+    // Plot numbers are now displayed as yAxis names instead of graphic elements
     
     this.LOG('Setting chart option with grid config...');
     this.chart.setOption(option);
@@ -2159,11 +2156,26 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const tempUnits = this.getGridUnitsByData();
     this.LOG("currentXAxisArray getGridUnitsByData:", tempUnits);
     
+    // Get the axis position map to determine fixed plot numbers
+    const axisMap = this.getAxisPositionMap();
+    const visibleGridNames = this.currentGridNames;
+    const plotNumber1 = visibleGridNames[0] ? axisMap[visibleGridNames[0]] + 1 : 1;
+    
     myYAxisArray.push({
       type: 'value',
       scale: true,
       splitNumber: this.currentConfig.option.yAxis.splitNumber,
-      name: this.ctx.settings.yAxisLeftTitle || '',
+      name: String(plotNumber1),  // Display plot number as axis name
+      nameLocation: 'middle',
+      nameGap: 45,  // Distance from axis to name
+      nameRotate: 0,  // Keep horizontal
+      nameTextStyle: {
+        fontSize: this.currentSize === 'small' ? 20 : 
+                 this.currentSize === 'large' ? 24 : 28,
+        fontWeight: 'bold',
+        color: '#007aff',
+        align: 'center'
+      },
       axisLine: {
         show: false  // [CLAUDE] Hide y-axis line for cleaner look
       },
@@ -2189,13 +2201,24 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Add Y axes for all grids
     for (let i = 1; i < this.currentGrids; i++) {
+      const plotNumber = visibleGridNames[i] ? axisMap[visibleGridNames[i]] + 1 : i + 1;
       myYAxisArray.push({
         type: 'value',
         show: true,
         scale: true,
         splitNumber: this.currentConfig.option.yAxis.splitNumber,
         alignTicks: true,
-        name: i === 1 ? (this.ctx.settings.yAxisRightTitle || '') : '',
+        name: String(plotNumber),  // Display plot number as axis name
+        nameLocation: 'middle',
+        nameGap: 45,  // Distance from axis to name
+        nameRotate: 0,  // Keep horizontal
+        nameTextStyle: {
+          fontSize: this.currentSize === 'small' ? 20 : 
+                   this.currentSize === 'large' ? 24 : 28,
+          fontWeight: 'bold',
+          color: '#007aff',
+          align: 'center'
+        },
         axisLine: {
           show: false  // [CLAUDE] Hide y-axis line
         },
