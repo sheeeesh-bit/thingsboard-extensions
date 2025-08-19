@@ -7,7 +7,6 @@ import {
   ViewChild,
   OnDestroy
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import * as echarts from 'echarts/core';
 import { WidgetContext } from '@home/models/widget-component.models';
 import { LineChart } from 'echarts/charts';
@@ -24,6 +23,15 @@ import { CanvasRenderer } from 'echarts/renderers';
 import * as XLSX from 'xlsx';
 import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
+import { 
+  DEFAULT_PERFORMANCE_CONFIG,
+  ChartPerformanceMonitor,
+  DataOptimizer,
+  AnimationFrameScheduler,
+  MemoryOptimizer,
+  SmoothInteraction,
+  createOptimizedTooltipFormatter
+} from './chart-performance-utils';
 
 // Register required components
 echarts.use([
@@ -55,14 +63,8 @@ const SIZE_NAMES = {
   HUGE: "huge",
 };
 
-// DataZoom geometry constants - fixed pixel dimensions for consistent appearance
-const DATAZOOM_HEIGHT_PX = 28;      // height of the slider track in pixels
-const DATAZOOM_BOTTOM_PX = 40;       // gap between slider and container bottom in pixels
-const GAP_BEFORE_DATAZOOM_PX = 70;   // gap between last plot and slider in pixels
-
-// Grid spacing constants - unified pixel-based spacing
-const GAP_BETWEEN_GRIDS_PX = 70;    // consistent visual gap between stacked plots in pixels
-const GAP_TOP_RESERVED_PCT = 8;     // % reserved at top for legend space (even though overlay doesn't use it)
+// Layout constants are defined inline in getGridConfig() where they're used
+// to maintain clarity about the specific layout calculations
 
 // Standard 3-subplot mapping (original)
 const axisPositionMapStandard = {
@@ -88,6 +90,13 @@ const axisPositionMapExtended = {
   styleUrls: ['./echarts-line-chart.component.scss']
 })
 export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestroy {
+
+  // Performance optimization tools
+  private performanceConfig = DEFAULT_PERFORMANCE_CONFIG;
+  private performanceMonitor = new ChartPerformanceMonitor();
+  private animationScheduler = new AnimationFrameScheduler();
+  private dataUpdateDebounceTimer: any = null;
+  private totalDataPoints = 0;
 
   @ViewChild('chartContainer', {static: false}) chartContainer: ElementRef<HTMLElement>;
   @ViewChild('legendOverlay', { static: false }) legendOverlay: ElementRef<HTMLDivElement>;
@@ -191,17 +200,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // Formatter configurations
   private browserLocale = Intl.DateTimeFormat().resolvedOptions().timeZone.startsWith('Europe/') ? "en-GB" : navigator.language || (navigator as any).userLanguage;
-  private datePipe: DatePipe;
   
   // Helper method to get the correct axis position map
   private getAxisPositionMap(): any {
     return this.ctx.settings?.multipleDevices ? axisPositionMapExtended : axisPositionMapStandard;
   }
   
-  // Helper method to get max allowed grids
-  private getMaxAllowedGrids(): number {
-    return this.ctx.settings?.multipleDevices ? 7 : 3;
-  }
 
   ngOnInit(): void {
     this.LOG(this.ctx);
@@ -215,7 +219,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.nextColorIndex = 0;
     
     // Initialize DatePipe with user's locale
-    this.datePipe = new DatePipe(this.browserLocale);
     
     // Initialize debug output first
     this.DEBUG = this.ctx.settings.debugOutput;
@@ -349,7 +352,44 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return Number.isFinite(best) ? best : 999;
   }
 
+  // Performance optimization helper methods
+  private getOptimalSymbol(dataPoints: number): string {
+    if (!this.ctx.settings.showDataPoints) return 'none';
+    if (dataPoints > 400) return 'none';  // No symbols for dense data
+    if (dataPoints > 200) return 'emptyCircle';  // Lighter symbols for medium density
+    return 'circle';  // Full symbols for sparse data
+  }
+  
+  private getOptimalSymbolSize(dataPoints: number): number {
+    const baseSize = (this.ctx.settings.symbolSize_data || 5) * 2.5;
+    if (dataPoints > 300) return baseSize * 0.6;  // Smaller for dense data
+    if (dataPoints > 150) return baseSize * 0.8;  // Medium for moderate density
+    return baseSize;  // Full size for sparse data
+  }
+  
+  private getOptimalSampling(dataPoints: number): string | undefined {
+    if (dataPoints > 5000) return 'lttb';  // Best algorithm for very large datasets
+    if (dataPoints > 2000) return 'average';  // Faster for medium-large datasets
+    if (dataPoints > 800) return 'max';  // Simple sampling for medium datasets
+    return undefined;  // No sampling for small datasets
+  }
+  
+  private getOptimalAnimationDuration(dataPoints: number): number {
+    if (dataPoints > this.performanceConfig.animationThreshold) return 0;
+    if (dataPoints > 1000) return 150;  // Quick animation for medium data
+    if (dataPoints > 500) return 200;   // Moderate animation
+    return 300;  // Full animation for small datasets
+  }
+  
   ngOnDestroy(): void {
+    // Stop performance monitoring and cleanup
+    MemoryOptimizer.stopAutoCleanup();
+    this.animationScheduler.clear();
+    
+    if (this.dataUpdateDebounceTimer) {
+      clearTimeout(this.dataUpdateDebounceTimer);
+    }
+    
     // Clean up component reference from ThingsBoard scope
     if (this.ctx.$scope && this.ctx.$scope.echartsLineChartComponent === this) {
       this.LOG('[ECharts Line Chart] Removing component from ThingsBoard scope');
@@ -390,9 +430,22 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('Data series count:', this.ctx.data?.length || 0);
     this.LOG('Legend overrides active:', this.legendOverridesGrids);
     
+    // Debounce rapid data updates for better performance
+    if (this.dataUpdateDebounceTimer) {
+      clearTimeout(this.dataUpdateDebounceTimer);
+    }
+    
+    this.dataUpdateDebounceTimer = setTimeout(() => {
+      this.performanceMonitor.measureFrame(() => {
+        this.processDataUpdateWithPerformance();
+      });
+    }, this.performanceConfig.dataUpdateDebounce);
+    
     // Reset hovered grid index to avoid stale references
     this.hoveredGridIndex = null;
-    
+  }
+  
+  private processDataUpdateWithPerformance(): void {
     // Clear legend override if this is fresh data from ThingsBoard
     const hasNewData = this.ctx.data?.some((series, idx) => 
       series.data?.length !== this.lastDataLengths?.[idx]
@@ -548,17 +601,34 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         xAxisIndex: gridIndex,
         yAxisIndex: gridIndex,
         data: this.ctx.data[i].data,
-        // [CLAUDE EDIT] Performance: symbols only when not dense
-        symbol: (this.ctx.settings.showDataPoints && points <= 400) ? 'circle' : 'none',
-        symbolSize: (this.ctx.settings.symbolSize_data || 5) * 2.5, // Increase size by 2.5x to match original
-        smooth: this.ctx.settings.smooth,
-        // [CLAUDE EDIT] Performance optimizations
-        sampling: points > 800 ? 'lttb' : undefined,
-        progressive: 600,
-        progressiveThreshold: 4000,
-        large: points > 5000,
-        largeThreshold: 2000,
-        silent: !labelSelected  // [CLAUDE EDIT] Reduce interaction cost when off
+        // Ultra-performance optimizations based on data density
+        symbol: this.getOptimalSymbol(points),
+        symbolSize: this.getOptimalSymbolSize(points),
+        showSymbol: points <= this.performanceConfig.showSymbolThreshold,
+        smooth: this.ctx.settings.smooth && points < 1000, // Disable smoothing for large datasets
+        // Advanced sampling and rendering
+        sampling: this.getOptimalSampling(points),
+        progressive: this.performanceConfig.progressive,
+        progressiveThreshold: this.performanceConfig.progressiveThreshold,
+        progressiveChunkMode: 'sequential',
+        large: points > this.performanceConfig.largeThreshold,
+        largeThreshold: this.performanceConfig.largeThreshold,
+        // Animation control
+        animation: points < this.performanceConfig.animationThreshold,
+        animationDuration: this.getOptimalAnimationDuration(points),
+        animationEasing: 'cubicInOut',
+        // Interaction optimization
+        silent: !labelSelected,  // Reduce interaction cost when off
+        emphasis: {
+          disabled: points > 5000, // Disable emphasis for very large datasets
+          scale: points < 1000 ? 1.5 : 1.2
+        },
+        blur: {
+          disabled: true // Disable blur effect for performance
+        },
+        select: {
+          disabled: points > 2000 // Disable selection for large datasets
+        }
       };
       myNewOptions.series.push(seriesElement);
     }
@@ -695,17 +765,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return this.pxToPct(48); // Reduced from 70 to 48 for tighter spacing
   }
 
-  // [CLAUDE] Get chart inner height in pixels
-  private getChartInnerHeightPx(): number {
-    const el = this.chartContainer?.nativeElement?.querySelector('#echartContainer') as HTMLElement;
-    return el?.clientHeight || this.ctx.height || 600;
-  }
-
-  // [CLAUDE] Measure actual legend height in pixels
-  private measureLegendHeightPx(): number {
-    const legendEl = this.legendViewport?.nativeElement;
-    return legendEl?.offsetHeight || 32; // Fallback to 32px if not found
-  }
 
   // Floating overlays live outside the canvas, so don't reserve space in grids
   private getTopReservePct(): number { 
@@ -758,11 +817,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return parts.length > 1 ? parts[1] : key;
   }
   
-  private extractEntityFromKey(key: string): string {
-    // Extract entity from "entityName :: label"
-    const parts = key.split(' :: ');
-    return parts.length > 0 ? parts[0] : 'Unknown';
-  }
   
   // Get grouped legend state (unique labels only)
   private getGroupLegendState(): { data: string[]; selected: Record<string, boolean> } {
@@ -817,9 +871,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Group series by entity
     const entityGroups: Record<string, { seriesKeys: string[], color: string }> = {};
     
-    for (let i = 0; i < this.ctx.data.length; i++) {
-      const entityName = this.ctx.data[i].datasource?.entityName || 'Unknown';
-      const label = this.ctx.data[i].dataKey.label;
+    for (const data of this.ctx.data) {
+      const entityName = data.datasource?.entityName || 'Unknown';
+      const label = data.dataKey.label;
       const seriesKey = this.buildSeriesKey(entityName, label);
       
       if (!entityGroups[entityName]) {
@@ -858,10 +912,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Find all series keys for this entity
     const seriesKeys: string[] = [];
-    for (let i = 0; i < this.ctx.data.length; i++) {
-      const currentEntityName = this.ctx.data[i].datasource?.entityName || 'Unknown';
+    for (const data of this.ctx.data) {
+      const currentEntityName = data.datasource?.entityName || 'Unknown';
       if (currentEntityName === entityName) {
-        const label = this.ctx.data[i].dataKey.label;
+        const label = data.dataKey.label;
         const seriesKey = this.buildSeriesKey(entityName, label);
         seriesKeys.push(seriesKey);
       }
@@ -909,9 +963,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.applyScrollableHeight();
     }
     
-    // [CLAUDE EDIT] Enable dirty-rect rendering for performance
-    this.chart = echarts.init(containerElement, undefined, { useDirtyRect: true });
-    this.LOG('[ECharts Line Chart] Chart instance created:', !!this.chart);
+    // Initialize chart with comprehensive performance optimizations
+    this.chart = echarts.init(containerElement, undefined, {
+      renderer: 'canvas',
+      useDirtyRect: this.performanceConfig.useDirtyRect,
+      devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2), // Cap at 2 for performance
+      width: 'auto',
+      height: 'auto'
+    });
+    this.LOG('[ECharts Line Chart] Chart instance created with performance optimizations:', !!this.chart);
+    
+    // Start memory optimization
+    MemoryOptimizer.startAutoCleanup(this.chart);
     
     // [CLAUDE EDIT] Disable animations for performance
     this.chart.setOption({ animation: false, animationDurationUpdate: 0 });
@@ -1039,7 +1102,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
       
       // Toggle visibility of actual series (they're hidden but control visibility)
-      const action = event.selected[clickedLabel] ? 'legendSelect' : 'legendUnSelect';
       seriesToToggle.forEach(seriesName => {
         // Find the series and toggle its visibility
         const seriesIndex = this.ctx.data.findIndex(s => {
@@ -1380,14 +1442,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return formatted;
   }
 
-  /**
-   * Format timestamp using the user's timezone settings
-   * Matches ThingsBoard's history display format
-   */
-  private formatTimestamp(timestamp: number): string {
-    // Use formatLocalTimestamp for consistency
-    return this.formatLocalTimestamp(timestamp);
-  }
 
   /**
    * Build a filename: "label[deviceName]_YYYY-MM-DD_HH-mm-ss-SSS.<ext>"
@@ -1835,15 +1889,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   public resetZoom(): void {
+    // Use smooth zoom animation for enhanced UX
+    if (this.chart) {
+      SmoothInteraction.smoothZoom(this.chart, 0, 100, 300);
+    }
     this.zoomStart = 0;
     this.zoomEnd = 100;
-    if (this.chart) {
-      this.chart.dispatchAction({
-        type: 'dataZoom',
-        start: 0,
-        end: 100
-      });
-    }
     this.updateZoomOverlay();
   }
   
@@ -2570,14 +2621,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
   }
 
-  private LOGE(...args: any[]): void {
-    if (this.DEBUG) {
-      console.error("[sc chart v6.1 3sub production] ERROR:", ...args);
-    }
-  }
 
-  // Configuration objects
-  private gridConfig(): any {
+  // Grid configuration for different layouts and container sizes (not currently used)
+  private unusedGetGridConfig(): any {
     return {
       "singleGrid": {
         "small": [{
@@ -3093,8 +3139,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // Get representative color for a label (first visible series with this label)
   private pickRepresentativeColor(label: string): string {
     // Find first series with this label
-    for (let i = 0; i < this.ctx.data.length; i++) {
-      const series = this.ctx.data[i];
+    for (const series of this.ctx.data) {
       if (series?.dataKey?.label === label) {
         const entityName = series.datasource?.entityName || 'Unknown';
         // Return the entity color if we have it
@@ -3234,8 +3279,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.legendHasMorePages = (this.legendCurrentPage + 1) < this.legendTotalPages;
   }
   
-  // [CLAUDE EDIT] Update pagination based on current items (kept for compatibility)
-  private updateLegendPagination(): void {
+  // Update pagination based on current items - not currently used but kept for future
+  private unusedUpdateLegendPagination(): void {
     // First recalculate items per page if viewport changed
     this.calculateItemsPerPage();
   }
