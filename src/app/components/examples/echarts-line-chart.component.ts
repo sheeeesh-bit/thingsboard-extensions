@@ -23,15 +23,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 import * as XLSX from 'xlsx';
 import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-import { 
-  DEFAULT_PERFORMANCE_CONFIG,
-  ChartPerformanceMonitor,
-  DataOptimizer,
-  AnimationFrameScheduler,
-  MemoryOptimizer,
-  SmoothInteraction,
-  createOptimizedTooltipFormatter
-} from './chart-performance-utils';
+// Removed heavy performance utilities that were causing unresponsiveness
 
 // Register required components
 echarts.use([
@@ -91,11 +83,7 @@ const axisPositionMapExtended = {
 })
 export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestroy {
 
-  // Performance optimization tools
-  private performanceConfig = DEFAULT_PERFORMANCE_CONFIG;
-  private performanceMonitor = new ChartPerformanceMonitor();
-  private animationScheduler = new AnimationFrameScheduler();
-  private dataUpdateDebounceTimer: any = null;
+  // Simple performance tracking
   private totalDataPoints = 0;
 
   @ViewChild('chartContainer', {static: false}) chartContainer: ElementRef<HTMLElement>;
@@ -352,43 +340,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return Number.isFinite(best) ? best : 999;
   }
 
-  // Performance optimization helper methods
-  private getOptimalSymbol(dataPoints: number): string {
-    if (!this.ctx.settings.showDataPoints) return 'none';
-    if (dataPoints > 400) return 'none';  // No symbols for dense data
-    if (dataPoints > 200) return 'emptyCircle';  // Lighter symbols for medium density
-    return 'circle';  // Full symbols for sparse data
-  }
-  
-  private getOptimalSymbolSize(dataPoints: number): number {
-    const baseSize = (this.ctx.settings.symbolSize_data || 5) * 2.5;
-    if (dataPoints > 300) return baseSize * 0.6;  // Smaller for dense data
-    if (dataPoints > 150) return baseSize * 0.8;  // Medium for moderate density
-    return baseSize;  // Full size for sparse data
-  }
-  
-  private getOptimalSampling(dataPoints: number): string | undefined {
-    if (dataPoints > 5000) return 'lttb';  // Best algorithm for very large datasets
-    if (dataPoints > 2000) return 'average';  // Faster for medium-large datasets
-    if (dataPoints > 800) return 'max';  // Simple sampling for medium datasets
-    return undefined;  // No sampling for small datasets
-  }
-  
-  private getOptimalAnimationDuration(dataPoints: number): number {
-    if (dataPoints > this.performanceConfig.animationThreshold) return 0;
-    if (dataPoints > 1000) return 150;  // Quick animation for medium data
-    if (dataPoints > 500) return 200;   // Moderate animation
-    return 300;  // Full animation for small datasets
-  }
-  
   ngOnDestroy(): void {
-    // Stop performance monitoring and cleanup
-    MemoryOptimizer.stopAutoCleanup();
-    this.animationScheduler.clear();
-    
-    if (this.dataUpdateDebounceTimer) {
-      clearTimeout(this.dataUpdateDebounceTimer);
-    }
     
     // Clean up component reference from ThingsBoard scope
     if (this.ctx.$scope && this.ctx.$scope.echartsLineChartComponent === this) {
@@ -430,22 +382,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('Data series count:', this.ctx.data?.length || 0);
     this.LOG('Legend overrides active:', this.legendOverridesGrids);
     
-    // Debounce rapid data updates for better performance
-    if (this.dataUpdateDebounceTimer) {
-      clearTimeout(this.dataUpdateDebounceTimer);
-    }
-    
-    this.dataUpdateDebounceTimer = setTimeout(() => {
-      this.performanceMonitor.measureFrame(() => {
-        this.processDataUpdateWithPerformance();
-      });
-    }, this.performanceConfig.dataUpdateDebounce);
-    
     // Reset hovered grid index to avoid stale references
     this.hoveredGridIndex = null;
-  }
-  
-  private processDataUpdateWithPerformance(): void {
+    
+    // Count total data points for optimization decisions
+    this.totalDataPoints = this.ctx.data?.reduce((sum, series) => 
+      sum + (series.data?.length || 0), 0) || 0;
+    
+    this.LOG('Total data points:', this.totalDataPoints);
+    
+    // Process update immediately
     // Clear legend override if this is fresh data from ThingsBoard
     const hasNewData = this.ctx.data?.some((series, idx) => 
       series.data?.length !== this.lastDataLengths?.[idx]
@@ -537,7 +483,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.LOG('Current grid count:', this.currentGrids);
     }
     
-    const myNewOptions: any = {};
+    const myNewOptions: any = {
+      // Smart animation control based on data size
+      animation: this.totalDataPoints < 5000,
+      animationDuration: this.totalDataPoints > 2000 ? 200 : 300,
+      animationDurationUpdate: this.totalDataPoints > 2000 ? 100 : 300,
+      animationEasing: 'cubicOut'
+    };
     myNewOptions.series = [];
     
     this.LOG('=== SERIES CREATION ===');
@@ -601,34 +553,20 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         xAxisIndex: gridIndex,
         yAxisIndex: gridIndex,
         data: this.ctx.data[i].data,
-        // Ultra-performance optimizations based on data density
-        symbol: this.getOptimalSymbol(points),
-        symbolSize: this.getOptimalSymbolSize(points),
-        showSymbol: points <= this.performanceConfig.showSymbolThreshold,
-        smooth: this.ctx.settings.smooth && points < 1000, // Disable smoothing for large datasets
-        // Advanced sampling and rendering
-        sampling: this.getOptimalSampling(points),
-        progressive: this.performanceConfig.progressive,
-        progressiveThreshold: this.performanceConfig.progressiveThreshold,
-        progressiveChunkMode: 'sequential',
-        large: points > this.performanceConfig.largeThreshold,
-        largeThreshold: this.performanceConfig.largeThreshold,
-        // Animation control
-        animation: points < this.performanceConfig.animationThreshold,
-        animationDuration: this.getOptimalAnimationDuration(points),
-        animationEasing: 'cubicInOut',
-        // Interaction optimization
-        silent: !labelSelected,  // Reduce interaction cost when off
-        emphasis: {
-          disabled: points > 5000, // Disable emphasis for very large datasets
-          scale: points < 1000 ? 1.5 : 1.2
-        },
-        blur: {
-          disabled: true // Disable blur effect for performance
-        },
-        select: {
-          disabled: points > 2000 // Disable selection for large datasets
-        }
+        // Balanced performance settings
+        symbol: (this.ctx.settings.showDataPoints && points <= 1000) ? 'circle' : 'none',
+        symbolSize: (this.ctx.settings.symbolSize_data || 5) * 2.5,
+        showSymbol: this.ctx.settings.showDataPoints && points <= 1000,
+        smooth: this.ctx.settings.smooth && points < 2000,
+        // Performance optimizations that don't hurt responsiveness
+        sampling: points > 5000 ? 'lttb' : undefined,  // Only sample for very large datasets
+        large: points > 10000,  // Only use large mode for really big data
+        largeThreshold: 5000,
+        // Progressive rendering for massive datasets
+        progressive: points > 20000 ? 5000 : undefined,
+        progressiveThreshold: points > 20000 ? 10000 : undefined,
+        // Keep interactions responsive
+        silent: !labelSelected
       };
       myNewOptions.series.push(seriesElement);
     }
@@ -656,15 +594,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const needsFullReset = this.resetGrid || this.legendOverridesGrids;
     
     if (needsFullReset) {
-      this.LOG('Applying full reset with replaceMerge only (no notMerge)');
-      // Replace structural parts while preserving tooltip and other settings
+      this.LOG('Applying full reset with replaceMerge');
+      // Replace structural parts for grid changes
       this.chart.setOption(myNewOptions, {
         replaceMerge: ['grid', 'xAxis', 'yAxis', 'series', 'dataZoom']
       });
       this.resetGrid = false;
     } else {
-      // Normal update for data changes only
-      this.chart.setOption(myNewOptions);
+      // Use notMerge for faster data updates
+      this.chart.setOption(myNewOptions, true);  // true = notMerge for better performance
     }
     
     // Hide the loading spinner after data is rendered
@@ -963,21 +901,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.applyScrollableHeight();
     }
     
-    // Initialize chart with comprehensive performance optimizations
+    // Initialize chart with proven performance settings
     this.chart = echarts.init(containerElement, undefined, {
       renderer: 'canvas',
-      useDirtyRect: this.performanceConfig.useDirtyRect,
-      devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2), // Cap at 2 for performance
-      width: 'auto',
-      height: 'auto'
+      useDirtyRect: true  // Dirty rect rendering for selective updates
     });
-    this.LOG('[ECharts Line Chart] Chart instance created with performance optimizations:', !!this.chart);
-    
-    // Start memory optimization
-    MemoryOptimizer.startAutoCleanup(this.chart);
-    
-    // [CLAUDE EDIT] Disable animations for performance
-    this.chart.setOption({ animation: false, animationDurationUpdate: 0 });
+    this.LOG('[ECharts Line Chart] Chart instance created:', !!this.chart);
     
     // Show loading spinner immediately
     this.chart.showLoading({
@@ -1889,12 +1818,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   public resetZoom(): void {
-    // Use smooth zoom animation for enhanced UX
-    if (this.chart) {
-      SmoothInteraction.smoothZoom(this.chart, 0, 100, 300);
-    }
     this.zoomStart = 0;
     this.zoomEnd = 100;
+    if (this.chart) {
+      this.chart.dispatchAction({
+        type: 'dataZoom',
+        start: 0,
+        end: 100
+      });
+    }
     this.updateZoomOverlay();
   }
   
