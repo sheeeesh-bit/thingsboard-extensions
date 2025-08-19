@@ -354,6 +354,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         // Reset max items to force fresh calculation when exiting fullscreen
         if (isExitingFullscreen) {
           this.maxItemsWithoutPagination = 0;
+          
+          // Force update of CSS custom properties for grid margins
+          // This ensures the legend overlay has correct padding
+          this.syncLegendToGridMargins('12%', '1%');
         }
         
         // Force comprehensive DOM reflow to get accurate measurements
@@ -385,6 +389,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // Second recalculation - after browser has started adjusting layout
       setTimeout(() => {
         this.LOG('Second recalculation after fullscreen change');
+        
+        // Ensure CSS properties are still applied
+        if (isExitingFullscreen) {
+          this.syncLegendToGridMargins('12%', '1%');
+        }
         
         // Force another recalculation with fresh measurements
         if (this.legendViewport?.nativeElement) {
@@ -2679,57 +2688,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     };
   }
 
-  private createPlotNumberGraphics(): any {
-    const elements: any[] = [];
-    const grids = this.currentGridArray();
-    
-    // Get the axis position map to determine fixed plot numbers
-    const axisMap = this.getAxisPositionMap();
-    
-    // Get the current grid names (which plots are actually visible)
-    const visibleGridNames = this.currentGridNames;
-    
-    // Create plot numbers for each visible grid
-    for (let i = 0; i < grids.length && i < visibleGridNames.length; i++) {
-      const grid = grids[i];
-      const gridName = visibleGridNames[i];
-      
-      // Get the fixed plot number from the axis map (1-based)
-      const plotNumber = axisMap[gridName] + 1;
-      
-      // Calculate vertical center of the grid
-      // grid.top is a string like "8%", grid.height is a string like "20%"
-      const topValue = parseFloat(grid.top);
-      const heightValue = parseFloat(grid.height);
-      const centerY = topValue + (heightValue / 2);
-      
-      // ECharts v5 syntax: text type directly supports style.text
-      elements.push({
-        type: 'text',
-        id: `plot-number-${i}`,  // Add unique ID for proper updates
-        left: 14,  // Fixed left gutter in pixels
-        top: `${centerY}%`,  // Vertically centered in the grid
-        style: {
-          text: String(plotNumber),
-          fontSize: this.currentSize === 'small' ? 24 : 
-                   this.currentSize === 'large' ? 28 : 32,
-          fontWeight: 'bold',
-          fill: '#007aff',
-          textAlign: 'center',
-          textVerticalAlign: 'middle'
-        },
-        z: 100,  // Above plot but below tooltips
-        silent: true  // Don't interfere with chart interactions
-      });
-      
-      this.LOG(`Plot ${gridName} (${plotNumber}) at ${centerY}% (grid top: ${grid.top}, height: ${grid.height})`);
-    }
-    
-    // Return proper graphic configuration for ECharts v5
-    return {
-      elements: elements
-    };
-  }
 
   private getDataZoomConfig(): any[] {
     return [
@@ -3092,31 +3050,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
   }
   
-  // Measure actual legend and chip widths from DOM
-  private measureLegendWidths(): { viewportWidth: number; avgChipWidth: number } {
-    if (!this.legendViewport?.nativeElement || !this.legendTrack?.nativeElement) {
-      return { viewportWidth: 600, avgChipWidth: 100 }; // Fallback values
-    }
-    
-    const viewport = this.legendViewport.nativeElement;
-    const track = this.legendTrack.nativeElement;
-    const chips = track.querySelectorAll('.legend-chip');
-    
-    // Get viewport width
-    const viewportWidth = viewport.offsetWidth;
-    
-    // Calculate average chip width
-    let totalWidth = 0;
-    let chipCount = 0;
-    chips.forEach((chip: HTMLElement) => {
-      totalWidth += chip.offsetWidth;
-      chipCount++;
-    });
-    
-    const avgChipWidth = chipCount > 0 ? totalWidth / chipCount : 100;
-    
-    return { viewportWidth, avgChipWidth };
-  }
   
   // [CLAUDE EDIT] Calculate items per page based on measured widths with debouncing
   private calculateItemsPerPage(): void {
@@ -3140,6 +3073,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     if (!this.legendViewport?.nativeElement || !this.legendItems.length) return;
     
     const viewport = this.legendViewport.nativeElement;
+    const overlay = viewport.closest('.legend-overlay') as HTMLElement;
     
     // Force comprehensive DOM reflow to ensure we have accurate measurements
     // This is critical after fullscreen changes
@@ -3151,13 +3085,31 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const computedStyle = window.getComputedStyle(viewport);
     void computedStyle.width;
     
-    const viewportWidth = viewport.offsetWidth;
+    // Use clientWidth instead of offsetWidth to exclude borders
+    // Also check if the overlay has proper padding applied
+    let viewportWidth = viewport.clientWidth;
+    
+    // During fullscreen transitions, the CSS custom properties might not be applied yet
+    // So we need to account for the padding manually if needed
+    if (overlay) {
+      const overlayStyle = window.getComputedStyle(overlay);
+      const paddingLeft = parseFloat(overlayStyle.paddingLeft) || 0;
+      const paddingRight = parseFloat(overlayStyle.paddingRight) || 0;
+      
+      // If paddings seem too small (< 10px total), it might mean percentages haven't resolved
+      if (paddingLeft + paddingRight < 10) {
+        // Apply a safety margin to prevent clipping
+        const safetyMargin = viewportWidth * 0.15; // 15% safety margin
+        viewportWidth = viewportWidth - safetyMargin;
+        this.LOG(`Applied safety margin during transition: effective width = ${viewportWidth}`);
+      }
+    }
     
     // Simple estimation approach
     const estimatedChipWidth = 130; // Estimate for chip with plot number and text
     const gap = 8;
     const pagerWidth = 70; // Space for pagination buttons
-    const buffer = 20; // Small buffer
+    const buffer = 30; // Increased buffer for safety
     
     const estimatedTotalWidth = this.legendItems.length * (estimatedChipWidth + gap);
     const availableWidthWithoutPagers = viewportWidth - buffer;
