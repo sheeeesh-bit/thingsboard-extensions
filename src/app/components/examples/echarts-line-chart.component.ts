@@ -2528,29 +2528,44 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   private createPlotNumberGraphics(): any[] {
     const graphics = [];
+    
+    // Always create numbers for all possible plots based on axis assignments
+    // This ensures numbers stay fixed regardless of visibility
+    const axisMap = this.getAxisPositionMap();
+    const plotNames = Object.keys(axisMap).sort((a, b) => axisMap[a] - axisMap[b]);
+    
+    // Get current visible grids to position the numbers
     const grids = this.currentGridArray();
     
-    // Create a plot number for each grid
-    for (let i = 0; i < grids.length; i++) {
+    this.LOG('Creating plot number graphics. AxisMap:', axisMap, 'PlotNames:', plotNames, 'Grids:', grids);
+    
+    // Create plot numbers for visible grids
+    for (let i = 0; i < grids.length && i < plotNames.length; i++) {
       const grid = grids[i];
+      const plotName = plotNames[i];
+      const plotNumber = axisMap[plotName] + 1; // Make it 1-based
       
-      // Calculate position based on grid
-      graphics.push({
+      // Add plot number on the left side
+      const graphic = {
         type: 'text',
-        left: '2%',  // Position on the left side
-        top: grid.top,  // Align with grid top
+        left: 20,  // Fixed pixel position from left
+        top: grid.top,  // Position based on grid (already includes %)
         style: {
-          text: String(i + 1),  // Plot number (1-based)
-          fontSize: 28,
+          text: String(plotNumber),
+          fontSize: 32,
           fontWeight: 'bold',
           fill: '#007aff',
           textAlign: 'center',
-          textVerticalAlign: 'top'
+          textVerticalAlign: 'middle'
         },
-        z: 100  // Ensure it's on top
-      });
+        z: 100
+      };
+      
+      this.LOG(`Creating plot number ${plotNumber} at top: ${grid.top}`);
+      graphics.push(graphic);
     }
     
+    this.LOG('Final graphics array:', graphics);
     return graphics;
   }
 
@@ -2868,25 +2883,34 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     const group = this.getGroupLegendState();
     
-    // Build legend items with colors and grid order positions
+    // Get the fixed plot number for each label based on its axis assignment
+    const axisMap = this.getAxisPositionMap();
+    
+    // Build legend items with colors and FIXED plot numbers
     const itemsWithPosition = group.data.map(label => {
+      // Find the axis assignment for this label
+      let axisAssignment = 'Top'; // Default
+      for (const series of this.ctx.data || []) {
+        if (series?.dataKey?.label === label) {
+          axisAssignment = series.dataKey?.settings?.axisAssignment || 'Top';
+          break;
+        }
+      }
+      
+      // Get the fixed plot number from the axis map
+      const fixedPlotNumber = (axisMap[axisAssignment] ?? 0) + 1; // Make it 1-based
+      
       return {
         label,
         color: this.pickRepresentativeColor(label),
         selected: group.selected[label] !== false,
-        pos: this.gridOrderIndexOfLabel(label)  // [CLAUDE EDIT] Use grid order helper
+        plotNumber: fixedPlotNumber
       };
     });
     
-    // [CLAUDE EDIT] Sort by grid order (pos), then by label for stability
+    // Sort by plot number for consistent ordering
     this.legendItems = itemsWithPosition
-      .sort((a, b) => a.pos - b.pos || a.label.localeCompare(b.label))
-      .map(({ label, color, selected, pos }) => ({ 
-        label, 
-        color, 
-        selected,
-        plotNumber: pos + 1  // Add 1 to make it 1-based instead of 0-based
-      }));
+      .sort((a, b) => a.plotNumber - b.plotNumber || a.label.localeCompare(b.label));
     
     // [CLAUDE EDIT] Apply pagination without recalculating widths
     this.applyLegendPagination();
