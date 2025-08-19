@@ -330,6 +330,39 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         }
       }
     }, 100);
+    
+    // Listen for fullscreen changes to force legend recalculation
+    this.setupFullscreenListener();
+  }
+  
+  private setupFullscreenListener(): void {
+    const fullscreenHandler = () => {
+      this.LOG('Fullscreen change detected');
+      // Force recalculation after fullscreen change
+      setTimeout(() => {
+        // Reset max items to force fresh calculation
+        this.maxItemsWithoutPagination = 0;
+        
+        // Force legend recalculation
+        if (this.legendViewport?.nativeElement) {
+          this.calculateItemsPerPage();
+        }
+        
+        // Also trigger resize handling
+        if (this.ctx) {
+          this.onResize();
+        }
+      }, 300); // Give browser time to complete transition
+    };
+    
+    // Listen for all fullscreen change events (cross-browser)
+    document.addEventListener('fullscreenchange', fullscreenHandler);
+    document.addEventListener('webkitfullscreenchange', fullscreenHandler);
+    document.addEventListener('mozfullscreenchange', fullscreenHandler);
+    document.addEventListener('MSFullscreenChange', fullscreenHandler);
+    
+    // Store handler for cleanup
+    (this as any).fullscreenHandler = fullscreenHandler;
   }
 
   // [CLAUDE EDIT] Helper to compute grid order for a label
@@ -361,6 +394,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Clean up pagination calculation timer
     if (this.paginationCalculationTimer) {
       clearTimeout(this.paginationCalculationTimer);
+    }
+    
+    // Clean up fullscreen listeners
+    if ((this as any).fullscreenHandler) {
+      document.removeEventListener('fullscreenchange', (this as any).fullscreenHandler);
+      document.removeEventListener('webkitfullscreenchange', (this as any).fullscreenHandler);
+      document.removeEventListener('mozfullscreenchange', (this as any).fullscreenHandler);
+      document.removeEventListener('MSFullscreenChange', (this as any).fullscreenHandler);
     }
     
     // Clean up state subscriptions
