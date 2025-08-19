@@ -165,6 +165,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public legendHasMorePages = false;
   public legendNeedsPagination = false; // Show pagination only when needed
   private paginationCalculationTimer: any = null;
+  private maxItemsWithoutPagination = 0; // Track max items that have fit
   
   // DOM refs for measuring
   @ViewChild('legendViewport', { static: false }) legendViewport: ElementRef;
@@ -3036,18 +3037,34 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Store current page
     const currentPage = this.legendCurrentPage;
     
-    if (estimatedTotalWidth <= availableWidthWithoutPagers) {
+    // Check if we've successfully shown all items before at this width
+    if (!this.legendNeedsPagination && this.legendItems.length === this.legendPageItems.length) {
+      // We're currently showing all items without pagination - remember this
+      this.maxItemsWithoutPagination = Math.max(this.maxItemsWithoutPagination, this.legendItems.length);
+    }
+    
+    // If we know these items have fit before, don't add pagination
+    if (this.legendItems.length <= this.maxItemsWithoutPagination && 
+        estimatedTotalWidth <= availableWidthWithoutPagers + 100) { // Be more generous
+      // All items should fit based on history
+      this.legendNeedsPagination = false;
+      this.legendItemsPerPage = this.legendItems.length;
+      this.legendCurrentPage = 0;
+      this.legendPageItems = [...this.legendItems];
+    } else if (estimatedTotalWidth <= availableWidthWithoutPagers) {
       // All items fit - no pagination needed
       this.legendNeedsPagination = false;
       this.legendItemsPerPage = this.legendItems.length;
       this.legendCurrentPage = 0;
       this.legendPageItems = [...this.legendItems];
+      // Remember this success
+      this.maxItemsWithoutPagination = Math.max(this.maxItemsWithoutPagination, this.legendItems.length);
     } else {
       // Pagination needed
       this.legendNeedsPagination = true;
       const itemsPerPage = Math.max(3, Math.floor(availableWidthWithPagers / (estimatedChipWidth + gap)));
       
-      // Only update if changed significantly
+      // Only update if changed
       if (Math.abs(this.legendItemsPerPage - itemsPerPage) > 0) {
         this.legendItemsPerPage = itemsPerPage;
       }
