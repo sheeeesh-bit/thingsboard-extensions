@@ -2530,8 +2530,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     };
   }
 
-  private createPlotNumberGraphics(): any[] {
-    const graphics: any[] = [];
+  private createPlotNumberGraphics(): any {
+    const elements: any[] = [];
     const grids = this.currentGridArray();
     
     // Get the axis position map to determine fixed plot numbers
@@ -2554,8 +2554,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const heightValue = parseFloat(grid.height);
       const centerY = topValue + (heightValue / 2);
       
-      graphics.push({
+      // ECharts v5 syntax: text type directly supports style.text
+      elements.push({
         type: 'text',
+        id: `plot-number-${i}`,  // Add unique ID for proper updates
         left: 14,  // Fixed left gutter in pixels
         top: `${centerY}%`,  // Vertically centered in the grid
         style: {
@@ -2567,13 +2569,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           textAlign: 'center',
           textVerticalAlign: 'middle'
         },
-        z: 100  // Above plot but below tooltips
+        z: 100,  // Above plot but below tooltips
+        silent: true  // Don't interfere with chart interactions
       });
       
       this.LOG(`Plot ${gridName} (${plotNumber}) at ${centerY}% (grid top: ${grid.top}, height: ${grid.height})`);
     }
     
-    return graphics;
+    // Return proper graphic configuration for ECharts v5
+    return {
+      elements: elements
+    };
   }
 
   private getDataZoomConfig(): any[] {
