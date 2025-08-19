@@ -338,13 +338,41 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private setupFullscreenListener(): void {
     const fullscreenHandler = () => {
       this.LOG('Fullscreen change detected');
-      // Force recalculation after fullscreen change
+      
+      // Detect if we're exiting fullscreen (most problematic case)
+      const isExitingFullscreen = !document.fullscreenElement && 
+                                   !(document as any).webkitFullscreenElement &&
+                                   !(document as any).mozFullScreenElement &&
+                                   !(document as any).msFullscreenElement;
+      
+      if (isExitingFullscreen) {
+        this.LOG('Exiting fullscreen - using enhanced recalculation strategy');
+      }
+      
+      // First recalculation - immediate but may have stale measurements
       setTimeout(() => {
-        // Reset max items to force fresh calculation
-        this.maxItemsWithoutPagination = 0;
+        // Reset max items to force fresh calculation when exiting fullscreen
+        if (isExitingFullscreen) {
+          this.maxItemsWithoutPagination = 0;
+        }
         
-        // Force legend recalculation
+        // Force comprehensive DOM reflow to get accurate measurements
         if (this.legendViewport?.nativeElement) {
+          const viewport = this.legendViewport.nativeElement;
+          
+          // Force reflow using multiple property reads
+          void viewport.offsetHeight;
+          void viewport.offsetWidth;
+          void viewport.getBoundingClientRect();
+          
+          const width = viewport.offsetWidth;
+          this.LOG(`Fullscreen transition (1st) - viewport width: ${width}`);
+          
+          // Clear any cached measurements
+          if (this.paginationCalculationTimer) {
+            clearTimeout(this.paginationCalculationTimer);
+          }
+          
           this.calculateItemsPerPage();
         }
         
@@ -352,7 +380,56 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         if (this.ctx) {
           this.onResize();
         }
-      }, 300); // Give browser time to complete transition
+      }, 50); // Very quick initial calculation
+      
+      // Second recalculation - after browser has started adjusting layout
+      setTimeout(() => {
+        this.LOG('Second recalculation after fullscreen change');
+        
+        // Force another recalculation with fresh measurements
+        if (this.legendViewport?.nativeElement) {
+          const viewport = this.legendViewport.nativeElement;
+          
+          // Force DOM reflow again
+          void viewport.offsetHeight;
+          void viewport.clientWidth;
+          viewport.style.display = 'none';
+          void viewport.offsetHeight; // Trigger reflow
+          viewport.style.display = '';
+          
+          const width = viewport.offsetWidth;
+          this.LOG(`Fullscreen transition (2nd) - viewport width: ${width}`);
+          
+          // Recalculate with fresh measurements
+          this.calculateItemsPerPage();
+        }
+      }, 250); // Medium delay for layout to partially settle
+      
+      // Third recalculation - final check after everything has settled
+      setTimeout(() => {
+        this.LOG('Final recalculation after fullscreen change');
+        
+        // Force final recalculation with fully settled measurements
+        if (this.legendViewport?.nativeElement) {
+          const viewport = this.legendViewport.nativeElement;
+          
+          // One more comprehensive reflow
+          void viewport.offsetHeight;
+          void viewport.offsetWidth;
+          void viewport.scrollWidth;
+          
+          const width = viewport.offsetWidth;
+          this.LOG(`Fullscreen transition (final) - viewport width: ${width}`);
+          
+          // Final recalculation with fully settled DOM
+          this.calculateItemsPerPage();
+          
+          // Trigger change detection to ensure UI updates
+          if (this.ctx?.detectChanges) {
+            this.ctx.detectChanges();
+          }
+        }
+      }, 600); // Longer delay to ensure everything is fully settled
     };
     
     // Listen for all fullscreen change events (cross-browser)
@@ -3063,6 +3140,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     if (!this.legendViewport?.nativeElement || !this.legendItems.length) return;
     
     const viewport = this.legendViewport.nativeElement;
+    
+    // Force comprehensive DOM reflow to ensure we have accurate measurements
+    // This is critical after fullscreen changes
+    void viewport.offsetHeight; // Force reflow
+    void viewport.offsetWidth;
+    void viewport.getBoundingClientRect();
+    
+    // Get the computed styles to force style recalculation
+    const computedStyle = window.getComputedStyle(viewport);
+    void computedStyle.width;
+    
     const viewportWidth = viewport.offsetWidth;
     
     // Simple estimation approach
@@ -3122,23 +3210,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
   }
   
-  // Calculate total width of all legend items
-  private calculateTotalItemsWidth(): number {
-    if (!this.legendTrack?.nativeElement) return 0;
-    
-    const track = this.legendTrack.nativeElement;
-    const chips = track.querySelectorAll('.legend-chip');
-    const gap = 8; // Gap between chips
-    
-    let totalWidth = gap; // Start with initial gap
-    chips.forEach((chip: HTMLElement) => {
-      // Use getBoundingClientRect for more accurate measurement
-      const rect = chip.getBoundingClientRect();
-      totalWidth += rect.width + gap;
-    });
-    
-    return totalWidth;
-  }
   
   // [CLAUDE EDIT] Apply pagination without recalculating widths
   private applyLegendPagination(): void {

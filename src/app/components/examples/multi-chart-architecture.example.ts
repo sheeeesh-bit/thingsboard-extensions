@@ -9,9 +9,9 @@ interface PlotInstance {
 }
 
 export class MultiChartComponent {
-  private plots: Map<string, PlotInstance> = new Map();
+  private plots = new Map<string, PlotInstance>();
   private sharedDataZoom: any;
-  private legendState: Map<string, boolean> = new Map();
+  private legendState = new Map<string, boolean>();
   
   // Create individual plot
   private createPlot(containerId: string, data: any[], gridIndex: number): PlotInstance {
