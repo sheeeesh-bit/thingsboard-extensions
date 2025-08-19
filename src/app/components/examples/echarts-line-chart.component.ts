@@ -163,6 +163,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }> = [];
   public legendTotalPages = 1;
   public legendHasMorePages = false;
+  public legendNeedsPagination = false; // Show pagination only when needed
   
   // DOM refs for measuring
   @ViewChild('legendViewport', { static: false }) legendViewport: ElementRef;
@@ -2996,24 +2997,71 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private calculateItemsPerPage(): void {
     // Use setTimeout to ensure DOM is rendered
     setTimeout(() => {
-      const { viewportWidth, avgChipWidth } = this.measureLegendWidths();
+      if (!this.legendViewport?.nativeElement) return;
+      
+      const viewport = this.legendViewport.nativeElement;
+      const viewportWidth = viewport.offsetWidth;
+      
+      // First, check if all items can fit without pagination
+      const totalItemsWidth = this.calculateTotalItemsWidth();
       const gap = 8; // Gap between chips in pixels
-      const pagerWidth = 28 * 2 + 16; // Two pager buttons plus gaps
-      const availableWidth = viewportWidth - pagerWidth;
       
-      // Calculate how many chips fit
-      const itemsPerPage = Math.max(3, Math.floor(availableWidth / (avgChipWidth + gap)));
+      if (totalItemsWidth <= viewportWidth) {
+        // All items fit - no pagination needed
+        this.legendNeedsPagination = false;
+        this.legendItemsPerPage = this.legendItems.length;
+        this.legendCurrentPage = 0;
+        this.applyLegendPagination();
+      } else {
+        // Pagination needed
+        this.legendNeedsPagination = true;
+        const { avgChipWidth } = this.measureLegendWidths();
+        const pagerWidth = 28 * 2 + 16; // Two pager buttons plus gaps
+        const availableWidth = viewportWidth - pagerWidth;
+        
+        // Calculate how many chips fit
+        const itemsPerPage = Math.max(3, Math.floor(availableWidth / (avgChipWidth + gap)));
+        
+        // Only update if changed
+        if (this.legendItemsPerPage !== itemsPerPage) {
+          this.legendItemsPerPage = itemsPerPage;
+          this.applyLegendPagination();
+        }
+      }
       
-      // Only update if changed
-      if (this.legendItemsPerPage !== itemsPerPage) {
-        this.legendItemsPerPage = itemsPerPage;
-        this.applyLegendPagination();  // [CLAUDE EDIT] Use apply instead of update
+      if (this.ctx?.detectChanges) {
+        this.ctx.detectChanges();
       }
     }, 0);
   }
   
+  // Calculate total width of all legend items
+  private calculateTotalItemsWidth(): number {
+    if (!this.legendTrack?.nativeElement) return 0;
+    
+    const track = this.legendTrack.nativeElement;
+    const chips = track.querySelectorAll('.legend-chip');
+    const gap = 8; // Gap between chips
+    
+    let totalWidth = 0;
+    chips.forEach((chip: HTMLElement) => {
+      totalWidth += chip.offsetWidth + gap;
+    });
+    
+    return totalWidth;
+  }
+  
   // [CLAUDE EDIT] Apply pagination without recalculating widths - sequence never broken
   private applyLegendPagination(): void {
+    // If pagination not needed, show all items
+    if (!this.legendNeedsPagination) {
+      this.legendPageItems = [...this.legendItems];
+      this.legendTotalPages = 1;
+      this.legendCurrentPage = 0;
+      this.legendHasMorePages = false;
+      return;
+    }
+    
     // Always show items from the beginning to maintain sequence
     // The first item should always be visible regardless of page
     const itemsToShow = Math.min(this.legendItemsPerPage, this.legendItems.length);

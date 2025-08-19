@@ -58,8 +58,9 @@
     <div class="chart-container-wrapper">
       <!-- Top floating legend overlay -->
       <nav class="legend-overlay" #legendOverlay aria-label="Series legend">
-        <!-- Previous page button -->
-        <button type="button"
+        <!-- Previous page button - only show when pagination needed -->
+        <button *ngIf="legendNeedsPagination"
+                type="button"
                 class="legend-pager legend-pager--prev"
                 [disabled]="legendCurrentPage === 0"
                 (click)="legendPrevPage()"
@@ -86,8 +87,9 @@
           </div>
         </div>
         
-        <!-- Next page button -->
-        <button type="button"
+        <!-- Next page button - only show when pagination needed -->
+        <button *ngIf="legendNeedsPagination"
+                type="button"
                 class="legend-pager legend-pager--next"
                 [disabled]="!legendHasMorePages"
                 (click)="legendNextPage()"
