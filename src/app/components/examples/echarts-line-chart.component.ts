@@ -490,9 +490,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       document.removeEventListener('MSFullscreenChange', (this as any).fullscreenHandler);
     }
     
-    // Clean up window resize listener
+    // Clean up window resize listeners
     if ((this as any).windowResizeHandler) {
       window.removeEventListener('resize', (this as any).windowResizeHandler);
+      window.removeEventListener('orientationchange', (this as any).windowResizeHandler);
+    }
+    
+    // Clean up visibility change listener
+    if ((this as any).visibilityChangeHandler) {
+      document.removeEventListener('visibilitychange', (this as any).visibilityChangeHandler);
     }
     
     // Clean up state subscriptions
@@ -1400,6 +1406,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Track previous width to detect maximize/restore
     let previousWidth = 0;
+    let lastWindowWidth = window.innerWidth;
     
     this.resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -1408,24 +1415,38 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         if (width > 0 && height > 0) {
           this.LOG('[ECharts Line Chart] Container resized:', { width, height });
           
+          // Always force immediate legend recalculation on ANY resize
+          // This is aggressive but ensures we never have clipping
+          this.LOG('Forcing immediate legend recalculation on resize');
+          
+          // Clear ALL caches immediately
+          this.maxItemsWithoutPagination = 0;
+          
+          // Force immediate recalculation - no delay
+          this.performPaginationCalculation();
+          
           // Detect significant width changes that indicate maximize/restore
           const widthChange = Math.abs(width - previousWidth);
-          const isSignificantChange = widthChange > 200; // More than 200px change
+          const isSignificantChange = widthChange > 100; // Lower threshold
           
           if (isSignificantChange && previousWidth > 0) {
-            this.LOG('Detected significant resize (likely maximize/restore), forcing full recalculation');
+            this.LOG(`SIGNIFICANT RESIZE DETECTED: ${previousWidth}px -> ${width}px (change: ${widthChange}px)`);
             
-            // Reset pagination cache to force fresh calculation
-            this.maxItemsWithoutPagination = 0;
-            
-            // Force legend recalculation with delays similar to fullscreen handling
+            // Additional recalculations for significant changes
             setTimeout(() => {
-              this.calculateItemsPerPage();
+              this.LOG('Recalculating after significant resize (100ms)');
+              this.performPaginationCalculation();
             }, 100);
             
             setTimeout(() => {
-              this.calculateItemsPerPage();
+              this.LOG('Recalculating after significant resize (300ms)');
+              this.performPaginationCalculation();
             }, 300);
+            
+            setTimeout(() => {
+              this.LOG('Final recalculation after significant resize (500ms)');
+              this.performPaginationCalculation();
+            }, 500);
           }
           
           previousWidth = width;
@@ -1439,25 +1460,51 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.resizeObserver.observe(this.chartContainer.nativeElement);
     this.LOG('[HEIGHT DEBUG] ResizeObserver attached to chart container');
     
-    // Also add a window resize listener as backup for maximize/restore
+    // Window resize listener with more aggressive handling
     const windowResizeHandler = () => {
-      this.LOG('Window resize event detected');
+      const currentWindowWidth = window.innerWidth;
+      const windowWidthChange = Math.abs(currentWindowWidth - lastWindowWidth);
       
-      // Force recalculation after a delay to let layout settle
-      setTimeout(() => {
-        // Reset cache and recalculate
-        this.maxItemsWithoutPagination = 0;
-        this.calculateItemsPerPage();
-        
-        // Also trigger general resize
-        this.onResize();
-      }, 200);
+      this.LOG(`Window resize: ${lastWindowWidth}px -> ${currentWindowWidth}px (change: ${windowWidthChange}px)`);
+      
+      // Always reset and recalculate on window resize
+      this.maxItemsWithoutPagination = 0;
+      
+      // Immediate recalculation
+      this.performPaginationCalculation();
+      
+      // Multiple delayed recalculations to catch any layout settling
+      const delays = [50, 150, 300, 500];
+      delays.forEach(delay => {
+        setTimeout(() => {
+          this.LOG(`Window resize recalculation at ${delay}ms`);
+          this.performPaginationCalculation();
+        }, delay);
+      });
+      
+      lastWindowWidth = currentWindowWidth;
+      
+      // Also trigger general resize
+      this.onResize();
     };
     
+    // Use both standard resize and Chrome-specific resize events
     window.addEventListener('resize', windowResizeHandler);
     
-    // Store handler for cleanup
+    // Also listen for orientation change (mobile) and visibility change
+    window.addEventListener('orientationchange', windowResizeHandler);
+    
+    const visibilityChangeHandler = () => {
+      if (!document.hidden) {
+        this.LOG('Document became visible, recalculating');
+        windowResizeHandler();
+      }
+    };
+    document.addEventListener('visibilitychange', visibilityChangeHandler);
+    
+    // Store handlers for cleanup
     (this as any).windowResizeHandler = windowResizeHandler;
+    (this as any).visibilityChangeHandler = visibilityChangeHandler;
   }
 
   /**
