@@ -3025,6 +3025,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     this.lastMeasuredWidth = viewportWidth;
     
+    // Store current page to restore after calculation
+    const currentPage = this.legendCurrentPage;
+    
     // Show all items temporarily for accurate measurement
     this.legendNeedsPagination = false;
     this.legendPageItems = [...this.legendItems];
@@ -3056,6 +3059,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         const itemsPerPage = Math.max(3, Math.floor(availableWidth / (avgChipWidth + gap)));
         
         this.legendItemsPerPage = itemsPerPage;
+        // Restore the current page if still valid
+        this.legendCurrentPage = Math.min(currentPage, Math.max(0, Math.ceil(this.legendItems.length / itemsPerPage) - 1));
         this.applyLegendPagination();
       }
       
@@ -3083,7 +3088,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return totalWidth;
   }
   
-  // [CLAUDE EDIT] Apply pagination without recalculating widths - sequence never broken
+  // [CLAUDE EDIT] Apply pagination without recalculating widths
   private applyLegendPagination(): void {
     // If pagination not needed, show all items
     if (!this.legendNeedsPagination) {
@@ -3094,36 +3099,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
     
-    // Always show items from the beginning to maintain sequence
-    // The first item should always be visible regardless of page
-    const itemsToShow = Math.min(this.legendItemsPerPage, this.legendItems.length);
+    // Standard pagination - simple window sliding
+    const startIdx = this.legendCurrentPage * this.legendItemsPerPage;
+    const endIdx = Math.min(startIdx + this.legendItemsPerPage, this.legendItems.length);
     
-    // For pagination, we shift the window but always include earlier items if space allows
-    if (this.legendCurrentPage === 0) {
-      // First page: show first N items
-      this.legendPageItems = this.legendItems.slice(0, itemsToShow);
-    } else {
-      // Subsequent pages: always include first item, then show next items
-      const remainingSlots = itemsToShow - 1; // Reserve one slot for first item
-      const startIdx = 1 + (this.legendCurrentPage - 1) * remainingSlots;
-      const endIdx = Math.min(startIdx + remainingSlots, this.legendItems.length);
-      
-      // Combine first item with the page's items
-      this.legendPageItems = [
-        this.legendItems[0], // Always include first item
-        ...this.legendItems.slice(startIdx, endIdx)
-      ];
-    }
+    // Show items for current page
+    this.legendPageItems = this.legendItems.slice(startIdx, endIdx);
     
-    // Calculate total pages with this new logic
-    if (this.legendItems.length <= this.legendItemsPerPage) {
-      this.legendTotalPages = 1;
-    } else {
-      // First page shows N items, subsequent pages show N-1 new items (plus first item)
-      const itemsAfterFirst = this.legendItems.length - this.legendItemsPerPage;
-      const subsequentPageSize = Math.max(1, this.legendItemsPerPage - 1);
-      this.legendTotalPages = 1 + Math.ceil(itemsAfterFirst / subsequentPageSize);
-    }
+    // Calculate total pages
+    this.legendTotalPages = Math.ceil(this.legendItems.length / this.legendItemsPerPage);
     
     // Ensure current page is valid
     if (this.legendCurrentPage >= this.legendTotalPages) {
