@@ -165,9 +165,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public legendHasMorePages = false;
   public legendNeedsPagination = false; // Show pagination only when needed
   private paginationCalculationTimer: any = null;
-  private lastMeasuredWidth = 0; // Cache to prevent flip-flopping
-  private paginationDecisionMade = false; // Flag to prevent constant recalculation
-  private lastItemCount = 0; // Track when items change
   
   // DOM refs for measuring
   @ViewChild('legendViewport', { static: false }) legendViewport: ElementRef;
@@ -3009,21 +3006,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
     
-    // Check if items changed (reset decision if so)
-    if (this.legendItems.length !== this.lastItemCount) {
-      this.lastItemCount = this.legendItems.length;
-      this.paginationDecisionMade = false;
-      this.lastMeasuredWidth = 0;
-    }
-    
-    // If decision was already made and width hasn't changed significantly, skip
-    if (this.paginationDecisionMade) {
-      const currentWidth = this.legendViewport.nativeElement.offsetWidth;
-      if (Math.abs(currentWidth - this.lastMeasuredWidth) < 50) { // Larger tolerance
-        return; // Keep current pagination state
-      }
-    }
-    
     // Clear any pending calculation
     if (this.paginationCalculationTimer) {
       clearTimeout(this.paginationCalculationTimer);
@@ -3032,7 +3014,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Debounce the calculation to prevent flip-flopping
     this.paginationCalculationTimer = setTimeout(() => {
       this.performPaginationCalculation();
-    }, 200); // Wait longer for DOM to settle
+    }, 150); // Wait for DOM to settle
   }
   
   private performPaginationCalculation(): void {
@@ -3041,64 +3023,44 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const viewport = this.legendViewport.nativeElement;
     const viewportWidth = viewport.offsetWidth;
     
-    // Store for future comparisons
-    this.lastMeasuredWidth = viewportWidth;
+    // Simple estimation approach
+    const estimatedChipWidth = 130; // Estimate for chip with plot number and text
+    const gap = 8;
+    const pagerWidth = 70; // Space for pagination buttons
+    const buffer = 20; // Small buffer
     
-    // Store current page to restore after calculation
+    const estimatedTotalWidth = this.legendItems.length * (estimatedChipWidth + gap);
+    const availableWidthWithoutPagers = viewportWidth - buffer;
+    const availableWidthWithPagers = viewportWidth - pagerWidth - buffer;
+    
+    // Store current page
     const currentPage = this.legendCurrentPage;
     
-    // If we haven't made a decision yet, measure properly
-    if (!this.paginationDecisionMade) {
-      // Estimate based on average chip width (avoid DOM manipulation)
-      const estimatedChipWidth = 120; // Reasonable estimate for a chip with plot number
-      const gap = 8;
-      const pagerWidth = 60; // Space for pagination buttons
-      const buffer = 100; // Generous buffer
-      
-      const estimatedTotalWidth = this.legendItems.length * (estimatedChipWidth + gap);
-      
-      if (estimatedTotalWidth <= viewportWidth - buffer) {
-        // All items fit - no pagination needed
-        this.legendNeedsPagination = false;
-        this.legendItemsPerPage = this.legendItems.length;
-        this.legendCurrentPage = 0;
-        this.legendPageItems = [...this.legendItems];
-        this.paginationDecisionMade = true;
-      } else {
-        // Pagination needed
-        this.legendNeedsPagination = true;
-        const availableWidth = viewportWidth - pagerWidth;
-        const itemsPerPage = Math.max(3, Math.floor(availableWidth / (estimatedChipWidth + gap)));
-        
-        this.legendItemsPerPage = itemsPerPage;
-        this.legendCurrentPage = Math.min(currentPage, Math.max(0, Math.ceil(this.legendItems.length / itemsPerPage) - 1));
-        this.applyLegendPagination();
-        this.paginationDecisionMade = true;
-      }
-      
-      if (this.ctx?.detectChanges) {
-        this.ctx.detectChanges();
-      }
+    if (estimatedTotalWidth <= availableWidthWithoutPagers) {
+      // All items fit - no pagination needed
+      this.legendNeedsPagination = false;
+      this.legendItemsPerPage = this.legendItems.length;
+      this.legendCurrentPage = 0;
+      this.legendPageItems = [...this.legendItems];
     } else {
-      // Decision already made, just update if needed
-      if (this.legendNeedsPagination) {
-        // Recalculate items per page for new width
-        const pagerWidth = 60;
-        const estimatedChipWidth = 120;
-        const gap = 8;
-        const availableWidth = viewportWidth - pagerWidth;
-        const newItemsPerPage = Math.max(3, Math.floor(availableWidth / (estimatedChipWidth + gap)));
-        
-        // Only update if significantly different
-        if (Math.abs(newItemsPerPage - this.legendItemsPerPage) >= 2) {
-          this.legendItemsPerPage = newItemsPerPage;
-          this.applyLegendPagination();
-          
-          if (this.ctx?.detectChanges) {
-            this.ctx.detectChanges();
-          }
-        }
+      // Pagination needed
+      this.legendNeedsPagination = true;
+      const itemsPerPage = Math.max(3, Math.floor(availableWidthWithPagers / (estimatedChipWidth + gap)));
+      
+      // Only update if changed significantly
+      if (Math.abs(this.legendItemsPerPage - itemsPerPage) > 0) {
+        this.legendItemsPerPage = itemsPerPage;
       }
+      
+      // Restore current page if valid
+      const maxPage = Math.ceil(this.legendItems.length / this.legendItemsPerPage) - 1;
+      this.legendCurrentPage = Math.min(currentPage, Math.max(0, maxPage));
+      
+      this.applyLegendPagination();
+    }
+    
+    if (this.ctx?.detectChanges) {
+      this.ctx.detectChanges();
     }
   }
   
