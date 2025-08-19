@@ -1401,12 +1401,27 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }, 200);
   }
   
+  // Helper to detect if window is maximized
+  private isWindowMaximized(): boolean {
+    // Check if window dimensions match screen dimensions (with small tolerance)
+    const tolerance = 10; // pixels
+    const isMaxWidth = Math.abs(window.outerWidth - screen.availWidth) < tolerance;
+    const isMaxHeight = Math.abs(window.outerHeight - screen.availHeight) < tolerance;
+    
+    // Also check using screen.width/height for some browsers
+    const isFullScreenWidth = Math.abs(window.outerWidth - screen.width) < tolerance;
+    const isFullScreenHeight = Math.abs(window.outerHeight - screen.height) < tolerance;
+    
+    return (isMaxWidth && isMaxHeight) || (isFullScreenWidth && isFullScreenHeight);
+  }
+  
   private setupResizeObserver(): void {
     this.LOG('[HEIGHT DEBUG] Setting up ResizeObserver');
     
     // Track previous width to detect maximize/restore
     let previousWidth = 0;
     let lastWindowWidth = window.innerWidth;
+    let wasMaximized = this.isWindowMaximized();
     
     this.resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -1465,16 +1480,40 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const currentWindowWidth = window.innerWidth;
       const windowWidthChange = Math.abs(currentWindowWidth - lastWindowWidth);
       
+      // Check if maximize state changed
+      const isNowMaximized = this.isWindowMaximized();
+      const maximizeStateChanged = isNowMaximized !== wasMaximized;
+      
+      if (maximizeStateChanged) {
+        this.LOG(`MAXIMIZE STATE CHANGED: ${wasMaximized ? 'Maximized' : 'Normal'} -> ${isNowMaximized ? 'Maximized' : 'Normal'}`);
+      }
+      
       this.LOG(`Window resize: ${lastWindowWidth}px -> ${currentWindowWidth}px (change: ${windowWidthChange}px)`);
       
-      // Always reset and recalculate on window resize
-      this.maxItemsWithoutPagination = 0;
+      // Always reset and recalculate on window resize or maximize state change
+      if (maximizeStateChanged || windowWidthChange > 0) {
+        this.maxItemsWithoutPagination = 0;
+        this.LOG('Reset cache due to window resize or maximize state change');
+      }
       
       // Immediate recalculation
       this.performPaginationCalculation();
       
       // Multiple delayed recalculations to catch any layout settling
       const delays = [50, 150, 300, 500];
+      
+      // Add extra recalculation for maximize state changes
+      if (maximizeStateChanged) {
+        // Add an immediate extra calculation for maximize/restore
+        setTimeout(() => {
+          this.LOG('Extra recalculation for maximize state change (25ms)');
+          this.performPaginationCalculation();
+        }, 25);
+        
+        // Add a very late recalculation for maximize state changes
+        delays.push(800, 1000);
+      }
+      
       delays.forEach(delay => {
         setTimeout(() => {
           this.LOG(`Window resize recalculation at ${delay}ms`);
@@ -1483,6 +1522,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       });
       
       lastWindowWidth = currentWindowWidth;
+      wasMaximized = isNowMaximized;
       
       // Also trigger general resize
       this.onResize();
