@@ -602,7 +602,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.LOG('Applying full reset with replaceMerge');
       // Replace structural parts for grid changes
       this.chart.setOption(myNewOptions, {
-        replaceMerge: ['grid', 'xAxis', 'yAxis', 'series', 'dataZoom']
+        replaceMerge: ['grid', 'xAxis', 'yAxis', 'series', 'dataZoom', 'graphic']
       });
       this.resetGrid = false;
     } else {
@@ -965,6 +965,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     option.grid = this.currentGridArray();
     this.LOG('grid configuration:', option.grid);
+    
+    // Add plot numbers as graphic elements
+    option.graphic = this.createPlotNumberGraphics();
+    this.LOG('graphic configuration:', option.graphic);
     
     this.LOG('Setting chart option with grid config...');
     this.chart.setOption(option);
