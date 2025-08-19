@@ -490,6 +490,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       document.removeEventListener('MSFullscreenChange', (this as any).fullscreenHandler);
     }
     
+    // Clean up window resize listener
+    if ((this as any).windowResizeHandler) {
+      window.removeEventListener('resize', (this as any).windowResizeHandler);
+    }
+    
     // Clean up state subscriptions
     if (this.stateChangeSubscription) {
       this.stateChangeSubscription.unsubscribe();
@@ -1392,12 +1397,39 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   private setupResizeObserver(): void {
     this.LOG('[HEIGHT DEBUG] Setting up ResizeObserver');
+    
+    // Track previous width to detect maximize/restore
+    let previousWidth = 0;
+    
     this.resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
         this.LOG(`[HEIGHT DEBUG] ResizeObserver triggered - contentRect: width=${width}, height=${height}`);
         if (width > 0 && height > 0) {
           this.LOG('[ECharts Line Chart] Container resized:', { width, height });
+          
+          // Detect significant width changes that indicate maximize/restore
+          const widthChange = Math.abs(width - previousWidth);
+          const isSignificantChange = widthChange > 200; // More than 200px change
+          
+          if (isSignificantChange && previousWidth > 0) {
+            this.LOG('Detected significant resize (likely maximize/restore), forcing full recalculation');
+            
+            // Reset pagination cache to force fresh calculation
+            this.maxItemsWithoutPagination = 0;
+            
+            // Force legend recalculation with delays similar to fullscreen handling
+            setTimeout(() => {
+              this.calculateItemsPerPage();
+            }, 100);
+            
+            setTimeout(() => {
+              this.calculateItemsPerPage();
+            }, 300);
+          }
+          
+          previousWidth = width;
+          
           this.LOG(`[HEIGHT DEBUG] Before resize - ctx.height: ${this.ctx.height}`);
           this.onResize();
           this.LOG(`[HEIGHT DEBUG] After resize - ctx.height: ${this.ctx.height}`);
@@ -1406,6 +1438,26 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     });
     this.resizeObserver.observe(this.chartContainer.nativeElement);
     this.LOG('[HEIGHT DEBUG] ResizeObserver attached to chart container');
+    
+    // Also add a window resize listener as backup for maximize/restore
+    const windowResizeHandler = () => {
+      this.LOG('Window resize event detected');
+      
+      // Force recalculation after a delay to let layout settle
+      setTimeout(() => {
+        // Reset cache and recalculate
+        this.maxItemsWithoutPagination = 0;
+        this.calculateItemsPerPage();
+        
+        // Also trigger general resize
+        this.onResize();
+      }, 200);
+    };
+    
+    window.addEventListener('resize', windowResizeHandler);
+    
+    // Store handler for cleanup
+    (this as any).windowResizeHandler = windowResizeHandler;
   }
 
   /**
