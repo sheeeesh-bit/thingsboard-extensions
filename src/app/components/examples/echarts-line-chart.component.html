@@ -80,7 +80,7 @@
                     (click)="toggleLabel(item)"
                     [attr.aria-pressed]="item.selected"
                     [title]="!canTurnOff(item.label) ? 'At least one series must remain visible' : item.label">
-              <span class="dot" [style.backgroundColor]="item.color"></span>
+              <span class="plot-number">{{ item.plotNumber }}</span>
               <span class="label-text">{{ item.label }}</span>
             </button>
           </div>

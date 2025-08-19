@@ -148,6 +148,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     label: string;
     color: string;
     selected: boolean;
+    plotNumber: number;
   }> = [];
   public lastPulsedLabel: string | null = null;
   
@@ -158,6 +159,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     label: string;
     color: string;
     selected: boolean;
+    plotNumber: number;
   }> = [];
   public legendTotalPages = 1;
   public legendHasMorePages = false;
@@ -576,6 +578,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     myNewOptions.yAxis = this.currentYAxisArray();
     myNewOptions.grid = this.currentGridArray();
     myNewOptions.dataZoom = this.getDataZoomConfig(); // Update datazoom based on current grid config
+    
+    // Add plot numbers as graphic elements
+    myNewOptions.graphic = this.createPlotNumberGraphics();
     
     // Hidden controller legend - maintains selection state but not visible
     // The custom HTML toolbar will control this via dispatchAction
@@ -2521,6 +2526,34 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     };
   }
 
+  private createPlotNumberGraphics(): any[] {
+    const graphics = [];
+    const grids = this.currentGridArray();
+    
+    // Create a plot number for each grid
+    for (let i = 0; i < grids.length; i++) {
+      const grid = grids[i];
+      
+      // Calculate position based on grid
+      graphics.push({
+        type: 'text',
+        left: '2%',  // Position on the left side
+        top: grid.top,  // Align with grid top
+        style: {
+          text: String(i + 1),  // Plot number (1-based)
+          fontSize: 28,
+          fontWeight: 'bold',
+          fill: '#007aff',
+          textAlign: 'center',
+          textVerticalAlign: 'top'
+        },
+        z: 100  // Ensure it's on top
+      });
+    }
+    
+    return graphics;
+  }
+
   private getDataZoomConfig(): any[] {
     return [
       // Keep the internal slider hidden — external bar controls start/end
@@ -2848,7 +2881,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // [CLAUDE EDIT] Sort by grid order (pos), then by label for stability
     this.legendItems = itemsWithPosition
       .sort((a, b) => a.pos - b.pos || a.label.localeCompare(b.label))
-      .map(({ label, color, selected }) => ({ label, color, selected }));
+      .map(({ label, color, selected, pos }) => ({ 
+        label, 
+        color, 
+        selected,
+        plotNumber: pos + 1  // Add 1 to make it 1-based instead of 0-based
+      }));
     
     // [CLAUDE EDIT] Apply pagination without recalculating widths
     this.applyLegendPagination();

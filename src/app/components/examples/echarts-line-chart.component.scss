@@ -339,18 +339,25 @@ div[fxFlex] {
   user-select: none;
   white-space: nowrap;
   
-  // Color dot indicator
-  .dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
+  // Plot number indicator
+  .plot-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: #007aff;
+    color: white;
+    font-weight: 600;
+    font-size: 12px;
     flex-shrink: 0;
-    border: 1px solid rgba(0, 0, 0, 0.08);
   }
   
   // Label text
   .label-text {
     letter-spacing: -0.01em;
+    margin-left: 2px;
   }
   
   // Inactive state
@@ -358,8 +365,9 @@ div[fxFlex] {
     opacity: 0.45;
     font-weight: 400;
     
-    .dot {
-      opacity: 0.6;
+    .plot-number {
+      background: #999;
+      opacity: 0.7;
     }
   }
   
