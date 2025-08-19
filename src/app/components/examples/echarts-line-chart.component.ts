@@ -2531,45 +2531,48 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private createPlotNumberGraphics(): any[] {
-    const graphics = [];
-    
-    // Always create numbers for all possible plots based on axis assignments
-    // This ensures numbers stay fixed regardless of visibility
-    const axisMap = this.getAxisPositionMap();
-    const plotNames = Object.keys(axisMap).sort((a, b) => axisMap[a] - axisMap[b]);
-    
-    // Get current visible grids to position the numbers
+    const graphics: any[] = [];
     const grids = this.currentGridArray();
     
-    this.LOG('Creating plot number graphics. AxisMap:', axisMap, 'PlotNames:', plotNames, 'Grids:', grids);
+    // Get the axis position map to determine fixed plot numbers
+    const axisMap = this.getAxisPositionMap();
     
-    // Create plot numbers for visible grids
-    for (let i = 0; i < grids.length && i < plotNames.length; i++) {
+    // Get the current grid names (which plots are actually visible)
+    const visibleGridNames = this.currentGridNames;
+    
+    // Create plot numbers for each visible grid
+    for (let i = 0; i < grids.length && i < visibleGridNames.length; i++) {
       const grid = grids[i];
-      const plotName = plotNames[i];
-      const plotNumber = axisMap[plotName] + 1; // Make it 1-based
+      const gridName = visibleGridNames[i];
       
-      // Add plot number on the left side
-      const graphic = {
+      // Get the fixed plot number from the axis map (1-based)
+      const plotNumber = axisMap[gridName] + 1;
+      
+      // Calculate vertical center of the grid
+      // grid.top is a string like "8%", grid.height is a string like "20%"
+      const topValue = parseFloat(grid.top);
+      const heightValue = parseFloat(grid.height);
+      const centerY = topValue + (heightValue / 2);
+      
+      graphics.push({
         type: 'text',
-        left: 20,  // Fixed pixel position from left
-        top: grid.top,  // Position based on grid (already includes %)
+        left: 14,  // Fixed left gutter in pixels
+        top: `${centerY}%`,  // Vertically centered in the grid
         style: {
           text: String(plotNumber),
-          fontSize: 32,
+          fontSize: this.currentSize === 'small' ? 24 : 
+                   this.currentSize === 'large' ? 28 : 32,
           fontWeight: 'bold',
           fill: '#007aff',
           textAlign: 'center',
           textVerticalAlign: 'middle'
         },
-        z: 100
-      };
+        z: 100  // Above plot but below tooltips
+      });
       
-      this.LOG(`Creating plot number ${plotNumber} at top: ${grid.top}`);
-      graphics.push(graphic);
+      this.LOG(`Plot ${gridName} (${plotNumber}) at ${centerY}% (grid top: ${grid.top}, height: ${grid.height})`);
     }
     
-    this.LOG('Final graphics array:', graphics);
     return graphics;
   }
 
