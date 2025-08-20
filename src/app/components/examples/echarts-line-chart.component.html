@@ -61,8 +61,17 @@
   <!-- Chart and sidebar container -->
   <div fxFlex class="echarts-layout">
     <!-- Entity sidebar (left side) -->
-    <aside class="entity-sidebar" *ngIf="ctx.settings.showEntitySidebar !== false">
-      <table class="entity-table">
+    <aside class="entity-sidebar" 
+           [class.sidebar-collapsed]="isSidebarCollapsed"
+           *ngIf="ctx.settings.showEntitySidebar !== false">
+      <!-- Sidebar toggle button -->
+      <button class="sidebar-toggle" 
+              (click)="toggleSidebar()"
+              [title]="isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+        <i class="material-icons">{{ isSidebarCollapsed ? 'chevron_right' : 'chevron_left' }}</i>
+      </button>
+      
+      <table class="entity-table" *ngIf="!isSidebarCollapsed">
         <thead>
           <tr>
             <th colspan="3">Entities</th>

@@ -194,19 +194,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private chartActionBatch: any = null;
   private originalAnimationState: boolean | null = null;
   
-  // Queue system for entity/legend operations
-  private operationQueue: Array<{
-    type: 'entity' | 'legend',
-    id: string,
-    action: () => Promise<void>,
-    priority: number,
-    queuePosition?: number  // Track original queue position for debugging
-  }> = [];
-  private isProcessingQueue = false;
-  private maxConcurrentOps = 1; // Process one at a time for clearer debugging
-  private currentOperations = 0;
-  private maxQueueSize = 10; // Maximum queue size
-  private queueCounter = 0; // Counter for queue position tracking
+  // Sidebar state
+  public isSidebarCollapsed = false;
   
   // UI feedback states
   private lastPulsedEntity: string | null = null;
@@ -229,37 +218,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   constructor(private dialog: MatDialog) {}
   
-  // Test method to demonstrate queue processing
-  private testQueueProcessing(): void {
-    this.LOG('[QUEUE TEST] 🧪 Starting queue test with 5 operations...');
+  // Toggle sidebar visibility
+  public toggleSidebar(): void {
+    this.isSidebarCollapsed = !this.isSidebarCollapsed;
+    this.LOG(`[SIDEBAR] Sidebar ${this.isSidebarCollapsed ? 'collapsed' : 'expanded'}`);
     
-    // Add operations in order 1, 2, 3, 4, 5 with different priorities
-    this.queueOperation('entity', 'entity-1', async () => {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      this.LOG('[QUEUE TEST] Operation 1 executed');
-    }, 1); // Low priority
-    
-    this.queueOperation('legend', 'legend-2', async () => {
-      await new Promise(resolve => setTimeout(resolve, 150));
-      this.LOG('[QUEUE TEST] Operation 2 executed');
-    }, 3); // High priority
-    
-    this.queueOperation('entity', 'entity-3', async () => {
-      await new Promise(resolve => setTimeout(resolve, 80));
-      this.LOG('[QUEUE TEST] Operation 3 executed');
-    }, 2); // Medium priority
-    
-    this.queueOperation('legend', 'legend-4', async () => {
-      await new Promise(resolve => setTimeout(resolve, 120));
-      this.LOG('[QUEUE TEST] Operation 4 executed');
-    }, 3); // High priority
-    
-    this.queueOperation('entity', 'entity-5', async () => {
-      await new Promise(resolve => setTimeout(resolve, 90));
-      this.LOG('[QUEUE TEST] Operation 5 executed');
-    }, 1); // Low priority
-    
-    this.LOG('[QUEUE TEST] 📝 Expected order (by priority): 2,4,3,1,5');
+    // Trigger chart resize after animation
+    setTimeout(() => {
+      if (this.chart && !this.chart.isDisposed()) {
+        this.chart.resize();
+        this.LOG('[SIDEBAR] Chart resized after sidebar toggle');
+      }
+    }, 300); // Wait for CSS transition
   }
 
   ngOnInit(): void {
@@ -1384,101 +1354,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }, 200);
   }
   
-  // Queue system for load balancing operations
-  private queueOperation(type: 'entity' | 'legend', id: string, action: () => Promise<void>, priority = 1): void {
-    // Check queue size limit
-    if (this.operationQueue.length >= this.maxQueueSize) {
-      this.LOG(`[QUEUE] ❌ Queue full (${this.maxQueueSize} items), rejecting operation: ${id}`);
-      return;
-    }
-    
-    // Remove any existing operation with the same id to prevent duplicates
-    const removedOps = this.operationQueue.filter(op => op.id === id);
-    if (removedOps.length > 0) {
-      this.LOG(`[QUEUE] 🔄 Removing duplicate operation: ${id} (position: ${removedOps[0].queuePosition})`);
-    }
-    this.operationQueue = this.operationQueue.filter(op => op.id !== id);
-    
-    // Increment queue counter and add new operation
-    this.queueCounter++;
-    const newOp = { type, id, action, priority, queuePosition: this.queueCounter };
-    this.operationQueue.push(newOp);
-    
-    // Sort by priority (higher priority first), then by queue position for same priority
-    this.operationQueue.sort((a, b) => {
-      if (b.priority !== a.priority) {
-        return b.priority - a.priority;
-      }
-      return (a.queuePosition || 0) - (b.queuePosition || 0);
-    });
-    
-    // Log current queue state
-    const queueOrder = this.operationQueue.map(op => `${op.queuePosition}:${op.id.substring(0, 8)}`).join(' → ');
-    this.LOG(`[QUEUE] ➕ Added #${this.queueCounter}:${id} (${type}, priority:${priority})`);
-    this.LOG(`[QUEUE] 📋 Current queue [${this.operationQueue.length} items]: ${queueOrder}`);
-    
-    // Process queue if not already processing
-    this.processQueue();
-  }
-  
-  private async processQueue(): Promise<void> {
-    if (this.isProcessingQueue || this.operationQueue.length === 0) {
-      if (this.operationQueue.length === 0) {
-        this.LOG(`[QUEUE] 📭 Queue empty, nothing to process`);
-      }
-      return;
-    }
-    
-    this.isProcessingQueue = true;
-    this.LOG(`[QUEUE] 🚀 Starting queue processing...`);
-    
-    while (this.operationQueue.length > 0 && this.currentOperations < this.maxConcurrentOps) {
-      const operation = this.operationQueue.shift();
-      if (!operation) break;
-      
-      this.currentOperations++;
-      const remainingQueue = this.operationQueue.map(op => `${op.queuePosition}:${op.id.substring(0, 8)}`).join(' → ');
-      
-      this.LOG(`[QUEUE] ▶️ Processing #${operation.queuePosition}:${operation.id} (${operation.type})`);
-      this.LOG(`[QUEUE] 📊 Status: ${this.currentOperations} running, ${this.operationQueue.length} pending`);
-      if (this.operationQueue.length > 0) {
-        this.LOG(`[QUEUE] ⏳ Remaining: ${remainingQueue}`);
-      }
-      
-      const startTime = Date.now();
-      
-      // Execute operation with error handling
-      operation.action()
-        .then(() => {
-          const duration = Date.now() - startTime;
-          this.LOG(`[QUEUE] ✅ Completed #${operation.queuePosition}:${operation.id} in ${duration}ms`);
-        })
-        .catch(error => {
-          const duration = Date.now() - startTime;
-          this.LOG(`[QUEUE] ❌ Failed #${operation.queuePosition}:${operation.id} after ${duration}ms:`, error);
-        })
-        .finally(() => {
-          this.currentOperations--;
-          this.LOG(`[QUEUE] 📉 Active operations: ${this.currentOperations}`);
-          
-          // Continue processing if queue not empty
-          if (this.operationQueue.length > 0) {
-            this.LOG(`[QUEUE] ⏩ Continuing with ${this.operationQueue.length} remaining items...`);
-            setTimeout(() => this.processQueue(), 10);
-          } else if (this.currentOperations === 0) {
-            // All operations complete
-            this.isProcessingQueue = false;
-            this.LOG(`[QUEUE] 🎉 All operations complete! Queue processed successfully.`);
-          }
-        });
-    }
-    
-    // If no operations could be started, we're done
-    if (this.currentOperations === 0 && this.operationQueue.length === 0) {
-      this.isProcessingQueue = false;
-      this.LOG(`[QUEUE] 💤 Queue processing stopped (empty queue)`);
-    }
-  }
   
   
   // Check if an entity can be disabled (prevent disabling the last visible entity)
@@ -1508,19 +1383,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG(`[UI] Pulsing entity: ${entityName} (action blocked)`);
   }
   
-  // Async version of performEntityToggle for queue processing
-  private async performEntityToggleAsync(entityName: string): Promise<void> {
-    return new Promise<void>((resolve) => {
-      try {
-        this.performEntityToggle(entityName);
-        // Give a small delay for ECharts to process
-        setTimeout(() => resolve(), 50);
-      } catch (error) {
-        this.LOG(`[QUEUE] Error in performEntityToggleAsync for ${entityName}:`, error);
-        resolve(); // Don't reject to keep queue processing
-      }
-    });
-  }
   
   // Check which plots/grids have visible series WITH DATA
   /* private checkPlotVisibility(legendSelected: {[key: string]: boolean}): {[plot: string]: {hasVisibleSeries: boolean, seriesNames: string[]}} {
@@ -2056,7 +1918,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public toggleEntityVisibility(entityName: string): void {
     if (!this.ctx?.data || !this.chart) return;
     
-    this.LOG(`[PERF] Entity click: ${entityName}`);
+    this.LOG(`[ENTITY] Toggle clicked: ${entityName}`);
     
     // Check if entity can be disabled (prevent disabling last visible entity)
     const entityData = this.entityList.find(e => e.name === entityName);
@@ -2071,10 +1933,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.updateEntityListOptimistically(entityName);
     });
     
-    // Queue the entity toggle operation with high priority
-    this.queueOperation('entity', entityName, async () => {
-      await this.performEntityToggleAsync(entityName);
-    }, 2); // High priority for direct entity clicks
+    // Perform the toggle with debouncing
+    this.debouncedUIUpdate('entity-toggle', () => {
+      this.performEntityToggle(entityName);
+    });
   }
   
   private updateEntityListOptimistically(entityName: string): void {
@@ -4743,19 +4605,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
     
-    this.LOG(`[PERF] Legend click: ${item.label}`);
+    this.LOG(`[LEGEND] Toggle clicked: ${item.label}`);
     
-    // Immediate UI feedback - update legend items optimistically
-    this.batchUIUpdate('legend-chips', () => {
-      mainItem.selected = !mainItem.selected;
-      item.selected = mainItem.selected;
-      this.ctx.detectChanges();
+    // Toggle the selection
+    mainItem.selected = !mainItem.selected;
+    item.selected = mainItem.selected;
+    
+    // Perform the toggle with debouncing
+    this.debouncedUIUpdate('legend-toggle', () => {
+      this.performLegendToggle(item.label, mainItem.selected);
     });
-    
-    // Queue the legend toggle operation with medium priority
-    this.queueOperation('legend', item.label, async () => {
-      await this.performLegendToggleAsync(item.label, mainItem.selected);
-    }, 1); // Medium priority for legend clicks
   }
   
   // Helper to toggle all series belonging to a label (kept for compatibility)
@@ -4835,18 +4694,5 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }, 50);
   }
   
-  // Async version of performLegendToggle for queue processing
-  private async performLegendToggleAsync(label: string, shouldSelect: boolean): Promise<void> {
-    return new Promise<void>((resolve) => {
-      try {
-        this.performLegendToggle(label, shouldSelect);
-        // Give a small delay for ECharts to process
-        setTimeout(() => resolve(), 100);
-      } catch (error) {
-        this.LOG(`[QUEUE] Error in performLegendToggleAsync for ${label}:`, error);
-        resolve(); // Don't reject to keep queue processing
-      }
-    });
-  }
 
 }
