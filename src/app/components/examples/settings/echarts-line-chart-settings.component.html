@@ -1,8 +1,69 @@
 <form [formGroup]="echartsLineChartSettingsForm" *ngIf="echartsLineChartSettingsForm" style="width: 100%;">
   <div class="mat-content mat-padding" fxLayout="column" style="width: 100%;">
     
-    <!-- Legend Style Settings -->
+    <!-- Design Settings -->
     <mat-expansion-panel expanded>
+      <mat-expansion-panel-header>
+        <mat-panel-title>Design</mat-panel-title>
+      </mat-expansion-panel-header>
+      
+      <div fxLayout="column" fxLayoutGap="16px">
+        
+        <h4>Y-Axis Label Layout</h4>
+        <mat-form-field class="mat-block" appearance="outline">
+          <mat-label>Number of Lines</mat-label>
+          <mat-select formControlName="yAxisLabelLines">
+            <mat-option [value]="1">
+              <div fxLayout="row" fxLayoutAlign="start center" fxLayoutGap="16px">
+                <div fxFlex="30" style="font-weight: 500">1 Line</div>
+                <div fxFlex style="font-size: 11px; color: #666; font-family: monospace">
+                  Temperature (°C) - 1
+                </div>
+              </div>
+            </mat-option>
+            <mat-option [value]="2">
+              <div fxLayout="row" fxLayoutAlign="start center" fxLayoutGap="16px">
+                <div fxFlex="30" style="font-weight: 500">2 Lines</div>
+                <div fxFlex style="font-size: 11px; color: #666; font-family: monospace; line-height: 1.4">
+                  Temperature<br>(°C) - 1
+                </div>
+              </div>
+            </mat-option>
+            <mat-option [value]="3">
+              <div fxLayout="row" fxLayoutAlign="start center" fxLayoutGap="16px">
+                <div fxFlex="30" style="font-weight: 500">3 Lines</div>
+                <div fxFlex style="font-size: 11px; color: #666; font-family: monospace; line-height: 1.4">
+                  1<br>Temperature<br>(°C)
+                </div>
+              </div>
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        
+        <h4>Color Scheme</h4>
+        <mat-form-field class="mat-block" appearance="outline">
+          <mat-label>Chart Color Scheme</mat-label>
+          <mat-select formControlName="colorScheme">
+            <mat-option value="default">Default (Blue/Orange/Green)</mat-option>
+            <mat-option value="dark">Dark (Deep Colors)</mat-option>
+            <mat-option value="vibrant">Vibrant (Bright Colors)</mat-option>
+            <mat-option value="pastel">Pastel (Soft Colors)</mat-option>
+            <mat-option value="monochrome">Monochrome (Blue Shades)</mat-option>
+          </mat-select>
+        </mat-form-field>
+        
+        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px;">
+          <p style="margin: 8px 0;"><strong>Layout Options:</strong></p>
+          <ul style="margin: 4px 0; padding-left: 20px;">
+            <li><strong>Stacked:</strong> Traditional 3-line layout with plot number, label, and units on separate lines</li>
+            <li><strong>Compact:</strong> Space-saving single line format: "Label (units) · ①"</li>
+          </ul>
+        </div>
+      </div>
+    </mat-expansion-panel>
+
+    <!-- Legend Style Settings -->
+    <mat-expansion-panel>
       <mat-expansion-panel-header>
         <mat-panel-title>Legend Style Settings</mat-panel-title>
       </mat-expansion-panel-header>
@@ -107,6 +168,20 @@
         
         <!-- Grid Layout Settings -->
         <h4>Grid Layout</h4>
+        
+        <mat-form-field class="mat-block" appearance="outline">
+          <mat-label>Start Scrolling After (Number of Plots)</mat-label>
+          <mat-select formControlName="scrollingStartsAfter">
+            <mat-option [value]="1">1 Plot (Always scroll)</mat-option>
+            <mat-option [value]="2">2 Plots</mat-option>
+            <mat-option [value]="3">3 Plots (Default)</mat-option>
+            <mat-option [value]="4">4 Plots</mat-option>
+            <mat-option [value]="5">5 Plots</mat-option>
+            <mat-option [value]="6">6 Plots</mat-option>
+            <mat-option [value]="7">7 Plots</mat-option>
+          </mat-select>
+          <mat-hint>Plots will fit without scrolling up to this number</mat-hint>
+        </mat-form-field>
         <div fxLayout="row" fxLayoutGap="16px">
           <mat-form-field fxFlex appearance="outline">
             <mat-label>Markline Left or Right</mat-label>
@@ -259,6 +334,63 @@
           <input matInput type="number" min="0" max="50" formControlName="tooltipShowAllIfSeriesCountLTE">
           <mat-hint>Show all series from all grids if the total visible series count across all grids is ≤ this value (0 = disabled)</mat-hint>
         </mat-form-field>
+      </div>
+    </mat-expansion-panel>
+
+    <!-- Features Tab - Control UI Element Visibility -->
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>Features</mat-panel-title>
+      </mat-expansion-panel-header>
+      
+      <div fxLayout="column" fxLayoutGap="16px">
+        <h4>Button Visibility</h4>
+        
+        <mat-checkbox formControlName="showImageButton">
+          Show Image Export Button
+        </mat-checkbox>
+        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
+          Enable to show the camera button for exporting chart as image
+        </div>
+        
+        <mat-checkbox formControlName="showExportButton">
+          Show Data Export Button
+        </mat-checkbox>
+        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
+          Enable to show the export dropdown (CSV, XLS, XLSX)
+        </div>
+        
+        <mat-checkbox formControlName="showResetZoomButton">
+          Show Reset Zoom Button
+        </mat-checkbox>
+        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
+          Enable to show the reset zoom button
+        </div>
+        
+        <h4>Sidebar Features</h4>
+        
+        <mat-checkbox formControlName="showEntitySidebar">
+          Show Entity Sidebar
+        </mat-checkbox>
+        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
+          Enable to show the entity list on the left side
+        </div>
+        
+        <h4>Chart Features</h4>
+        
+        <mat-checkbox formControlName="showCustomLegend">
+          Show Custom Legend
+        </mat-checkbox>
+        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
+          Enable to show the custom legend with plot numbers
+        </div>
+        
+        <mat-checkbox formControlName="showZoomControls">
+          Show Zoom Controls
+        </mat-checkbox>
+        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
+          Enable to show the bottom zoom slider controls
+        </div>
       </div>
     </mat-expansion-panel>
 

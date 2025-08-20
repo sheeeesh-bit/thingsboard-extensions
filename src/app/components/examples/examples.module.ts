@@ -8,15 +8,19 @@ import {
   WidgetConfigComponentsModule
 } from '@home/components/public-api';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatDialogModule } from '@angular/material/dialog';
+import { MatRadioModule } from '@angular/material/radio';
 import { EchartsLineChartComponent } from './echarts-line-chart.component';
 import { EchartsLineChartSettingsComponent } from './settings/echarts-line-chart-settings.component';
 import { EchartsLineChartDataKeySettingsComponent } from './data-key-settings/echarts-line-chart-data-key-settings.component';
+import { EchartsSettingsDialogComponent } from './settings-dialog/echarts-settings-dialog.component';
 
 @NgModule({
   declarations: [
     EchartsLineChartComponent,
     EchartsLineChartSettingsComponent,
-    EchartsLineChartDataKeySettingsComponent
+    EchartsLineChartDataKeySettingsComponent,
+    EchartsSettingsDialogComponent
   ],
   imports: [
     CommonModule,
@@ -25,7 +29,9 @@ import { EchartsLineChartDataKeySettingsComponent } from './data-key-settings/ec
     HomeComponentsModule,
     BasicWidgetConfigModule,
     WidgetConfigComponentsModule,
-    MatMenuModule
+    MatMenuModule,
+    MatDialogModule,
+    MatRadioModule
   ],
   exports: [
     EchartsLineChartComponent,

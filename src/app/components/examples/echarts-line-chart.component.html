@@ -4,11 +4,23 @@
 <div fxFlex fxLayout="column" style="height: 100%; width: 100%;" fxLayoutAlign="start stretch">
 
     <!-- Buttons at the top -->
-    <div class="tb-button-container" fxLayoutAlign="end stretch">
-        <button mat-icon-button (click)="menuButtons('genImage')" class="tb-button"  matTooltipPosition="above" matTooltip="Download Image"><i class="material-icons">photo_camera</i></button>
+    <div class="tb-button-container" fxLayoutAlign="end stretch" *ngIf="ctx.settings.showImageButton !== false || ctx.settings.showExportButton !== false || ctx.settings.showResetZoomButton !== false">
+        <button *ngIf="ctx.settings.showImageButton !== false" 
+                mat-icon-button 
+                (click)="menuButtons('genImage')" 
+                class="tb-button"  
+                matTooltipPosition="above" 
+                matTooltip="Download Image">
+            <i class="material-icons">photo_camera</i>
+        </button>
         
         <!-- Export dropdown menu -->
-        <button mat-icon-button [matMenuTriggerFor]="exportMenu" class="tb-button" matTooltipPosition="above" matTooltip="Export Data">
+        <button *ngIf="ctx.settings.showExportButton !== false"
+                mat-icon-button 
+                [matMenuTriggerFor]="exportMenu" 
+                class="tb-button" 
+                matTooltipPosition="above" 
+                matTooltip="Export Data">
             <i class="material-icons">save_alt</i>
         </button>
         <mat-menu #exportMenu="matMenu">
@@ -26,13 +38,30 @@
             </button>
         </mat-menu>
         
-        <button mat-icon-button (click)="menuButtons('reset')" class="tb-button" matTooltipPosition="above" matTooltip="Reset Zoom" matTooltipClass="custom-tooltip"><i class="material-icons">restore_page</i></button> 
+        <button *ngIf="ctx.settings.showResetZoomButton !== false"
+                mat-icon-button 
+                (click)="menuButtons('reset')" 
+                class="tb-button" 
+                matTooltipPosition="above" 
+                matTooltip="Reset Zoom" 
+                matTooltipClass="custom-tooltip">
+            <i class="material-icons">restore_page</i>
+        </button>
+        
+        <!-- Settings Dialog Button -->
+        <button mat-icon-button 
+                (click)="openSettingsDialog()" 
+                class="tb-button" 
+                matTooltipPosition="above" 
+                matTooltip="Widget Settings">
+            <i class="material-icons">settings</i>
+        </button>
     </div>
   
   <!-- Chart and sidebar container -->
   <div fxFlex class="echarts-layout">
     <!-- Entity sidebar (left side) -->
-    <aside class="entity-sidebar">
+    <aside class="entity-sidebar" *ngIf="ctx.settings.showEntitySidebar !== false">
       <table class="entity-table">
         <thead>
           <tr>
@@ -48,7 +77,9 @@
               <div class="swatch-box" [style.background-color]="entity.color"></div>
             </td>
             <td class="entity-name" [title]="entity.name">{{ entity.name }}</td>
-            <td class="entity-count">{{ entity.count }}</td>
+            <td class="entity-count" [title]="'Series: ' + entity.count + ', Points: ' + entity.dataPoints">
+              {{ entity.count }}<span class="data-points"> ({{ entity.dataPoints }})</span>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -57,7 +88,7 @@
     <!-- Chart area with floating overlays -->
     <div class="chart-container-wrapper">
       <!-- Top floating legend overlay -->
-      <nav class="legend-overlay" #legendOverlay aria-label="Series legend">
+      <nav class="legend-overlay" #legendOverlay aria-label="Series legend" *ngIf="ctx.settings.showCustomLegend !== false">
         <!-- Previous page button - only show when pagination needed -->
         <button *ngIf="legendNeedsPagination"
                 type="button"
@@ -103,10 +134,19 @@
       <!-- Scrollable chart container -->
       <div #chartContainer class="chart-outer">
         <div id="echartContainer"></div>
+        <!-- No Data Message -->
+        <div *ngIf="hasNoVisibleData" class="no-data-message">
+          <div class="no-data-content">
+            <i class="material-icons">info_outline</i>
+            <h3>No Data Available</h3>
+            <p>All selected devices have no data in the current time range.</p>
+            <p>Please enable devices with data from the sidebar.</p>
+          </div>
+        </div>
       </div>
 
       <!-- Bottom floating zoom overlay -->
-      <div class="zoom-overlay" #zoomOverlay>
+      <div class="zoom-overlay" #zoomOverlay *ngIf="ctx.settings.showZoomControls !== false">
         <div class="zoom-track">
           <div class="zoom-window"></div>
           <div class="zoom-handle left" 

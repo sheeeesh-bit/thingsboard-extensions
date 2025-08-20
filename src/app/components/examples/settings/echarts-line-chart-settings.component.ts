@@ -10,6 +10,10 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   showlegend?: boolean;
   legendcolortext?: string;
   
+  // Design Settings
+  yAxisLabelLines?: 1 | 2 | 3;  // Number of lines for Y-axis labels
+  colorScheme?: 'default' | 'dark' | 'vibrant' | 'pastel' | 'monochrome';
+  
   // Y-Axis Settings
   yAxisLeftTitle?: string;
   yAxisLeftUnit?: string;
@@ -42,6 +46,7 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   grid_layout_top?: number;
   grid_layout_bottom?: number;
   markline_layout_left_or_right?: number;
+  scrollingStartsAfter?: number;  // Number of plots after which scrolling starts (default: 3)
   
   // Annotations
   annotations?: Array<{
@@ -58,6 +63,14 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   tooltipOnlyHoveredGrid?: boolean;
   tooltipMaxItems?: number;
   tooltipShowAllIfSeriesCountLTE?: number;
+  
+  // Features - UI Element Visibility
+  showImageButton?: boolean;
+  showExportButton?: boolean;
+  showResetZoomButton?: boolean;
+  showEntitySidebar?: boolean;
+  showCustomLegend?: boolean;
+  showZoomControls?: boolean;
   
   // Debug
   debugOutput?: boolean;
@@ -84,6 +97,8 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       smooth: false,
       showlegend: false,
       legendcolortext: '#000000',
+      yAxisLabelLines: 3,  // Default to 3 lines
+      colorScheme: 'default',
       yAxisLeftTitle: '',
       yAxisLeftUnit: 'ml',
       yAxisLeftAutoScale: true,
@@ -105,10 +120,18 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       grid_layout_top: 40,
       grid_layout_bottom: 240,
       markline_layout_left_or_right: 285,
+      scrollingStartsAfter: 3,
       annotations: [],
       tooltipOnlyHoveredGrid: false,
       tooltipMaxItems: 10,
       tooltipShowAllIfSeriesCountLTE: 0,
+      // Features - default all to true (visible)
+      showImageButton: true,
+      showExportButton: true,
+      showResetZoomButton: true,
+      showEntitySidebar: true,
+      showCustomLegend: true,
+      showZoomControls: true,
       debugOutput: false
     };
   }
@@ -118,6 +141,10 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       // Legend Settings
       showlegend: [settings.showlegend],
       legendcolortext: [settings.legendcolortext || '#000000'],
+      
+      // Design Settings
+      yAxisLabelLines: [settings.yAxisLabelLines || 3],
+      colorScheme: [settings.colorScheme || 'default'],
       
       // Graph Settings
       smooth: [settings.smooth],
@@ -142,6 +169,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       grid_layout_top: [settings.grid_layout_top || 40],
       grid_layout_bottom: [settings.grid_layout_bottom || 240],
       markline_layout_left_or_right: [settings.markline_layout_left_or_right || 285],
+      scrollingStartsAfter: [settings.scrollingStartsAfter || 3],
       
       // Annotations
       annotations: this.fb.array(this.createAnnotations(settings.annotations || [])),
@@ -150,6 +178,14 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       tooltipOnlyHoveredGrid: [settings.tooltipOnlyHoveredGrid || false],
       tooltipMaxItems: [settings.tooltipMaxItems || 10],
       tooltipShowAllIfSeriesCountLTE: [settings.tooltipShowAllIfSeriesCountLTE || 0],
+      
+      // Features - UI Element Visibility
+      showImageButton: [settings.showImageButton !== false],
+      showExportButton: [settings.showExportButton !== false],
+      showResetZoomButton: [settings.showResetZoomButton !== false],
+      showEntitySidebar: [settings.showEntitySidebar !== false],
+      showCustomLegend: [settings.showCustomLegend !== false],
+      showZoomControls: [settings.showZoomControls !== false],
       
       // Debug
       debugOutput: [settings.debugOutput]

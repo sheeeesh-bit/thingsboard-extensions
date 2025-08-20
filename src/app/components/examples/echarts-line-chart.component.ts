@@ -23,6 +23,8 @@ import { CanvasRenderer } from 'echarts/renderers';
 import * as XLSX from 'xlsx';
 import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
+import { MatDialog } from '@angular/material/dialog';
+import { EchartsSettingsDialogComponent } from './settings-dialog/echarts-settings-dialog.component';
 // Removed heavy performance utilities that were causing unresponsiveness
 
 // Register required components
@@ -95,11 +97,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public zoomStart = 0;
   public zoomEnd = 100;
   
+  // Loading and data state flags
+  public hasNoVisibleData = false;
+  private isInitialLoad = true;  // Track if this is the first data load
+  private hasReceivedData = false;  // Track if we've ever received data
+  
   // Entity sidebar model
   public entityList: Array<{
     name: string;
     color: string;
     count: number;
+    dataPoints: number;
     visible: boolean;
   }> = [];
 
@@ -113,35 +121,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // Entity-based color mapping
   private entityColorMap: Record<string, string> = {};
   private nextColorIndex = 0;
-  // Extended color palette for 100+ devices
-  private colorPalette = [
-    // ECharts default colors (20)
-    '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de',
-    '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc', '#ff9f7f',
-    '#ffdb5c', '#95e1d3', '#ff6b6b', '#4ecdc4', '#a8e6cf',
-    '#ffd3b6', '#ffaaa5', '#ff8b94', '#dcedc1', '#ffeaa7',
-    // Additional distinct colors (80 more for total of 100)
-    '#2e7d32', '#1976d2', '#d32f2f', '#f57c00', '#7b1fa2',
-    '#c2185b', '#0288d1', '#388e3c', '#fbc02d', '#512da8',
-    '#00796b', '#5d4037', '#616161', '#455a64', '#e64a19',
-    '#afb42b', '#689f38', '#00897b', '#0097a7', '#1565c0',
-    '#283593', '#6a1b9a', '#8e24aa', '#ad1457', '#d81b60',
-    '#00695c', '#00838f', '#0277bd', '#01579b', '#4527a0',
-    '#311b92', '#880e4f', '#b71c1c', '#bf360c', '#e65100',
-    '#ff6f00', '#f57f17', '#f9a825', '#827717', '#558b2f',
-    '#33691e', '#2e7d32', '#1b5e20', '#004d40', '#006064',
-    '#01579b', '#0d47a1', '#1a237e', '#4a148c', '#880e4f',
-    '#ff1744', '#d50000', '#ff3d00', '#dd2c00', '#ff6d00',
-    '#ffab00', '#ffd600', '#aeea00', '#64dd17', '#00c853',
-    '#00bfa5', '#00b8d4', '#00b0ff', '#2979ff', '#3d5afe',
-    '#651fff', '#6200ea', '#aa00ff', '#d500f9', '#e91e63',
-    '#f50057', '#ff4081', '#ff80ab', '#ff1744', '#f44336',
-    '#ff5252', '#ff5722', '#ff6e40', '#ff9800', '#ffc107',
-    '#ffeb3b', '#cddc39', '#8bc34a', '#4caf50', '#009688',
-    '#00bcd4', '#03a9f4', '#2196f3', '#3f51b5', '#673ab7',
-    '#9c27b0', '#e91e63', '#795548', '#9e9e9e', '#607d8b',
-    '#78909c', '#90a4ae', '#b0bec5', '#cfd8dc', '#eceff1'
-  ];
   
   // Custom legend overlay state
   public legendItems: Array<{
@@ -179,6 +158,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private currentSize = "small";
   private maxGrids = 0;
   private setGrids = new Set<string>();
+  
+  // Color schemes
+  private colorSchemes = {
+    default: ['#007aff', '#ff9500', '#34c759', '#5856d6', '#ff3b30', '#af52de', '#ff6482', '#32ade6', '#ffcc00', '#5ac8fa'],
+    dark: ['#1e3a8a', '#7c2d12', '#14532d', '#581c87', '#7f1d1d', '#701a75', '#831843', '#164e63', '#713f12', '#1e40af'],
+    vibrant: ['#ff006e', '#fb5607', '#ffbe0b', '#8338ec', '#3a86ff', '#06ffa5', '#ff4365', '#00f5ff', '#ffd60a', '#7209b7'],
+    pastel: ['#ffd6ff', '#e7c6ff', '#c8b6ff', '#b8c0ff', '#bbd0ff', '#a8dadc', '#f1faee', '#ffdab9', '#ffb5a7', '#fcd5ce'],
+    monochrome: ['#001f3f', '#003366', '#004080', '#0059b3', '#0073e6', '#3399ff', '#66b3ff', '#99ccff', '#cce6ff', '#e6f2ff']
+  };
+  
+  public currentColorScheme = 'default';
   private currentGrids = 3;
   private currentGridNames: string[] = [];
   private resetGrid = false;
@@ -199,6 +189,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return this.ctx.settings?.multipleDevices ? axisPositionMapExtended : axisPositionMapStandard;
   }
   
+  constructor(private dialog: MatDialog) {}
 
   ngOnInit(): void {
     this.LOG(this.ctx);
@@ -206,6 +197,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('Component initialized');
     this.LOG('Widget context:', this.ctx);
     this.LOG('Widget settings:', this.ctx.settings);
+    
+    // Initialize color scheme
+    this.currentColorScheme = this.ctx.settings?.colorScheme || 'default';
+    this.LOG('Using color scheme:', this.currentColorScheme);
     
     // Reset entity color mapping on initialization
     this.entityColorMap = {};
@@ -529,6 +524,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('Chart instance exists:', !!this.chart);
     this.LOG('Data series count:', this.ctx.data?.length || 0);
     this.LOG('Legend overrides active:', this.legendOverridesGrids);
+    this.LOG('Is initial load:', this.isInitialLoad);
+    this.LOG('Has received data before:', this.hasReceivedData);
     
     // Reset hovered grid index to avoid stale references
     this.hoveredGridIndex = null;
@@ -564,30 +561,60 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     if (!this.ctx.data || this.ctx.data.length === 0) {
-      this.LOG('ERROR: No data available');
-      return;
+      this.LOG('ERROR: No data available, but continuing to render empty chart');
+      // Don't return - we need to render the chart structure even with no data
     }
     
     // Check if we have real data with actual points
-    const totalDataPoints = this.ctx.data.reduce((sum, series) => 
-      sum + (series.data?.length || 0), 0);
+    const totalDataPoints = this.ctx.data ? this.ctx.data.reduce((sum, series) => 
+      sum + (series.data?.length || 0), 0) : 0;
     
     if (totalDataPoints === 0) {
-      this.LOG('WARNING: Data series exist but contain no data points, skipping update');
-      // Keep showing loading spinner if chart is initialized
-      if (this.chart && !this.chart.isDisposed()) {
-        this.chart.showLoading({
-          text: 'Waiting for data...',
-          color: '#1976d2',
-          textColor: '#000',
-          maskColor: 'rgba(255, 255, 255, 0.8)',
-          fontSize: 14,
-          showSpinner: true,
-          spinnerRadius: 10,
-          lineWidth: 2
-        });
+      this.LOG('WARNING: Data series exist but contain no data points');
+      
+      // Only show "no data" message if we're not in initial load
+      // or if we've waited long enough for data to arrive
+      if (!this.isInitialLoad || this.hasReceivedData) {
+        // Hide loading spinner and show empty chart with "no data" message
+        if (this.chart && !this.chart.isDisposed()) {
+          this.chart.hideLoading();
+          // Set flag to show no data message
+          this.hasNoVisibleData = true;
+          this.ctx.detectChanges();
+        }
+      } else {
+        // Keep showing loading spinner during initial load
+        this.LOG('Initial load with no data - keeping loading spinner');
+        if (this.chart && !this.chart.isDisposed()) {
+          this.chart.showLoading({
+            text: 'Waiting for data...',
+            color: '#1976d2',
+            textColor: '#000',
+            maskColor: 'rgba(255, 255, 255, 0.8)',
+            fontSize: 14,
+            showSpinner: true,
+            spinnerRadius: 10,
+            lineWidth: 2
+          });
+        }
+        // Set a timeout to show "no data" message if data doesn't arrive
+        setTimeout(() => {
+          if (this.isInitialLoad && !this.hasReceivedData) {
+            this.LOG('Timeout reached - showing no data message');
+            if (this.chart && !this.chart.isDisposed()) {
+              this.chart.hideLoading();
+              this.hasNoVisibleData = true;
+              this.ctx.detectChanges();
+            }
+          }
+        }, 5000);  // Wait 5 seconds for initial data
       }
-      return;
+      // Don't return - continue to render empty chart structure
+    } else {
+      // We have data!
+      this.hasReceivedData = true;
+      this.isInitialLoad = false;
+      this.hasNoVisibleData = false;
     }
     
     this.LOG(`Processing ${totalDataPoints} total data points across ${this.ctx.data.length} series`);
@@ -604,27 +631,37 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Only recalculate grids from data if legend is not overriding
     if (!this.legendOverridesGrids) {
       this.LOG('=== RECALCULATING GRID CONFIGURATION FROM DATA ===');
-      const axisPositionMap = this.getAxisPositionMap();
-      this.LOG('axisPositionMap:', axisPositionMap);
       
-      const previousGridCount = this.currentGrids;
-      this.setGrids = this.countGridsBySettings(Object.keys(axisPositionMap));
-      this.LOG('Updated setGrids (unique axis assignments):', Array.from(this.setGrids));
-      
-      this.currentGridNames = Array.from(this.setGrids);
-      this.maxGrids = this.setGrids.size;
-      this.currentGrids = this.maxGrids;
-      
-      this.LOG('GRID RESULTS FROM DATA:');
-      this.LOG('- currentGridNames:', this.currentGridNames);
-      this.LOG('- maxGrids:', this.maxGrids);
-      this.LOG('- currentGrids:', this.currentGrids);
-      
-      if (previousGridCount !== this.currentGrids) {
-        this.LOG(`Grid count changed from ${previousGridCount} to ${this.currentGrids}`);
-        this.resetGrid = true;
-        // Keep DOM height in sync on data-driven grid changes
-        this.applyScrollableHeight();
+      // Handle case where there's no data
+      if (!this.ctx.data || this.ctx.data.length === 0) {
+        this.setGrids = new Set(['Top']);
+        this.currentGridNames = ['Top'];
+        this.maxGrids = 1;
+        this.currentGrids = 1;
+        this.LOG('No data available - using default single grid');
+      } else {
+        const axisPositionMap = this.getAxisPositionMap();
+        this.LOG('axisPositionMap:', axisPositionMap);
+        
+        const previousGridCount = this.currentGrids;
+        this.setGrids = this.countGridsBySettings(Object.keys(axisPositionMap));
+        this.LOG('Updated setGrids (unique axis assignments):', Array.from(this.setGrids));
+        
+        this.currentGridNames = Array.from(this.setGrids);
+        this.maxGrids = this.setGrids.size;
+        this.currentGrids = this.maxGrids;
+        
+        this.LOG('GRID RESULTS FROM DATA:');
+        this.LOG('- currentGridNames:', this.currentGridNames);
+        this.LOG('- maxGrids:', this.maxGrids);
+        this.LOG('- currentGrids:', this.currentGrids);
+        
+        if (previousGridCount !== this.currentGrids) {
+          this.LOG(`Grid count changed from ${previousGridCount} to ${this.currentGrids}`);
+          this.resetGrid = true;
+          // Keep DOM height in sync on data-driven grid changes
+          this.applyScrollableHeight();
+        }
       }
     } else {
       this.LOG('Using legend-selected grids:', this.currentGridNames);
@@ -646,6 +683,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       maxGrids: this.maxGrids,
       currentGridNames: this.currentGridNames
     });
+    
+    // If no data, create empty series to maintain chart structure
+    if (!this.ctx.data || this.ctx.data.length === 0) {
+      this.LOG('No data - creating empty series');
+      myNewOptions.series.push({
+        name: 'No Data',
+        type: 'line',
+        data: [],
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        showSymbol: false
+      });
+    }
     
     // Build dynamic axis map based on current grids
     const dynamicAxisMap = this.getDynamicAxisIndexMap();
@@ -687,15 +737,25 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         itemStyle: {
           normal: {
             color: entityColor,  // Use entity-based color instead of series-specific color
-            opacity: labelSelected ? 1 : 0.08  // [CLAUDE EDIT] Lower opacity when off
+            opacity: labelSelected ? 1 : 0.08,  // [CLAUDE EDIT] Lower opacity when off
+            borderWidth: 2,
+            borderColor: '#fff',  // White border for contrast
+            shadowBlur: 4,
+            shadowColor: 'rgba(0, 0, 0, 0.1)',
+            shadowOffsetY: 2
           }
         },
         lineStyle: {
           color: entityColor,  // Also set line color to entity color
           width: (axisAssignment === 'Middle') 
-            ? this.currentConfig.seriesElement.lineStyle.widthMiddle 
-            : this.currentConfig.seriesElement.lineStyle.width,
-          opacity: labelSelected ? 1 : 0.08  // [CLAUDE EDIT] Lower opacity when off
+            ? (this.currentSize === 'small' ? 2 : this.currentSize === 'large' ? 2.5 : 3)
+            : (this.currentSize === 'small' ? 2.5 : this.currentSize === 'large' ? 3 : 3.5),
+          opacity: labelSelected ? 1 : 0.08,  // [CLAUDE EDIT] Lower opacity when off
+          shadowBlur: labelSelected ? 2 : 0,  // Subtle shadow for depth
+          shadowColor: entityColor,
+          shadowOpacity: 0.3,
+          cap: 'round',  // Rounded line ends
+          join: 'round'  // Rounded line joins
         },
         type: 'line',
         xAxisIndex: gridIndex,
@@ -705,7 +765,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         symbol: (this.ctx.settings.showDataPoints && points <= 1000) ? 'circle' : 'none',
         symbolSize: (this.ctx.settings.symbolSize_data || 5) * 2.5,
         showSymbol: this.ctx.settings.showDataPoints && points <= 1000,
-        smooth: this.ctx.settings.smooth && points < 2000,
+        smooth: this.ctx.settings.smooth !== false ? 0.3 : false,  // Subtle smoothing by default
         // Performance optimizations that don't hurt responsiveness
         sampling: points > 5000 ? 'lttb' : undefined,  // Only sample for very large datasets
         large: points > 10000,  // Only use large mode for really big data
@@ -849,18 +909,49 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   // Get the gap between grids as a percentage, converted from pixels
+  // Dynamic gap that increases as plot count decreases (like bottom spacing)
   private getGapPct(): number {
-    return this.pxToPct(48); // Reduced from 70 to 48 for tighter spacing
+    // Fewer plots = bigger gap for better separation
+    // Similar pattern to bottom spacing but in pixels
+    if (this.currentGrids === 1) return 0;  // No gap needed for single plot
+    if (this.currentGrids === 2) return this.pxToPct(80);  // Large gap for 2 plots
+    if (this.currentGrids === 3) return this.pxToPct(80);   // Good spacing for 3 plots
+    if (this.currentGrids === 4) return this.pxToPct(80);   // 4 plots
+    if (this.currentGrids === 5) return this.pxToPct(80);   // 5 plots
+    if (this.currentGrids === 6) return this.pxToPct(80);   // 6 plots
+    return this.pxToPct(80); // 7+ plots still need adequate spacing
   }
 
 
-  // Floating overlays live outside the canvas, so don't reserve space in grids
+  // Reserve space at top and bottom to prevent line clipping
   private getTopReservePct(): number { 
-    return 0; 
+    // Use pixel-based buffer for 1, 2, and 3 plots to prevent excessive whitespace in fullscreen
+    if (this.currentGrids >= 1 && this.currentGrids <= 3) {
+      return this.pxToPct(60); // ~60px top buffer, scales with container height
+    }
+    // Fixed small buffer at top for all other configurations
+    return this.pxToPct(20); // ~20px buffer for 4+ plots
   }
   
   private getBottomReservePct(): number { 
-    return 0; 
+    // Use pixel-based buffer calculations to prevent plot cutoff in fullscreen
+    // Bottom buffer increases as plot count decreases for better fit
+    const scrollThreshold = this.ctx.settings?.scrollingStartsAfter || 3;
+    
+    // If we're at or below the scrolling threshold, use larger buffers for better spacing
+    if (this.currentGrids <= scrollThreshold) {
+      // Use pixel-based calculations to prevent fullscreen cutoff
+      if (this.currentGrids === 1) return this.pxToPct(150);  // ~100px for single plot
+      if (this.currentGrids === 2) return this.pxToPct(150);   // ~90px for two plots  
+      if (this.currentGrids === 3) return this.pxToPct(150);   // ~80px for three plots
+    }
+    
+    // Above scrolling threshold, use smaller pixel-based buffers
+    if (this.currentGrids >= 7) return this.pxToPct(70);  // ~50px for 7+ plots
+    if (this.currentGrids === 6) return this.pxToPct(70);  // ~60px for 6 plots
+    if (this.currentGrids === 5) return this.pxToPct(70);  // ~70px for 5 plots
+    if (this.currentGrids === 4) return this.pxToPct(70);  // ~75px for 4 plots
+    return this.pxToPct(70); // Default fallback ~60px
   }
   
   // Helper: heights of sticky bars
@@ -877,6 +968,142 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return !!this.ctx.settings?.tooltipOnlyHoveredGrid; // default off
   }
   
+  // Check which plots/grids have visible series WITH DATA
+  /* private checkPlotVisibility(legendSelected: {[key: string]: boolean}): {[plot: string]: {hasVisibleSeries: boolean, seriesNames: string[]}} {
+    const plotVisibility: {[plot: string]: {hasVisibleSeries: boolean, seriesNames: string[]}} = {};
+    
+    // Initialize plot visibility tracking for all possible plots
+    const allPlots = ['Top', 'Middle', 'Bottom'];
+    allPlots.forEach(plot => {
+      plotVisibility[plot] = {
+        hasVisibleSeries: false,
+        seriesNames: []
+      };
+    });
+    
+    // Go through all series and check their visibility AND data
+    this.ctx.data.forEach(series => {
+      const seriesKey = this.buildSeriesKey(series.datasource?.entityName || '', series.dataKey.label);
+      const axisAssignment = series.dataKey?.settings?.axisAssignment || 'Top';
+      const isVisible = legendSelected[seriesKey] !== false;
+      const hasData = series.data && Array.isArray(series.data) && series.data.length > 0;
+      
+      if (plotVisibility[axisAssignment]) {
+        plotVisibility[axisAssignment].seriesNames.push(seriesKey);
+        // Only consider it visible if it's both selected AND has data
+        if (isVisible && hasData) {
+          plotVisibility[axisAssignment].hasVisibleSeries = true;
+        }
+      }
+    });
+    
+    return plotVisibility;
+  } */
+  
+  // Create detailed debug object showing all plots and series visibility
+  private createDetailedVisibilityDebugInfo(legendSelected: {[key: string]: boolean}): any {
+    const debugInfo: any = {
+      timestamp: new Date().toISOString(),
+      totalSeries: this.ctx.data.length,
+      plots: {}
+    };
+    
+    // Group series by plot/axis assignment
+    const plotGroups: {[key: string]: any[]} = {};
+    
+    this.ctx.data.forEach((series) => {
+      const seriesKey = this.buildSeriesKey(series.datasource?.entityName || '', series.dataKey.label);
+      const axisAssignment = series.dataKey?.settings?.axisAssignment || 'Top';
+      const isVisible = legendSelected[seriesKey] !== false;
+      const dataPoints = series.data && Array.isArray(series.data) ? series.data.length : 0;
+      
+      if (!plotGroups[axisAssignment]) {
+        plotGroups[axisAssignment] = [];
+      }
+      
+      plotGroups[axisAssignment].push({
+        seriesName: seriesKey,
+        entityName: series.datasource?.entityName || 'Unknown',
+        label: series.dataKey.label,
+        visible: isVisible,
+        dataPoints: dataPoints,
+        hasData: dataPoints > 0,
+        axisPosition: series.dataKey?.settings?.axisPosition || 'left'
+      });
+    });
+    
+    // Create plot numbering based on order (Top=1, Middle=2, Bottom=3, etc.)
+    const plotOrder = ['Top', 'Middle', 'Bottom'];
+    let plotNumber = 1;
+    
+    plotOrder.forEach(plotName => {
+      if (plotGroups[plotName] && plotGroups[plotName].length > 0) {
+        const visibleCount = plotGroups[plotName].filter(s => s.visible).length;
+        const visibleWithDataCount = plotGroups[plotName].filter(s => s.visible && s.hasData).length;
+        const totalCount = plotGroups[plotName].length;
+        
+        debugInfo.plots[`Plot_${plotNumber}_${plotName}`] = {
+          plotNumber: plotNumber,
+          plotName: plotName,
+          visibleSeries: visibleCount,
+          visibleWithData: visibleWithDataCount,
+          totalSeries: totalCount,
+          allHidden: visibleCount === 0,
+          allHiddenOrNoData: visibleWithDataCount === 0,
+          series: plotGroups[plotName].map(s => ({
+            name: s.seriesName,
+            visible: s.visible ? '✓' : '✗',
+            dataPoints: s.dataPoints,
+            status: !s.visible ? 'hidden' : (s.dataPoints === 0 ? 'visible-no-data' : 'visible-with-data'),
+            entity: s.entityName,
+            label: s.label
+          }))
+        };
+        plotNumber++;
+      }
+    });
+    
+    // Add any additional plots not in the standard order
+    Object.keys(plotGroups).forEach(plotName => {
+      if (!plotOrder.includes(plotName)) {
+        const visibleCount = plotGroups[plotName].filter(s => s.visible).length;
+        const visibleWithDataCount = plotGroups[plotName].filter(s => s.visible && s.hasData).length;
+        const totalCount = plotGroups[plotName].length;
+        
+        debugInfo.plots[`Plot_${plotNumber}_${plotName}`] = {
+          plotNumber: plotNumber,
+          plotName: plotName,
+          visibleSeries: visibleCount,
+          visibleWithData: visibleWithDataCount,
+          totalSeries: totalCount,
+          allHidden: visibleCount === 0,
+          allHiddenOrNoData: visibleWithDataCount === 0,
+          series: plotGroups[plotName].map(s => ({
+            name: s.seriesName,
+            visible: s.visible ? '✓' : '✗',
+            dataPoints: s.dataPoints,
+            status: !s.visible ? 'hidden' : (s.dataPoints === 0 ? 'visible-no-data' : 'visible-with-data'),
+            entity: s.entityName,
+            label: s.label
+          }))
+        };
+        plotNumber++;
+      }
+    });
+    
+    // Summary statistics
+    debugInfo.summary = {
+      totalPlots: Object.keys(debugInfo.plots).length,
+      plotsWithData: Object.values(debugInfo.plots).filter((p: any) => !p.allHiddenOrNoData).length,
+      plotsWithoutData: Object.values(debugInfo.plots).filter((p: any) => p.allHiddenOrNoData).length,
+      visibleSeriesTotal: Object.values(debugInfo.plots).reduce((sum: number, p: any) => sum + p.visibleSeries, 0),
+      visibleSeriesWithData: Object.values(debugInfo.plots).reduce((sum: number, p: any) => sum + p.visibleWithData, 0),
+      hiddenSeriesTotal: Object.values(debugInfo.plots).reduce((sum: number, p: any) => sum + (p.totalSeries - p.visibleSeries), 0)
+    };
+    
+    return debugInfo;
+  }
+  
   // Helper to get consistent color for an entity
   private getColorForEntity(entityName: string): string {
     if (!entityName) {
@@ -885,12 +1112,64 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     if (!this.entityColorMap[entityName]) {
-      // Assign next color from palette
-      this.entityColorMap[entityName] = this.colorPalette[this.nextColorIndex % this.colorPalette.length];
+      // Get the active color palette based on selected scheme
+      const activeColorScheme = this.colorSchemes[this.currentColorScheme] || this.colorSchemes.default;
+      
+      // For extended palette, create variations if needed
+      let colorToUse: string;
+      const baseIndex = this.nextColorIndex % activeColorScheme.length;
+      const variation = Math.floor(this.nextColorIndex / activeColorScheme.length);
+      
+      if (variation === 0) {
+        // Use base colors for first set
+        colorToUse = activeColorScheme[baseIndex];
+      } else {
+        // Create variations for subsequent sets
+        const factor = 1 + (0.2 * variation);
+        colorToUse = this.adjustColorBrightness(activeColorScheme[baseIndex], factor);
+      }
+      
+      this.entityColorMap[entityName] = colorToUse;
       this.nextColorIndex++;
     }
     
     return this.entityColorMap[entityName];
+  }
+  
+  private adjustColorBrightness(color: string, factor: number): string {
+    // Simple brightness adjustment for hex colors
+    const hex = color.replace('#', '');
+    const r = Math.min(255, Math.floor(parseInt(hex.substring(0, 2), 16) * factor));
+    const g = Math.min(255, Math.floor(parseInt(hex.substring(2, 4), 16) * factor));
+    const b = Math.min(255, Math.floor(parseInt(hex.substring(4, 6), 16) * factor));
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  }
+  
+  public openSettingsDialog(): void {
+    const dialogRef = this.dialog.open(EchartsSettingsDialogComponent, {
+      width: '500px',
+      data: { colorScheme: this.currentColorScheme }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.changeColorScheme(result.colorScheme);
+      }
+    });
+  }
+  
+  public changeColorScheme(scheme: string): void {
+    this.LOG('Changing color scheme to:', scheme);
+    this.currentColorScheme = scheme;
+    
+    // Reset color mapping to apply new scheme
+    this.entityColorMap = {};
+    this.nextColorIndex = 0;
+    
+    // Trigger chart update with new colors
+    if (this.chart && !this.chart.isDisposed()) {
+      this.onDataUpdated();
+    }
   }
   
   // Helper functions for unique series keys
@@ -956,8 +1235,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
     
-    // Group series by entity
-    const entityGroups: Record<string, { seriesKeys: string[], color: string }> = {};
+    // Group series by entity and count data points
+    const entityGroups: Record<string, { seriesKeys: string[], color: string, dataPoints: number }> = {};
     
     for (const data of this.ctx.data) {
       const entityName = data.datasource?.entityName || 'Unknown';
@@ -967,17 +1246,23 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       if (!entityGroups[entityName]) {
         entityGroups[entityName] = {
           seriesKeys: [],
-          color: this.getColorForEntity(entityName)
+          color: this.getColorForEntity(entityName),
+          dataPoints: 0
         };
       }
       entityGroups[entityName].seriesKeys.push(seriesKey);
+      
+      // Count data points for this series
+      if (data.data && Array.isArray(data.data)) {
+        entityGroups[entityName].dataPoints += data.data.length;
+      }
     }
     
     // Get current legend selection state
     const opt: any = this.chart.getOption();
     const selected = opt?.legend?.[0]?.selected || {};
     
-    // Build entity list
+    // Build entity list with data point counts
     this.entityList = Object.keys(entityGroups).map(entityName => {
       const group = entityGroups[entityName];
       // Entity is visible if any of its series are visible
@@ -987,6 +1272,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         name: entityName,
         color: group.color,
         count: group.seriesKeys.length,
+        dataPoints: group.dataPoints,
         visible: visible
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
@@ -1000,6 +1286,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Find all series keys for this entity
     const seriesKeys: string[] = [];
+    
     for (const data of this.ctx.data) {
       const currentEntityName = data.datasource?.entityName || 'Unknown';
       if (currentEntityName === entityName) {
@@ -1009,7 +1296,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
     }
     
-    if (seriesKeys.length === 0) return;
+    if (seriesKeys.length === 0) {
+      return;
+    }
     
     // Get current visibility state from controller legend
     const opt: any = this.chart.getOption();
@@ -1020,6 +1309,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Toggle all series for this entity on controller legend
     const action = anyVisible ? 'legendUnSelect' : 'legendSelect';
+    
     seriesKeys.forEach(key => {
       this.chart.dispatchAction({
         type: action,
@@ -1028,8 +1318,80 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       });
     });
     
-    // Refresh entity list after toggling
-    setTimeout(() => this.refreshEntityList(), 50);
+    // After toggling, check if grids need to be recalculated
+    setTimeout(() => {
+      this.refreshEntityList();
+      this.syncCustomLegendFromChart();
+      
+      // Get updated legend state after timeout
+      const finalOption: any = this.chart.getOption();
+      const finalSelected = (finalOption?.legend?.[0]?.selected) || {};
+      
+      const activeSeriesKeys = Object.keys(finalSelected).filter(k => finalSelected[k] !== false);
+      
+      // Create detailed debug info
+      const debugInfo = this.createDetailedVisibilityDebugInfo(finalSelected);
+      
+      // Log the detailed visibility information
+      this.LOG('[Device_Plot_Visi: ] ====== VISIBILITY REPORT after toggling "' + entityName + '" ======');
+      this.LOG('[Device_Plot_Visi: ] Summary:', debugInfo.summary);
+      
+      // First, check and report any completely hidden plots
+      const hiddenPlots: string[] = [];
+      Object.keys(debugInfo.plots).forEach(plotKey => {
+        const plot = debugInfo.plots[plotKey];
+        if (plot.allHiddenOrNoData) {
+          hiddenPlots.push(`Plot ${plot.plotNumber} (${plot.plotName})`);
+        }
+      });
+      
+      if (hiddenPlots.length > 0) {
+        this.LOG('[Device_Plot_Visi: ] ⚠️  PLOTS WITH NO VISIBLE DATA (hidden or empty):');
+        hiddenPlots.forEach(plotName => {
+          this.LOG('[Device_Plot_Visi: ]     --> ' + plotName + ' has NO VISIBLE DATA');
+        });
+      }
+      
+      // Log each plot with its series
+      Object.keys(debugInfo.plots).forEach(plotKey => {
+        const plot = debugInfo.plots[plotKey];
+        const status = plot.allHiddenOrNoData ? '[NO DATA]' : '[HAS DATA]';
+        this.LOG(`[Device_Plot_Visi: ] Plot ${plot.plotNumber} (${plot.plotName}): ${plot.visibleWithData}/${plot.visibleSeries}/${plot.totalSeries} (with-data/visible/total) ${status}`);
+        plot.series.forEach((s: any) => {
+          const dataInfo = s.dataPoints === 0 ? ' [NO DATA]' : ` [${s.dataPoints} pts]`;
+          this.LOG(`[Device_Plot_Visi: ]     ${s.visible} ${s.name}${dataInfo}`);
+        });
+      });
+      
+      this.LOG('[Device_Plot_Visi: ] Full debug object:', JSON.stringify(debugInfo, null, 2));
+      this.LOG('[Device_Plot_Visi: ] ====== END VISIBILITY REPORT ======');
+      
+      // NEW APPROACH: Only include series that are visible AND have data
+      this.legendOverridesGrids = true;
+      const previousGridCount = this.currentGrids;
+      
+      // Filter to only include series that are both visible AND have data
+      const activeSeriesWithData = activeSeriesKeys.filter(key => {
+        const series = this.ctx.data.find(d => this.buildSeriesKey(d.datasource?.entityName || '', d.dataKey.label) === key);
+        return series && series.data && Array.isArray(series.data) && series.data.length > 0;
+      });
+      
+      this.LOG('[Device_Plot_Visi: ] Active series with data: ' + activeSeriesWithData.length + ' out of ' + activeSeriesKeys.length + ' visible series');
+      
+      // Pass only series that have actual data
+      this.setDataGridByNames(activeSeriesWithData);
+      
+      // If grid count changed, rebuild the chart
+      if (previousGridCount !== this.currentGrids) {
+        this.LOG('[Device_Plot_Visi: ]   Grid count changed: ' + previousGridCount + ' -> ' + this.currentGrids);
+        this.resetGrid = true;
+        this.applyScrollableHeight();
+        this.onDataUpdated();
+      }
+      
+      // Trigger change detection to update UI
+      this.ctx.detectChanges();
+    }, 100);  // Increased timeout to ensure legend actions complete
   }
 
   private initChart(): void {
@@ -1074,21 +1436,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.setTimeFormatter();
     this.initChartAndGrid();
     
-    // Don't call onDataUpdated immediately - wait for real data to arrive
-    // The data will come through ThingsBoard's data subscription
+    // Always call onDataUpdated to render the chart
+    // Even with no data, we need to show the chart structure
     if (!this.ctx.data || this.ctx.data.length === 0) {
-      this.LOG('[ECharts Line Chart] No data available yet, waiting for data subscription');
+      this.LOG('[ECharts Line Chart] No data available yet, but rendering chart structure');
     } else {
       this.LOG('[ECharts Line Chart] Data already available:', this.ctx.data.length, 'series');
-      // Only update if we have real data with actual points
-      const hasRealData = this.ctx.data.some(series => series.data && series.data.length > 0);
-      if (hasRealData) {
-        this.LOG('[ECharts Line Chart] Real data detected, updating chart');
-        this.onDataUpdated();
-      } else {
-        this.LOG('[ECharts Line Chart] Data series exist but are empty, waiting for real data');
-      }
     }
+    
+    // Always update to show chart (empty or with data)
+    this.onDataUpdated();
   }
 
   private initChartAndGrid(): void {
@@ -1382,6 +1739,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         this.onDataUpdated();
       } else {
         this.LOG('[State Change Handler] No data available, showing loading');
+        // Reset loading state when navigating to a new state
+        this.isInitialLoad = true;
+        this.hasNoVisibleData = false;
         this.chart.showLoading({
           text: 'Loading...',
           color: '#1976d2',
@@ -2223,19 +2583,21 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('currentGridArray called with currentGrids:', this.currentGrids, 'currentSize:', this.currentSize);
     let gridArray = [];
     
-    // Determine margins based on size
-    const leftMargin = this.currentSize === 'small' ? '12%' : '10%';
+    // Determine margins based on size - increased left margin for multi-line labels
+    const leftMargin = this.currentSize === 'small' ? '15%' : '13%';
     const rightMargin = '1%';
     
     // Sync legend overlay to use same margins as grids
     this.syncLegendToGridMargins(leftMargin, rightMargin);
     
-    // Use unified calculation for all grid counts to ensure consistent spacing
-    if (this.currentGrids > 3) {
+    // Use scrolling threshold from settings to determine layout type
+    const scrollThreshold = this.ctx.settings?.scrollingStartsAfter || 3;
+    
+    if (this.currentGrids > scrollThreshold) {
       // For scrollable layouts, use the existing calculation
       gridArray = this.calculateScrollableGrids(this.currentGrids);
     } else {
-      // For 1-3 grids, use the same unified spacing calculation
+      // For grids at or below threshold, fit without scrolling
       const grids = [];
       
       // [CLAUDE] Use dynamic top reserve based on actual legend height
@@ -2247,7 +2609,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // Get unified gap between grids
       const gapPct = this.getGapPct();
       
-      // Calculate available height - more space without dataZoom reserve
+      // Calculate available height with buffers to prevent clipping
       const availableHeight = 100 - topReserved - bottomReservedPct;
       
       // Calculate gaps and grid height
@@ -2287,7 +2649,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Get gap between grids as percentage from pixels
     const gapPct = this.getGapPct();
     
-    // Total vertical budget for plots + their gaps - more space available
+    // Total vertical budget for plots + their gaps
+    // Now accounts for 2.5% buffers at top and bottom to prevent line clipping
     const availableHeight = 100 - topReserved - bottomReserved;
     
     // Calculate total gaps between plots
@@ -2348,8 +2711,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       splitLine: {
         show: true,
         lineStyle: {
-          color: '#e9edf2',  // [CLAUDE] Apple-style subtle grid lines
-          width: 1
+          color: 'rgba(0, 0, 0, 0.06)',  // Ultra-subtle grid lines
+          width: 0.5
         }
       },
       axisLine: { 
@@ -2364,15 +2727,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       position: 'bottom',
       axisLabel: {
         show: true,
-        fontSize: this.currentConfig.option.xAxis.axisLabel.fontSize,
-        fontWeight: this.currentConfig.option.xAxis.axisLabel.fontWeight,
+        fontSize: this.currentSize === 'small' ? 14 : 
+                 this.currentSize === 'large' ? 15 : 16,
+        fontWeight: '400',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif',
         hideOverlap: true,
-        color: '#86868b',  // [CLAUDE] Apple-style muted labels
+        color: 'rgba(0, 0, 0, 0.7)',  // Darker for better readability
         interval: 'auto',
         formatter: createAxisFormatter(true), // First grid gets special first label
         rotate: this.currentConfig.option.xAxis.rotate,
         align: 'right',
-        margin: this.currentConfig.option.xAxis.margin,
+        margin: 20,  // Increased margin to prevent clipping
         showMinLabel: true,
         showMaxLabel: true
       },
@@ -2407,14 +2772,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         position: 'bottom', // Always position at bottom for all grids
         axisLabel: {
           show: true, // NOW SHOWING LABELS ON ALL GRIDS
-          fontSize: this.currentConfig.option.xAxis.axisLabel.fontSize,
-          fontWeight: this.currentConfig.option.xAxis.axisLabel.fontWeight,
+          fontSize: this.currentSize === 'small' ? 14 : 
+                   this.currentSize === 'large' ? 15 : 16,
+          fontWeight: '400',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif',
+          color: 'rgba(0, 0, 0, 0.7)',  // Darker for better readability
           hideOverlap: true,
           interval: 'auto', // Auto interval to prevent overcrowding
           formatter: createAxisFormatter(false), // Other grids don't get special first label
           rotate: this.currentConfig.option.xAxis.rotate,
           align: 'right',
-          margin: this.currentConfig.option.xAxis.margin,
+          margin: 20,  // Increased margin to prevent clipping
           showMinLabel: true,
           showMaxLabel: true
         },
@@ -2428,45 +2796,66 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private currentYAxisArray(): any[] {
     const myYAxisArray = [];
     const tempUnits = this.getGridUnitsByData();
-    this.LOG("currentXAxisArray getGridUnitsByData:", tempUnits);
+    this.LOG("currentYAxisArray getGridUnitsByData:", tempUnits);
     
     // Get the axis position map to determine fixed plot numbers
     const axisMap = this.getAxisPositionMap();
     const visibleGridNames = this.currentGridNames;
     const plotNumber1 = visibleGridNames[0] ? axisMap[visibleGridNames[0]] + 1 : 1;
     
+    // Get the actual series label and unit for this grid
+    const plotName1 = visibleGridNames[0] ? this.getFirstLabelForGrid(visibleGridNames[0]) : 'Top';
+    const unit1 = tempUnits[0] ? `(${tempUnits[0]})` : '';
+    
+    this.LOG(`Y-Axis 1 - Plot: ${plotNumber1}, Label: ${plotName1}, Unit: ${unit1}`);
+    
+    // Create label based on configured number of lines
+    const numLines = this.ctx.settings?.yAxisLabelLines || 3;
+    let multiLineLabel1: string;
+    
+    if (numLines === 1) {
+      // 1 line: "Temperature (°C) - 1"
+      multiLineLabel1 = `{singleLine|${plotName1} ${unit1} - ${plotNumber1}}`;
+    } else if (numLines === 2) {
+      // 2 lines: "Temperature" / "(°C) - 1"
+      multiLineLabel1 = `{topLine|${plotName1}}\n{bottomLine|${unit1} - ${plotNumber1}}`;
+    } else {
+      // 3 lines: "1" / "Temperature" / "(°C)"
+      multiLineLabel1 = `{plotNum|${plotNumber1}}\n{plotName|${plotName1}}\n{plotUnit|${unit1}}`;
+    }
+    
     myYAxisArray.push({
       type: 'value',
       scale: true,
       splitNumber: this.currentConfig.option.yAxis.splitNumber,
-      name: String(plotNumber1),  // Display plot number as axis name
+      name: multiLineLabel1,  // Axis label (compact or stacked)
       nameLocation: 'middle',
-      nameGap: 45,  // Distance from axis to name
+      nameGap: numLines === 1 ? 45 : numLines === 2 ? 55 : 65,  // Adjust gap based on number of lines
       nameRotate: 0,  // Keep horizontal
-      nameTextStyle: {
-        fontSize: this.currentSize === 'small' ? 20 : 
-                 this.currentSize === 'large' ? 24 : 28,
-        fontWeight: 'bold',
-        color: '#007aff',
-        align: 'center'
-      },
+      nameTextStyle: this.getYAxisLabelStyle(numLines),
       axisLine: {
-        show: false  // [CLAUDE] Hide y-axis line for cleaner look
+        show: true,
+        lineStyle: {
+          color: 'rgba(0, 0, 0, 0.08)',  // Very subtle axis line
+          width: 1
+        }
       },
       axisTick: {
         show: false  // [CLAUDE] Hide ticks
       },
       splitLine: {
         lineStyle: {
-          color: '#e9edf2',  // [CLAUDE] Apple-style subtle grid lines
-          width: 1
+          color: 'rgba(0, 0, 0, 0.06)',  // Ultra-subtle grid lines
+          width: 0.5
         }
       },
       axisLabel: {
         formatter: '{value} ' + (tempUnits[0] || ""),
-        color: '#86868b',  // [CLAUDE] Apple-style muted labels
-        fontSize: this.currentConfig.option.yAxis.axisLabel.fontSize,
-        fontWeight: this.currentConfig.option.yAxis.axisLabel.fontWeight,
+        color: 'rgba(0, 0, 0, 0.45)',  // Softer, more modern label color
+        fontSize: this.currentSize === 'small' ? 11 : 
+                 this.currentSize === 'large' ? 12 : 13,
+        fontWeight: '400',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif',
         showMinLabel: true,
         showMaxLabel: true
       },
@@ -2476,25 +2865,44 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Add Y axes for all grids
     for (let i = 1; i < this.currentGrids; i++) {
       const plotNumber = visibleGridNames[i] ? axisMap[visibleGridNames[i]] + 1 : i + 1;
+      
+      // Get the actual series label and unit for this grid
+      const plotName = visibleGridNames[i] ? this.getFirstLabelForGrid(visibleGridNames[i]) : `Plot${i + 1}`;
+      const unit = tempUnits[i] ? `(${tempUnits[i]})` : '';
+      
+      this.LOG(`Y-Axis ${i + 1} - Plot: ${plotNumber}, Label: ${plotName}, Unit: ${unit}`);
+      
+      // Create label based on configured number of lines
+      let multiLineLabel: string;
+      
+      if (numLines === 1) {
+        // 1 line: "Temperature (°C) - 1"
+        multiLineLabel = `{singleLine|${plotName} ${unit} - ${plotNumber}}`;
+      } else if (numLines === 2) {
+        // 2 lines: "Temperature" / "(°C) - 1"
+        multiLineLabel = `{topLine|${plotName}}\n{bottomLine|${unit} - ${plotNumber}}`;
+      } else {
+        // 3 lines: "1" / "Temperature" / "(°C)"
+        multiLineLabel = `{plotNum|${plotNumber}}\n{plotName|${plotName}}\n{plotUnit|${unit}}`;
+      }
+      
       myYAxisArray.push({
         type: 'value',
         show: true,
         scale: true,
         splitNumber: this.currentConfig.option.yAxis.splitNumber,
         alignTicks: true,
-        name: String(plotNumber),  // Display plot number as axis name
+        name: multiLineLabel,  // Axis label (compact or stacked)
         nameLocation: 'middle',
-        nameGap: 45,  // Distance from axis to name
+        nameGap: numLines === 1 ? 45 : numLines === 2 ? 55 : 65,  // Adjust gap based on number of lines
         nameRotate: 0,  // Keep horizontal
-        nameTextStyle: {
-          fontSize: this.currentSize === 'small' ? 20 : 
-                   this.currentSize === 'large' ? 24 : 28,
-          fontWeight: 'bold',
-          color: '#007aff',
-          align: 'center'
-        },
+        nameTextStyle: this.getYAxisLabelStyle(numLines),
         axisLine: {
-          show: false  // [CLAUDE] Hide y-axis line
+          show: true,
+          lineStyle: {
+            color: 'rgba(0, 0, 0, 0.08)',  // Very subtle axis line
+            width: 1
+          }
         },
         axisTick: {
           show: false  // [CLAUDE] Hide ticks
@@ -2507,9 +2915,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         },
         axisLabel: {
           formatter: '{value} ' + (tempUnits[i] || ''),
-          color: '#86868b',  // [CLAUDE] Apple-style muted labels
-          fontSize: this.currentConfig.option.yAxis.axisLabel.fontSize,
-          fontWeight: this.currentConfig.option.yAxis.axisLabel.fontWeight,
+          color: 'rgba(0, 0, 0, 0.45)',  // Softer, more modern label color
+          fontSize: this.currentSize === 'small' ? 11 : 
+                   this.currentSize === 'large' ? 12 : 13,
+          fontWeight: '400',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif',
           show: true,
           showMaxLabel: true
         },
@@ -2520,34 +2930,64 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private checkDataGridByName(selectedKeys: string[]): Set<string> {
+    this.LOG('[Device_Plot_Visi: ] checkDataGridByName called with keys:', selectedKeys);
+    
     const matchedValues = selectedKeys.map(key => {
       // Extract label from key to find the matching data object
       const label = this.extractLabelFromKey(key);
+      this.LOG('[Device_Plot_Visi: ] Extracted label from key:', key, '->', label);
+      
       const foundObject = this.ctx.data.find(obj => obj.dataKey.label === label);
+      const axisAssignment = foundObject ? (foundObject.dataKey.settings?.axisAssignment || 'Top') : null;
+      
+      this.LOG('[Device_Plot_Visi: ] For label', label, 'found axis assignment:', axisAssignment);
+      
       // Default to 'Top' if no assignment is set
-      return foundObject ? (foundObject.dataKey.settings?.axisAssignment || 'Top') : null;
+      return axisAssignment;
     });
-    this.LOG("matchedValues:", matchedValues);
+    this.LOG('[Device_Plot_Visi: ] All matched values:', matchedValues);
     
     const axisPositionMap = this.getAxisPositionMap();
+    this.LOG('[Device_Plot_Visi: ] Axis position map:', axisPositionMap);
+    
     const uniqueMatches = new Set(matchedValues.filter(item => item && Object.prototype.hasOwnProperty.call(axisPositionMap, item)));
-    this.LOG("uniqueMatches:", uniqueMatches, ", len:", uniqueMatches.size);
+    this.LOG('[Device_Plot_Visi: ] Unique matches (valid grids):', Array.from(uniqueMatches), ', count:', uniqueMatches.size);
     return uniqueMatches;
   }
 
   private setDataGridByNames(selectedKeys: string[]): void {
-    this.LOG('setDataGridByNames called with:', selectedKeys);
+    this.LOG('[Device_Plot_Visi: ] setDataGridByNames called with:', selectedKeys);
+    this.LOG('[Device_Plot_Visi: ] Number of selected keys:', selectedKeys.length);
+    
+    // If no keys with data, keep 1 grid but mark as having no data
+    if (selectedKeys.length === 0) {
+      this.LOG('[Device_Plot_Visi: ] No series with data - keeping 1 grid for stability');
+      this.currentGridNames = ['Top']; // Keep at least one grid
+      this.currentGrids = 1; // Minimum 1 grid to prevent chart breaking
+      // Only show no data message if we're not waiting for initial data
+      if (!this.isInitialLoad || this.hasReceivedData) {
+        this.hasNoVisibleData = true; // Flag to show no data message
+      }
+      return;
+    }
+    
+    // Clear no data flag and mark that we've received data
+    this.hasNoVisibleData = false;
+    this.hasReceivedData = true;
+    this.isInitialLoad = false;
     
     // Get unique axis assignments from selected series
     const selectedGrids = this.checkDataGridByName(selectedKeys);
+    this.LOG('[Device_Plot_Visi: ] Selected grids from checkDataGridByName:', Array.from(selectedGrids));
+    this.LOG('[Device_Plot_Visi: ] Number of unique grids:', selectedGrids.size);
     
     // Update current grid configuration
     this.currentGridNames = Array.from(selectedGrids);
     this.currentGrids = selectedGrids.size;
     
-    this.LOG('Updated grid configuration from legend:');
-    this.LOG('- currentGridNames:', this.currentGridNames);
-    this.LOG('- currentGrids:', this.currentGrids);
+    this.LOG('[Device_Plot_Visi: ] Updated grid configuration from legend:');
+    this.LOG('[Device_Plot_Visi: ] - currentGridNames:', this.currentGridNames);
+    this.LOG('[Device_Plot_Visi: ] - currentGrids:', this.currentGrids);
   }
 
   private countGridsBySettings(selectedKeys: string[]): Set<string> {
@@ -2632,9 +3072,106 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   private getDataUnitForGrid(gridName: string): string {
     const found = this.ctx.data.find(item => 
-      item.dataKey?.settings?.axisAssignment === gridName
+      (item.dataKey?.settings?.axisAssignment || 'Top') === gridName
     );
     return found?.dataKey?.units || "";
+  }
+
+  private getDataLabelsForGrid(gridName: string): string[] {
+    // Get all series labels that belong to this grid
+    const labels = this.ctx.data
+      .filter(item => (item.dataKey?.settings?.axisAssignment || 'Top') === gridName)
+      .map(item => item.dataKey?.label)
+      .filter(Boolean);
+    return labels;
+  }
+
+  private getFirstLabelForGrid(gridName: string): string {
+    // Get the first series label for this grid (for display on Y-axis)
+    const labels = this.getDataLabelsForGrid(gridName);
+    return labels.length > 0 ? labels[0] : gridName;
+  }
+
+  private getYAxisLabelStyle(numLines: number): any {
+    // Create consistent styling for all layout options
+    const baseFont = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+    
+    if (numLines === 1) {
+      // Single line style
+      return {
+        rich: {
+          singleLine: {
+            fontSize: this.currentSize === 'small' ? 13 : 
+                     this.currentSize === 'large' ? 15 : 17,
+            fontWeight: '500',
+            color: 'rgba(0, 0, 0, 0.87)',
+            lineHeight: this.currentSize === 'small' ? 16 : 
+                        this.currentSize === 'large' ? 18 : 20,
+            fontFamily: baseFont
+          }
+        }
+      };
+    } else if (numLines === 2) {
+      // Two line style
+      return {
+        rich: {
+          topLine: {
+            fontSize: this.currentSize === 'small' ? 14 : 
+                     this.currentSize === 'large' ? 16 : 18,
+            fontWeight: '600',
+            color: 'rgba(0, 0, 0, 0.87)',
+            lineHeight: this.currentSize === 'small' ? 18 : 
+                        this.currentSize === 'large' ? 20 : 22,
+            fontFamily: baseFont
+          },
+          bottomLine: {
+            fontSize: this.currentSize === 'small' ? 12 : 
+                     this.currentSize === 'large' ? 14 : 16,
+            fontWeight: '400',
+            color: 'rgba(0, 0, 0, 0.60)',
+            lineHeight: this.currentSize === 'small' ? 16 : 
+                        this.currentSize === 'large' ? 18 : 20,
+            fontFamily: baseFont,
+            padding: [2, 0, 0, 0]
+          }
+        }
+      };
+    } else {
+      // Three line style (default)
+      return {
+        rich: {
+          plotNum: {
+            fontSize: this.currentSize === 'small' ? 20 : 
+                     this.currentSize === 'large' ? 24 : 28,
+            fontWeight: '700',
+            color: '#1976d2',  // ThingsBoard primary blue
+            lineHeight: this.currentSize === 'small' ? 24 : 
+                        this.currentSize === 'large' ? 28 : 32,
+            fontFamily: baseFont
+          },
+          plotName: {
+            fontSize: this.currentSize === 'small' ? 14 : 
+                     this.currentSize === 'large' ? 16 : 18,
+            fontWeight: '500',
+            color: 'rgba(0, 0, 0, 0.87)',
+            lineHeight: this.currentSize === 'small' ? 18 : 
+                        this.currentSize === 'large' ? 20 : 22,
+            fontFamily: baseFont,
+            padding: [2, 0, 0, 0]
+          },
+          plotUnit: {
+            fontSize: this.currentSize === 'small' ? 12 : 
+                     this.currentSize === 'large' ? 13 : 15,
+            fontWeight: '400',
+            color: 'rgba(0, 0, 0, 0.54)',
+            lineHeight: this.currentSize === 'small' ? 15 : 
+                        this.currentSize === 'large' ? 16 : 18,
+            fontFamily: baseFont,
+            padding: [1, 0, 0, 0]
+          }
+        }
+      };
+    }
   }
 
   private setTimeFormatter(): void {
@@ -2668,6 +3205,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // [CLAUDE EDIT] Disable animations at root level
       animation: false,
       animationDurationUpdate: 0,
+      // Modern Apple-inspired background with subtle gradient
+      backgroundColor: {
+        type: 'linear',
+        x: 0,
+        y: 0,
+        x2: 0,
+        y2: 1,
+        colorStops: [{
+          offset: 0, color: '#ffffff' // Pure white at top
+        }, {
+          offset: 1, color: '#fafbfc' // Very subtle gray at bottom
+        }]
+      },
       // [CLAUDE] Apple-style system font
       textStyle: {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
