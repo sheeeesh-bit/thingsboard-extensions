@@ -199,15 +199,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     type: 'entity' | 'legend',
     id: string,
     action: () => Promise<void>,
-    priority: number
+    priority: number,
+    queuePosition?: number  // Track original queue position for debugging
   }> = [];
   private isProcessingQueue = false;
-  private maxConcurrentOps = 2; // Load balancing limit
+  private maxConcurrentOps = 1; // Process one at a time for clearer debugging
   private currentOperations = 0;
-  
-  // Loading state management
-  public isEChartsLoading = false;
-  private loadingTimeout: any = null;
+  private maxQueueSize = 10; // Maximum queue size
+  private queueCounter = 0; // Counter for queue position tracking
   
   // UI feedback states
   private lastPulsedEntity: string | null = null;
@@ -229,6 +228,39 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   constructor(private dialog: MatDialog) {}
+  
+  // Test method to demonstrate queue processing
+  private testQueueProcessing(): void {
+    this.LOG('[QUEUE TEST] 🧪 Starting queue test with 5 operations...');
+    
+    // Add operations in order 1, 2, 3, 4, 5 with different priorities
+    this.queueOperation('entity', 'entity-1', async () => {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      this.LOG('[QUEUE TEST] Operation 1 executed');
+    }, 1); // Low priority
+    
+    this.queueOperation('legend', 'legend-2', async () => {
+      await new Promise(resolve => setTimeout(resolve, 150));
+      this.LOG('[QUEUE TEST] Operation 2 executed');
+    }, 3); // High priority
+    
+    this.queueOperation('entity', 'entity-3', async () => {
+      await new Promise(resolve => setTimeout(resolve, 80));
+      this.LOG('[QUEUE TEST] Operation 3 executed');
+    }, 2); // Medium priority
+    
+    this.queueOperation('legend', 'legend-4', async () => {
+      await new Promise(resolve => setTimeout(resolve, 120));
+      this.LOG('[QUEUE TEST] Operation 4 executed');
+    }, 3); // High priority
+    
+    this.queueOperation('entity', 'entity-5', async () => {
+      await new Promise(resolve => setTimeout(resolve, 90));
+      this.LOG('[QUEUE TEST] Operation 5 executed');
+    }, 1); // Low priority
+    
+    this.LOG('[QUEUE TEST] 📝 Expected order (by priority): 2,4,3,1,5');
+  }
 
   ngOnInit(): void {
     this.LOG(this.ctx);
@@ -1354,16 +1386,36 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // Queue system for load balancing operations
   private queueOperation(type: 'entity' | 'legend', id: string, action: () => Promise<void>, priority = 1): void {
+    // Check queue size limit
+    if (this.operationQueue.length >= this.maxQueueSize) {
+      this.LOG(`[QUEUE] ❌ Queue full (${this.maxQueueSize} items), rejecting operation: ${id}`);
+      return;
+    }
+    
     // Remove any existing operation with the same id to prevent duplicates
+    const removedOps = this.operationQueue.filter(op => op.id === id);
+    if (removedOps.length > 0) {
+      this.LOG(`[QUEUE] 🔄 Removing duplicate operation: ${id} (position: ${removedOps[0].queuePosition})`);
+    }
     this.operationQueue = this.operationQueue.filter(op => op.id !== id);
     
-    // Add new operation to queue
-    this.operationQueue.push({ type, id, action, priority });
+    // Increment queue counter and add new operation
+    this.queueCounter++;
+    const newOp = { type, id, action, priority, queuePosition: this.queueCounter };
+    this.operationQueue.push(newOp);
     
-    // Sort by priority (higher priority first)
-    this.operationQueue.sort((a, b) => b.priority - a.priority);
+    // Sort by priority (higher priority first), then by queue position for same priority
+    this.operationQueue.sort((a, b) => {
+      if (b.priority !== a.priority) {
+        return b.priority - a.priority;
+      }
+      return (a.queuePosition || 0) - (b.queuePosition || 0);
+    });
     
-    this.LOG(`[QUEUE] Added ${type} operation: ${id}, queue size: ${this.operationQueue.length}`);
+    // Log current queue state
+    const queueOrder = this.operationQueue.map(op => `${op.queuePosition}:${op.id.substring(0, 8)}`).join(' → ');
+    this.LOG(`[QUEUE] ➕ Added #${this.queueCounter}:${id} (${type}, priority:${priority})`);
+    this.LOG(`[QUEUE] 📋 Current queue [${this.operationQueue.length} items]: ${queueOrder}`);
     
     // Process queue if not already processing
     this.processQueue();
@@ -1371,74 +1423,63 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   private async processQueue(): Promise<void> {
     if (this.isProcessingQueue || this.operationQueue.length === 0) {
+      if (this.operationQueue.length === 0) {
+        this.LOG(`[QUEUE] 📭 Queue empty, nothing to process`);
+      }
       return;
     }
     
     this.isProcessingQueue = true;
-    this.showEChartsLoading();
+    this.LOG(`[QUEUE] 🚀 Starting queue processing...`);
     
     while (this.operationQueue.length > 0 && this.currentOperations < this.maxConcurrentOps) {
       const operation = this.operationQueue.shift();
       if (!operation) break;
       
       this.currentOperations++;
-      this.LOG(`[QUEUE] Processing ${operation.type} operation: ${operation.id} (${this.currentOperations}/${this.maxConcurrentOps} concurrent)`);
+      const remainingQueue = this.operationQueue.map(op => `${op.queuePosition}:${op.id.substring(0, 8)}`).join(' → ');
+      
+      this.LOG(`[QUEUE] ▶️ Processing #${operation.queuePosition}:${operation.id} (${operation.type})`);
+      this.LOG(`[QUEUE] 📊 Status: ${this.currentOperations} running, ${this.operationQueue.length} pending`);
+      if (this.operationQueue.length > 0) {
+        this.LOG(`[QUEUE] ⏳ Remaining: ${remainingQueue}`);
+      }
+      
+      const startTime = Date.now();
       
       // Execute operation with error handling
       operation.action()
+        .then(() => {
+          const duration = Date.now() - startTime;
+          this.LOG(`[QUEUE] ✅ Completed #${operation.queuePosition}:${operation.id} in ${duration}ms`);
+        })
         .catch(error => {
-          this.LOG(`[QUEUE] Error in ${operation.type} operation ${operation.id}:`, error);
+          const duration = Date.now() - startTime;
+          this.LOG(`[QUEUE] ❌ Failed #${operation.queuePosition}:${operation.id} after ${duration}ms:`, error);
         })
         .finally(() => {
           this.currentOperations--;
+          this.LOG(`[QUEUE] 📉 Active operations: ${this.currentOperations}`);
           
           // Continue processing if queue not empty
           if (this.operationQueue.length > 0) {
+            this.LOG(`[QUEUE] ⏩ Continuing with ${this.operationQueue.length} remaining items...`);
             setTimeout(() => this.processQueue(), 10);
           } else if (this.currentOperations === 0) {
             // All operations complete
             this.isProcessingQueue = false;
-            this.hideEChartsLoading();
+            this.LOG(`[QUEUE] 🎉 All operations complete! Queue processed successfully.`);
           }
         });
     }
     
     // If no operations could be started, we're done
-    if (this.currentOperations === 0) {
+    if (this.currentOperations === 0 && this.operationQueue.length === 0) {
       this.isProcessingQueue = false;
-      this.hideEChartsLoading();
+      this.LOG(`[QUEUE] 💤 Queue processing stopped (empty queue)`);
     }
   }
   
-  // Loading state management
-  private showEChartsLoading(delay = 200): void {
-    // Clear any existing timeout
-    if (this.loadingTimeout) {
-      clearTimeout(this.loadingTimeout);
-    }
-    
-    // Show loading after delay to avoid flickering for quick operations
-    this.loadingTimeout = setTimeout(() => {
-      this.isEChartsLoading = true;
-      this.ctx.detectChanges();
-      this.LOG('[LOADING] ECharts loading state: ON');
-    }, delay);
-  }
-  
-  private hideEChartsLoading(): void {
-    // Clear timeout if loading hasn't started yet
-    if (this.loadingTimeout) {
-      clearTimeout(this.loadingTimeout);
-      this.loadingTimeout = null;
-    }
-    
-    // Hide loading immediately
-    if (this.isEChartsLoading) {
-      this.isEChartsLoading = false;
-      this.ctx.detectChanges();
-      this.LOG('[LOADING] ECharts loading state: OFF');
-    }
-  }
   
   // Check if an entity can be disabled (prevent disabling the last visible entity)
   private canDisableEntity(entityName: string): boolean {

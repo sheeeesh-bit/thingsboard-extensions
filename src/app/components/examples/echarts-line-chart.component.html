@@ -135,15 +135,6 @@
       <!-- Scrollable chart container -->
       <div #chartContainer class="chart-outer">
         <div id="echartContainer"></div>
-        
-        <!-- ECharts Loading Spinner -->
-        <div *ngIf="isEChartsLoading" class="echart-loading-overlay">
-          <div class="echart-loading-spinner">
-            <div class="spinner-ring"></div>
-            <div class="loading-text">Processing...</div>
-          </div>
-        </div>
-        
         <!-- No Data Message -->
         <div *ngIf="hasNoVisibleData" class="no-data-message">
           <div class="no-data-content">
