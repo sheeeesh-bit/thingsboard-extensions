@@ -104,7 +104,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // Entity sidebar model
   public entityList: Array<{
-    name: string;
+    name: string;           // Original entity name (for functionality)
+    displayName: string;    // Display name (deviceName attribute or fallback)
     color: string;
     count: number;
     dataPoints: number;
@@ -192,6 +193,24 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private pendingChartActions: Array<{type: string, name: string, legendIndex: number}> = [];
   private chartActionBatch: any = null;
   private originalAnimationState: boolean | null = null;
+  
+  // Queue system for entity/legend operations
+  private operationQueue: Array<{
+    type: 'entity' | 'legend',
+    id: string,
+    action: () => Promise<void>,
+    priority: number
+  }> = [];
+  private isProcessingQueue = false;
+  private maxConcurrentOps = 2; // Load balancing limit
+  private currentOperations = 0;
+  
+  // Loading state management
+  public isEChartsLoading = false;
+  private loadingTimeout: any = null;
+  
+  // UI feedback states
+  private lastPulsedEntity: string | null = null;
   
   // Time formatters
   private zoomTimeWithSeconds = 60 * 60 * 1000;       // 1 day
@@ -1330,6 +1349,135 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }, 200);
   }
   
+  // Queue system for load balancing operations
+  private queueOperation(type: 'entity' | 'legend', id: string, action: () => Promise<void>, priority = 1): void {
+    // Remove any existing operation with the same id to prevent duplicates
+    this.operationQueue = this.operationQueue.filter(op => op.id !== id);
+    
+    // Add new operation to queue
+    this.operationQueue.push({ type, id, action, priority });
+    
+    // Sort by priority (higher priority first)
+    this.operationQueue.sort((a, b) => b.priority - a.priority);
+    
+    this.LOG(`[QUEUE] Added ${type} operation: ${id}, queue size: ${this.operationQueue.length}`);
+    
+    // Process queue if not already processing
+    this.processQueue();
+  }
+  
+  private async processQueue(): Promise<void> {
+    if (this.isProcessingQueue || this.operationQueue.length === 0) {
+      return;
+    }
+    
+    this.isProcessingQueue = true;
+    this.showEChartsLoading();
+    
+    while (this.operationQueue.length > 0 && this.currentOperations < this.maxConcurrentOps) {
+      const operation = this.operationQueue.shift();
+      if (!operation) break;
+      
+      this.currentOperations++;
+      this.LOG(`[QUEUE] Processing ${operation.type} operation: ${operation.id} (${this.currentOperations}/${this.maxConcurrentOps} concurrent)`);
+      
+      // Execute operation with error handling
+      operation.action()
+        .catch(error => {
+          this.LOG(`[QUEUE] Error in ${operation.type} operation ${operation.id}:`, error);
+        })
+        .finally(() => {
+          this.currentOperations--;
+          
+          // Continue processing if queue not empty
+          if (this.operationQueue.length > 0) {
+            setTimeout(() => this.processQueue(), 10);
+          } else if (this.currentOperations === 0) {
+            // All operations complete
+            this.isProcessingQueue = false;
+            this.hideEChartsLoading();
+          }
+        });
+    }
+    
+    // If no operations could be started, we're done
+    if (this.currentOperations === 0) {
+      this.isProcessingQueue = false;
+      this.hideEChartsLoading();
+    }
+  }
+  
+  // Loading state management
+  private showEChartsLoading(delay = 200): void {
+    // Clear any existing timeout
+    if (this.loadingTimeout) {
+      clearTimeout(this.loadingTimeout);
+    }
+    
+    // Show loading after delay to avoid flickering for quick operations
+    this.loadingTimeout = setTimeout(() => {
+      this.isEChartsLoading = true;
+      this.ctx.detectChanges();
+      this.LOG('[LOADING] ECharts loading state: ON');
+    }, delay);
+  }
+  
+  private hideEChartsLoading(): void {
+    // Clear timeout if loading hasn't started yet
+    if (this.loadingTimeout) {
+      clearTimeout(this.loadingTimeout);
+      this.loadingTimeout = null;
+    }
+    
+    // Hide loading immediately
+    if (this.isEChartsLoading) {
+      this.isEChartsLoading = false;
+      this.ctx.detectChanges();
+      this.LOG('[LOADING] ECharts loading state: OFF');
+    }
+  }
+  
+  // Check if an entity can be disabled (prevent disabling the last visible entity)
+  private canDisableEntity(entityName: string): boolean {
+    const visibleEntities = this.entityList.filter(e => e.visible && e.name !== entityName);
+    const canDisable = visibleEntities.length > 0;
+    
+    if (!canDisable) {
+      this.LOG(`[QUEUE] Cannot disable ${entityName} - it's the last visible entity`);
+    }
+    
+    return canDisable;
+  }
+  
+  // Provide visual feedback when an action is blocked (pulse effect)
+  private pulseEntityVisually(entityName: string): void {
+    // Set the pulse state
+    this.lastPulsedEntity = entityName;
+    this.ctx.detectChanges();
+    
+    // Clear the pulse after animation duration
+    setTimeout(() => {
+      this.lastPulsedEntity = null;
+      this.ctx.detectChanges();
+    }, 600);
+    
+    this.LOG(`[UI] Pulsing entity: ${entityName} (action blocked)`);
+  }
+  
+  // Async version of performEntityToggle for queue processing
+  private async performEntityToggleAsync(entityName: string): Promise<void> {
+    return new Promise<void>((resolve) => {
+      try {
+        this.performEntityToggle(entityName);
+        // Give a small delay for ECharts to process
+        setTimeout(() => resolve(), 50);
+      } catch (error) {
+        this.LOG(`[QUEUE] Error in performEntityToggleAsync for ${entityName}:`, error);
+        resolve(); // Don't reject to keep queue processing
+      }
+    });
+  }
+  
   // Check which plots/grids have visible series WITH DATA
   /* private checkPlotVisibility(legendSelected: {[key: string]: boolean}): {[plot: string]: {hasVisibleSeries: boolean, seriesNames: string[]}} {
     const plotVisibility: {[plot: string]: {hasVisibleSeries: boolean, seriesNames: string[]}} = {};
@@ -1590,6 +1738,54 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return { data, selected };
   }
   
+  // Get display name for entity (deviceName attribute or fallback to entity name)  
+  private getEntityDisplayName(entityName: string): string {
+    // Try to get deviceName from entity data
+    try {
+      const entityData = this.ctx?.data?.find(d => d.datasource?.entityName === entityName);
+      if (entityData) {
+        const entity = entityData.datasource?.entity;
+        
+        // Look for deviceName in entity properties
+        if (entity) {
+          // Try entity label first (commonly used for display names)
+          if (entity.label && entity.label !== entity.name && entity.label.trim() !== '') {
+            this.LOG(`[DEVICE_NAME] Using entity label: ${entity.label} for entity: ${entityName}`);
+            return entity.label;
+          }
+          
+          // Try to access additionalInfo safely
+          const entityObj = entity as any;
+          if (entityObj.additionalInfo) {
+            if (entityObj.additionalInfo.deviceName) {
+              this.LOG(`[DEVICE_NAME] Found deviceName in additionalInfo: ${entityObj.additionalInfo.deviceName}`);
+              return entityObj.additionalInfo.deviceName;
+            }
+            if (entityObj.additionalInfo.description) {
+              this.LOG(`[DEVICE_NAME] Using description as fallback: ${entityObj.additionalInfo.description}`);
+              return entityObj.additionalInfo.description;
+            }
+          }
+        }
+        
+        // Try to get deviceName from data key attributes
+        const dataKey = entityData.dataKey;
+        if (dataKey && (dataKey as any).additionalInfo) {
+          const keyInfo = (dataKey as any).additionalInfo;
+          if (keyInfo.deviceName) {
+            this.LOG(`[DEVICE_NAME] Found deviceName in dataKey: ${keyInfo.deviceName}`);
+            return keyInfo.deviceName;
+          }
+        }
+      }
+    } catch (error) {
+      this.LOG(`[DEVICE_NAME] Error getting display name for ${entityName}:`, error);
+    }
+    
+    this.LOG(`[DEVICE_NAME] Using fallback entity name: ${entityName}`);
+    return entityName;
+  }
+
   // Refresh entity list for sidebar
   public refreshEntityList(): void {
     if (!this.ctx?.data || !this.chart) {
@@ -1624,20 +1820,21 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const opt: any = this.chart.getOption();
     const selected = opt?.legend?.[0]?.selected || {};
     
-    // Build entity list with data point counts
+    // Build entity list with display names and data point counts
     this.entityList = Object.keys(entityGroups).map(entityName => {
       const group = entityGroups[entityName];
       // Entity is visible if any of its series are visible
       const visible = group.seriesKeys.some(seriesKey => selected[seriesKey] !== false);
       
       return {
-        name: entityName,
+        name: entityName,                                    // Original entity name (for functionality)
+        displayName: this.getEntityDisplayName(entityName), // Display name (deviceName or fallback)
         color: group.color,
         count: group.seriesKeys.length,
         dataPoints: group.dataPoints,
         visible: visible
       };
-    }).sort((a, b) => a.name.localeCompare(b.name));
+    }).sort((a, b) => a.displayName.localeCompare(b.displayName)); // Sort by display name
     
     this.ctx.detectChanges();
   }
@@ -1648,15 +1845,23 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     this.LOG(`[PERF] Entity click: ${entityName}`);
     
+    // Check if entity can be disabled (prevent disabling last visible entity)
+    const entityData = this.entityList.find(e => e.name === entityName);
+    if (entityData?.visible && !this.canDisableEntity(entityName)) {
+      // Provide visual feedback for blocked action
+      this.pulseEntityVisually(entityName);
+      return;
+    }
+    
     // Immediate UI feedback - update entity list optimistically
     this.batchUIUpdate('entity-list', () => {
       this.updateEntityListOptimistically(entityName);
     });
     
-    // Debounced core logic to avoid rapid-fire clicks
-    this.debouncedUIUpdate('entity-toggle', () => {
-      this.performEntityToggle(entityName);
-    });
+    // Queue the entity toggle operation with high priority
+    this.queueOperation('entity', entityName, async () => {
+      await this.performEntityToggleAsync(entityName);
+    }, 2); // High priority for direct entity clicks
   }
   
   private updateEntityListOptimistically(entityName: string): void {
@@ -4325,12 +4530,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
     
-    // Toggle the selection in both main and page item
-    mainItem.selected = !mainItem.selected;
-    item.selected = mainItem.selected;
+    this.LOG(`[PERF] Legend click: ${item.label}`);
     
-    // Dispatch actions to toggle all series for this label
-    this.toggleAllSeriesForLabel(mainItem.label, mainItem.selected);
+    // Immediate UI feedback - update legend items optimistically
+    this.batchUIUpdate('legend-chips', () => {
+      mainItem.selected = !mainItem.selected;
+      item.selected = mainItem.selected;
+      this.ctx.detectChanges();
+    });
+    
+    // Queue the legend toggle operation with medium priority
+    this.queueOperation('legend', item.label, async () => {
+      await this.performLegendToggleAsync(item.label, mainItem.selected);
+    }, 1); // Medium priority for legend clicks
   }
   
   // Helper to toggle all series belonging to a label
@@ -4408,6 +4620,20 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         }, 200); // Wait for chart to complete rendering
       }
     }, 50);
+  }
+  
+  // Async version of performLegendToggle for queue processing
+  private async performLegendToggleAsync(label: string, shouldSelect: boolean): Promise<void> {
+    return new Promise<void>((resolve) => {
+      try {
+        this.performLegendToggle(label, shouldSelect);
+        // Give a small delay for ECharts to process
+        setTimeout(() => resolve(), 100);
+      } catch (error) {
+        this.LOG(`[QUEUE] Error in performLegendToggleAsync for ${label}:`, error);
+        resolve(); // Don't reject to keep queue processing
+      }
+    });
   }
 
 }

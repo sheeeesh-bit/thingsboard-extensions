@@ -72,11 +72,12 @@
           <tr *ngFor="let entity of entityList" 
               class="entity-row" 
               [class.entity-row--disabled]="!entity.visible"
+              [class.pulse-effect]="lastPulsedEntity === entity.name"
               (click)="toggleEntityVisibility(entity.name)">
             <td class="swatch-cell">
               <div class="swatch-box" [style.background-color]="entity.color"></div>
             </td>
-            <td class="entity-name" [title]="entity.name">{{ entity.name }}</td>
+            <td class="entity-name" [title]="entity.displayName + ' (' + entity.name + ')' ">{{ entity.displayName }}</td>
             <td class="entity-count" [title]="'Series: ' + entity.count + ', Points: ' + entity.dataPoints">
               {{ entity.count }}<span class="data-points"> ({{ entity.dataPoints }})</span>
             </td>
@@ -134,6 +135,15 @@
       <!-- Scrollable chart container -->
       <div #chartContainer class="chart-outer">
         <div id="echartContainer"></div>
+        
+        <!-- ECharts Loading Spinner -->
+        <div *ngIf="isEChartsLoading" class="echart-loading-overlay">
+          <div class="echart-loading-spinner">
+            <div class="spinner-ring"></div>
+            <div class="loading-text">Processing...</div>
+          </div>
+        </div>
+        
         <!-- No Data Message -->
         <div *ngIf="hasNoVisibleData" class="no-data-message">
           <div class="no-data-content">
