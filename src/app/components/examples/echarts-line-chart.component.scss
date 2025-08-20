@@ -128,22 +128,22 @@ div[fxFlex] {
   transform: translateY(-50%);
   z-index: 100;
   background: white;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-left: none;
-  border-radius: 0 8px 8px 0;
-  padding: 12px 4px;
+  border-radius: 0 6px 6px 0;
+  padding: 16px 3px;
   cursor: pointer;
-  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 1px 0 3px rgba(0, 0, 0, 0.05);
   
   &:hover {
     background: #f8f9fa;
-    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.12);
-    padding-right: 6px;
+    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.08);
+    padding-right: 5px;
   }
   
   .material-icons {
-    font-size: 18px;
+    font-size: 16px;
     color: #5f6368;
     display: block;
     transition: transform 0.3s ease;
@@ -153,10 +153,11 @@ div[fxFlex] {
     transform: scale(1.1);
   }
   
-  // When sidebar is hidden, move button to the left edge
+  // When sidebar is completely hidden
   &.sidebar-hidden {
     left: 0;
-    border-left: 1px solid rgba(0, 0, 0, 0.12);
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0 6px 6px 0;
   }
 }
 
@@ -173,13 +174,23 @@ div[fxFlex] {
   left: 80px;
 }
 
-// Adjust button position when sidebar is collapsed with colors/initials
+// Adjust button position when sidebar is collapsed with colors/initials (seamless attachment)
 .entity-sidebar.sidebar-collapsed-colors ~ .sidebar-toggle-btn {
   left: 60px;
+  border-left: none;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
 }
 
 .entity-sidebar.sidebar-collapsed-initials ~ .sidebar-toggle-btn {
   left: 80px;
+  border-left: none;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
 }
 
 
