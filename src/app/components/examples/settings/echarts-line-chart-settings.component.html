@@ -68,6 +68,26 @@
           <input matInput formControlName="customEntityAttribute" placeholder="e.g., displayName">
         </mat-form-field>
         
+        <h4>Sidebar Display Mode</h4>
+        <mat-form-field class="mat-block" appearance="outline">
+          <mat-label>Sidebar View Mode</mat-label>
+          <mat-select formControlName="sidebarDisplayMode">
+            <mat-option value="full">Full Table (Name + Count)</mat-option>
+            <mat-option value="compact">Compact (Name only)</mat-option>
+            <mat-option value="colors">Colors Only</mat-option>
+            <mat-option value="initials">Colors with Initials (3 letters)</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px;">
+          <p style="margin: 8px 0;"><strong>Display Modes:</strong></p>
+          <ul style="margin: 4px 0; padding-left: 20px;">
+            <li><strong>Full Table:</strong> Shows entity names with series count</li>
+            <li><strong>Compact:</strong> Shows entity names only in smaller format</li>
+            <li><strong>Colors Only:</strong> Shows only color boxes (minimal space)</li>
+            <li><strong>Colors with Initials:</strong> Shows color boxes with first 3 letters</li>
+          </ul>
+        </div>
+        
         <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px;">
           <p style="margin: 8px 0;"><strong>Layout Options:</strong></p>
           <ul style="margin: 4px 0; padding-left: 20px;">

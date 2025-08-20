@@ -72,9 +72,11 @@
     <!-- Entity sidebar (left side) -->
     <aside class="entity-sidebar" 
            [class.sidebar-hidden]="!isSidebarVisible"
+           [attr.data-mode]="sidebarDisplayMode"
            *ngIf="ctx.settings.showEntitySidebar !== false">
       
-      <table class="entity-table">
+      <!-- Full table mode -->
+      <table class="entity-table" *ngIf="sidebarDisplayMode === 'full'">
         <thead>
           <tr>
             <th colspan="3">Entities</th>
@@ -96,6 +98,46 @@
           </tr>
         </tbody>
       </table>
+      
+      <!-- Compact mode -->
+      <table class="entity-table-compact" *ngIf="sidebarDisplayMode === 'compact'">
+        <tbody>
+          <tr *ngFor="let entity of entityList" 
+              class="entity-row-compact" 
+              [class.entity-row--disabled]="!entity.visible"
+              (click)="toggleEntityVisibility(entity.name)">
+            <td class="swatch-cell">
+              <div class="swatch-box" [style.background-color]="entity.color"></div>
+            </td>
+            <td class="entity-name-compact" [title]="entity.displayName">
+              {{ entity.displayName }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <!-- Colors only mode -->
+      <div class="colors-container" *ngIf="sidebarDisplayMode === 'colors'">
+        <div *ngFor="let entity of entityList" 
+             class="color-box"
+             [class.color-box--disabled]="!entity.visible"
+             [style.background-color]="entity.color"
+             [title]="entity.displayName + ' - Click to toggle'"
+             (click)="toggleEntityVisibility(entity.name)">
+        </div>
+      </div>
+      
+      <!-- Colors with initials mode -->
+      <div class="initials-container" *ngIf="sidebarDisplayMode === 'initials'">
+        <div *ngFor="let entity of entityList" 
+             class="initial-box"
+             [class.initial-box--disabled]="!entity.visible"
+             [style.background-color]="entity.color"
+             [title]="entity.displayName + ' - Click to toggle'"
+             (click)="toggleEntityVisibility(entity.name)">
+          <span class="initial-text">{{ getEntityInitials(entity.displayName) }}</span>
+        </div>
+      </div>
     </aside>
     
     <!-- Chart area with floating overlays -->

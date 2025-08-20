@@ -196,6 +196,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // Sidebar state
   public isSidebarVisible = true;
+  public sidebarDisplayMode: 'full' | 'compact' | 'colors' | 'initials' = 'full';
   
   // UI feedback states
   private lastPulsedEntity: string | null = null;
@@ -232,12 +233,20 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }, 300); // Wait for CSS transition
   }
 
+  // Get initials from entity name (first 3 letters)
+  public getEntityInitials(name: string): string {
+    return name.substring(0, 3).toUpperCase();
+  }
+
   ngOnInit(): void {
     this.LOG(this.ctx);
     this.LOG(`=== CHART VERSION ${this.CHART_VERSION} INITIALIZATION START ===`);
     this.LOG('Component initialized');
     this.LOG('Widget context:', this.ctx);
     this.LOG('Widget settings:', this.ctx.settings);
+    
+    // Initialize sidebar display mode from settings
+    this.sidebarDisplayMode = this.ctx.settings?.sidebarDisplayMode || 'full';
     
     // Initialize color scheme
     this.currentColorScheme = this.ctx.settings?.colorScheme || 'default';

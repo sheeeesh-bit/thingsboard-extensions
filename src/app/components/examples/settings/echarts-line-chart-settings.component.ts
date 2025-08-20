@@ -17,6 +17,7 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   // Entity Display Settings
   entityDisplayAttribute?: 'label' | 'deviceName' | 'name' | 'custom';  // Which attribute to show for entities
   customEntityAttribute?: string;  // Custom attribute name if 'custom' is selected
+  sidebarDisplayMode?: 'full' | 'compact' | 'colors' | 'initials';  // How to display the sidebar
   
   // Y-Axis Settings
   yAxisLeftTitle?: string;
@@ -117,6 +118,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       colorScheme: 'default',
       entityDisplayAttribute: 'label',  // Default to label attribute
       customEntityAttribute: '',
+      sidebarDisplayMode: 'full',  // Default to full table view
       yAxisLeftTitle: '',
       yAxisLeftUnit: 'ml',
       yAxisLeftAutoScale: true,
@@ -179,6 +181,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       // Entity Display Settings
       entityDisplayAttribute: [settings.entityDisplayAttribute || 'label'],
       customEntityAttribute: [settings.customEntityAttribute || ''],
+      sidebarDisplayMode: [settings.sidebarDisplayMode || 'full'],
       
       // Graph Settings
       smooth: [settings.smooth],
