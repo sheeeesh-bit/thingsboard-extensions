@@ -176,6 +176,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private legendOverridesGrids = false;
   private lastDataLengths: number[] = [];
   
+  // Scroll position management for mode transitions
+  private scrollState = {
+    position: { top: 0, left: 0 },
+    wasScrolling: false,
+    isTransitioning: false
+  };
+  
   // Time formatters
   private zoomTimeWithSeconds = 60 * 60 * 1000;       // 1 day
   private zoomTimeWithMinutes = 7 * 24 * 60 * 60 * 1000;  // 7 days 
@@ -303,6 +310,51 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Don't apply height here - let initChart handle it
     
+    // Check lazy loading setting
+    const useLazyLoading = this.ctx.settings?.useLazyLoading !== false;
+    this.LOG(`[LAZY] Lazy loading enabled: ${useLazyLoading}`);
+    
+    if (useLazyLoading) {
+      // Lazy loading: initialize chart when it becomes visible
+      this.initializeLazyLoading();
+    } else {
+      // Immediate loading: initialize chart right away
+      this.initializeImmediate();
+    }
+    
+    // Listen for fullscreen changes to force legend recalculation
+    this.setupFullscreenListener();
+  }
+  
+  private initializeLazyLoading(): void {
+    this.LOG('[LAZY] Setting up lazy loading with Intersection Observer');
+    
+    // Create intersection observer to detect when chart becomes visible
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            this.LOG('[LAZY] Chart container is now visible, initializing...');
+            observer.disconnect(); // Stop observing
+            this.initializeImmediate();
+          }
+        });
+      }, {
+        root: null, // viewport
+        rootMargin: '50px', // Start loading 50px before it's visible
+        threshold: 0.1 // Trigger when 10% visible
+      });
+      
+      observer.observe(this.chartContainer.nativeElement);
+      this.LOG('[LAZY] Intersection Observer attached');
+    } else {
+      // Fallback for browsers without IntersectionObserver
+      this.LOG('[LAZY] IntersectionObserver not supported, using immediate loading');
+      this.initializeImmediate();
+    }
+  }
+  
+  private initializeImmediate(): void {
     // Delay initialization to ensure layout is complete
     setTimeout(() => {
       this.LOG(`[HEIGHT DEBUG] After timeout - ctx.height: ${this.ctx.height}`);
@@ -325,9 +377,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         }
       }
     }, 100);
-    
-    // Listen for fullscreen changes to force legend recalculation
-    this.setupFullscreenListener();
   }
   
   private setupFullscreenListener(): void {
@@ -927,7 +976,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private getTopReservePct(): number { 
     // Use pixel-based buffer for 1, 2, and 3 plots to prevent excessive whitespace in fullscreen
     if (this.currentGrids >= 1 && this.currentGrids <= 3) {
-      return this.pxToPct(60); // ~60px top buffer, scales with container height
+      return this.pxToPct(20); // ~60px top buffer, scales with container height
     }
     // Fixed small buffer at top for all other configurations
     return this.pxToPct(20); // ~20px buffer for 4+ plots
@@ -966,6 +1015,76 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // Helper to check if tooltip should only show hovered grid
   private onlyShowHoveredGrid(): boolean {
     return !!this.ctx.settings?.tooltipOnlyHoveredGrid; // default off
+  }
+  
+  // Scroll position management for smooth mode transitions
+  private captureScrollPosition(): void {
+    const container = this.chartContainer?.nativeElement;
+    if (!container) return;
+    
+    this.scrollState.position = {
+      top: container.scrollTop || 0,
+      left: container.scrollLeft || 0
+    };
+    this.scrollState.wasScrolling = this.isInScrollingMode();
+    
+    this.LOG(`[SCROLL] Captured position: ${this.scrollState.position.top}px, wasScrolling: ${this.scrollState.wasScrolling}`);
+  }
+  
+  private restoreScrollPosition(): void {
+    const container = this.chartContainer?.nativeElement;
+    if (!container || this.scrollState.isTransitioning) return;
+    
+    this.scrollState.isTransitioning = true;
+    
+    // Determine the appropriate scroll position based on mode transition
+    const isNowScrolling = this.isInScrollingMode();
+    
+    this.LOG(`[SCROLL] Restore: wasScrolling=${this.scrollState.wasScrolling}, isNowScrolling=${isNowScrolling}, grids=${this.currentGrids}`);
+    
+    // Wait for chart to render, then apply scroll position
+    setTimeout(() => {
+      if (!container) return;
+      
+      let targetScrollTop = 0;
+      
+      if (this.scrollState.wasScrolling && !isNowScrolling) {
+        // Transition from scrolling to non-scrolling mode
+        // Reset to top for clean fitted view
+        targetScrollTop = 0;
+        this.LOG('[SCROLL] Scrolling → Non-scrolling: Resetting to top');
+      } else if (!this.scrollState.wasScrolling && isNowScrolling) {
+        // Transition from non-scrolling to scrolling mode  
+        // Keep minimal scroll to show chart properly
+        targetScrollTop = 0;
+        this.LOG('[SCROLL] Non-scrolling → Scrolling: Starting from top');
+      } else if (this.scrollState.wasScrolling && isNowScrolling) {
+        // Both modes are scrolling, try to maintain relative position
+        // But be conservative to avoid jarring jumps
+        const maxScroll = container.scrollHeight - container.clientHeight;
+        const relativePos = Math.min(this.scrollState.position.top * 0.8, maxScroll); 
+        targetScrollTop = Math.max(0, relativePos);
+        this.LOG(`[SCROLL] Scrolling → Scrolling: Adjusted from ${this.scrollState.position.top}px to ${targetScrollTop}px`);
+      }
+      
+      // Apply smooth scroll
+      container.scrollTo({
+        top: targetScrollTop,
+        left: 0,
+        behavior: 'smooth'
+      });
+      
+      // Reset transition flag after scroll completes
+      setTimeout(() => {
+        this.scrollState.isTransitioning = false;
+      }, 300);
+      
+    }, 100); // Wait for chart render
+  }
+  
+  private isInScrollingMode(): boolean {
+    const scrollThreshold = this.ctx.settings?.scrollingStartsAfter || 3;
+    return this.currentGrids > scrollThreshold;
   }
   
   // Check which plots/grids have visible series WITH DATA
@@ -1370,6 +1489,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.legendOverridesGrids = true;
       const previousGridCount = this.currentGrids;
       
+      // Capture scroll position before mode change
+      this.captureScrollPosition();
+      
       // Filter to only include series that are both visible AND have data
       const activeSeriesWithData = activeSeriesKeys.filter(key => {
         const series = this.ctx.data.find(d => this.buildSeriesKey(d.datasource?.entityName || '', d.dataKey.label) === key);
@@ -1383,10 +1505,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
       // If grid count changed, rebuild the chart
       if (previousGridCount !== this.currentGrids) {
-        this.LOG('[Device_Plot_Visi: ]   Grid count changed: ' + previousGridCount + ' -> ' + this.currentGrids);
+        this.LOG(`[SCROLL] Entity toggle mode transition: ${previousGridCount} → ${this.currentGrids} grids`);
         this.resetGrid = true;
         this.applyScrollableHeight();
         this.onDataUpdated();
+        
+        // Restore appropriate scroll position after chart updates
+        setTimeout(() => {
+          this.restoreScrollPosition();
+        }, 200); // Wait for chart to complete rendering
       }
       
       // Trigger change detection to update UI
@@ -3965,12 +4092,22 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const activeSeriesKeys = Object.keys(legendSelected).filter(k => legendSelected[k] !== false);
       
       const previousGridCount = this.currentGrids;
+      
+      // Capture scroll position before mode change
+      this.captureScrollPosition();
+      
       this.setDataGridByNames(activeSeriesKeys);
       
       if (previousGridCount !== this.currentGrids) {
+        this.LOG(`[SCROLL] Mode transition detected: ${previousGridCount} → ${this.currentGrids} grids`);
         this.resetGrid = true;
         this.applyScrollableHeight();
         this.onDataUpdated();
+        
+        // Restore appropriate scroll position after chart updates
+        setTimeout(() => {
+          this.restoreScrollPosition();
+        }, 200); // Wait for chart to complete rendering
       }
     }, 50);
   }

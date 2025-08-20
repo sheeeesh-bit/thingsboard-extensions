@@ -397,10 +397,21 @@
     <!-- Debug Settings -->
     <mat-expansion-panel>
       <mat-expansion-panel-header>
-        <mat-panel-title>Debug</mat-panel-title>
+        <mat-panel-title>Debug & Performance</mat-panel-title>
       </mat-expansion-panel-header>
       
-      <mat-checkbox formControlName="debugOutput">Use Debug Output</mat-checkbox>
+      <div fxLayout="column" fxLayoutGap="16px">
+        <mat-checkbox formControlName="debugOutput">Use Debug Output</mat-checkbox>
+        
+        <mat-checkbox formControlName="useLazyLoading">
+          <div fxLayout="column">
+            <span>Use Lazy Loading</span>
+            <small style="color: #666; font-size: 11px;">
+              Enable deferred chart rendering for better initial load performance with large datasets
+            </small>
+          </div>
+        </mat-checkbox>
+      </div>
     </mat-expansion-panel>
 
   </div>

@@ -72,8 +72,9 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   showCustomLegend?: boolean;
   showZoomControls?: boolean;
   
-  // Debug
+  // Debug & Performance
   debugOutput?: boolean;
+  useLazyLoading?: boolean;
 }
 
 @Component({
@@ -132,7 +133,8 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       showEntitySidebar: true,
       showCustomLegend: true,
       showZoomControls: true,
-      debugOutput: false
+      debugOutput: false,
+      useLazyLoading: true
     };
   }
 
@@ -187,8 +189,9 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       showCustomLegend: [settings.showCustomLegend !== false],
       showZoomControls: [settings.showZoomControls !== false],
       
-      // Debug
-      debugOutput: [settings.debugOutput]
+      // Debug & Performance
+      debugOutput: [settings.debugOutput],
+      useLazyLoading: [settings.useLazyLoading !== false]
     });
   }
 
