@@ -64,7 +64,8 @@
     <button class="sidebar-toggle-btn" 
             (click)="toggleSidebar()"
             [title]="isSidebarVisible ? 'Hide sidebar' : 'Show sidebar'"
-            [class.sidebar-hidden]="!isSidebarVisible"
+            [attr.data-sidebar-state]="!isSidebarVisible ? sidebarCollapsedMode : 'visible'"
+            [attr.data-sidebar-mode]="isSidebarVisible ? sidebarDisplayMode : sidebarCollapsedMode"
             *ngIf="ctx.settings.showEntitySidebar !== false">
       <i class="material-icons">{{ isSidebarVisible ? 'chevron_left' : 'chevron_right' }}</i>
     </button>
@@ -77,13 +78,16 @@
            [attr.data-mode]="isSidebarVisible ? sidebarDisplayMode : sidebarCollapsedMode"
            *ngIf="ctx.settings.showEntitySidebar !== false">
       
+      <!-- Permanent header (visible in all modes except completely hidden) -->
+      <div class="sidebar-header" *ngIf="isSidebarVisible || sidebarCollapsedMode !== 'hidden'">
+        <span class="header-text" *ngIf="isSidebarVisible">Entities</span>
+        <span class="header-icon" *ngIf="!isSidebarVisible && sidebarCollapsedMode !== 'hidden'">
+          <i class="material-icons">dashboard</i>
+        </span>
+      </div>
+      
       <!-- Full table mode (only when visible) -->
       <table class="entity-table" *ngIf="isSidebarVisible && sidebarDisplayMode === 'full'">
-        <thead>
-          <tr>
-            <th colspan="3">Entities</th>
-          </tr>
-        </thead>
         <tbody>
           <tr *ngFor="let entity of entityList" 
               class="entity-row" 

@@ -124,8 +124,7 @@ div[fxFlex] {
 .sidebar-toggle-btn {
   position: absolute;
   left: 240px; // Default for full mode
-  top: 50%;
-  transform: translateY(-50%);
+  top: 24px; // Align with sidebar header
   z-index: 100;
   background: white;
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -152,42 +151,36 @@ div[fxFlex] {
   &:hover .material-icons {
     transform: scale(1.1);
   }
-  
-  // When sidebar is completely hidden
-  &.sidebar-hidden {
-    left: 0;
-    border-left: 1px solid rgba(0, 0, 0, 0.08);
-    border-radius: 0 6px 6px 0;
-  }
 }
 
-// Adjust button position based on sidebar mode when visible
-.entity-sidebar[data-mode="compact"] ~ .sidebar-toggle-btn:not(.sidebar-hidden) {
-  left: 180px;
+// Button positioning based on sidebar state and mode
+.sidebar-toggle-btn[data-sidebar-state="visible"] {
+  // Position based on visible mode
+  &[data-sidebar-mode="full"] { left: 240px; }
+  &[data-sidebar-mode="compact"] { left: 180px; }
+  &[data-sidebar-mode="colors"] { left: 60px; }
+  &[data-sidebar-mode="initials"] { left: 80px; }
 }
 
-.entity-sidebar[data-mode="colors"] ~ .sidebar-toggle-btn:not(.sidebar-hidden) {
-  left: 60px;
+.sidebar-toggle-btn[data-sidebar-state="hidden"] {
+  // Completely hidden - button at edge
+  left: 0;
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.entity-sidebar[data-mode="initials"] ~ .sidebar-toggle-btn:not(.sidebar-hidden) {
-  left: 80px;
-}
-
-// Adjust button position when sidebar is collapsed with colors/initials (seamless attachment)
-.entity-sidebar.sidebar-collapsed-colors ~ .sidebar-toggle-btn {
+.sidebar-toggle-btn[data-sidebar-state="colors"] {
+  // Collapsed to colors mode
   left: 60px;
   border-left: none;
-  box-shadow: none;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: saturate(180%) blur(12px);
   -webkit-backdrop-filter: saturate(180%) blur(12px);
 }
 
-.entity-sidebar.sidebar-collapsed-initials ~ .sidebar-toggle-btn {
+.sidebar-toggle-btn[data-sidebar-state="initials"] {
+  // Collapsed to initials mode
   left: 80px;
   border-left: none;
-  box-shadow: none;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: saturate(180%) blur(12px);
   -webkit-backdrop-filter: saturate(180%) blur(12px);
@@ -206,6 +199,41 @@ div[fxFlex] {
   max-height: 100%;
   position: relative;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  
+  // Sidebar header - always visible except when completely hidden
+  .sidebar-header {
+    position: sticky;
+    top: 0;
+    height: 48px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    z-index: 10;
+    flex-shrink: 0;
+    
+    .header-text {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #6e6e73;
+    }
+    
+    .header-icon {
+      color: #6e6e73;
+      
+      .material-icons {
+        font-size: 18px;
+      }
+    }
+  }
   
   &.sidebar-hidden {
     width: 0;
@@ -444,27 +472,8 @@ div[fxFlex] {
   border-collapse: collapse;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
   font-size: 13px;
-  
-  thead {
-    position: sticky;
-    top: 0;
-    background: rgba(255, 255, 255, 0.98);
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
-    z-index: 10;
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
-    
-    th {
-      padding: 14px 12px;
-      text-align: left;
-      font-weight: 600;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #6e6e73;
-      border-bottom: none;
-    }
-  }
+  flex: 1;
+  overflow-y: auto;
   
   tbody {
     tr.entity-row {
