@@ -124,7 +124,8 @@ div[fxFlex] {
 .sidebar-toggle-btn {
   position: absolute;
   left: 240px; // Default for full mode
-  top: 24px; // Align with sidebar header
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 100;
   background: white;
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -194,8 +195,7 @@ div[fxFlex] {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: saturate(180%) blur(12px);
   -webkit-backdrop-filter: saturate(180%) blur(12px);
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden; // Changed from overflow-y: auto
   max-height: 100%;
   position: relative;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -281,6 +281,10 @@ div[fxFlex] {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: calc(100% - 48px); // Account for header height
     
     .entity-row-compact {
       cursor: pointer;
@@ -326,6 +330,10 @@ div[fxFlex] {
     flex-direction: column;
     gap: 8px;
     padding: 12px;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: calc(100% - 48px); // Account for header height
     
     .color-box {
       width: 36px;
@@ -353,6 +361,10 @@ div[fxFlex] {
     flex-direction: column;
     gap: 8px;
     padding: 12px;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: calc(100% - 48px); // Account for header height
     
     .initial-box {
       width: 56px;
@@ -474,6 +486,8 @@ div[fxFlex] {
   font-size: 13px;
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  max-height: calc(100% - 48px); // Account for header height
   
   tbody {
     tr.entity-row {
