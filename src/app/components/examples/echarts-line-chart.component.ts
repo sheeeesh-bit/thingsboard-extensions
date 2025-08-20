@@ -183,6 +183,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     isTransitioning: false
   };
   
+  // UI Performance optimization state
+  private clickDebounceTimeout: any = null;
+  private pendingUIUpdates = new Set<string>();
+  private uiUpdateBatch: any = null;
+  
+  // ECharts interaction optimization state
+  private pendingChartActions: Array<{type: string, name: string, legendIndex: number}> = [];
+  private chartActionBatch: any = null;
+  private originalAnimationState: boolean | null = null;
+  
   // Time formatters
   private zoomTimeWithSeconds = 60 * 60 * 1000;       // 1 day
   private zoomTimeWithMinutes = 7 * 24 * 60 * 60 * 1000;  // 7 days 
@@ -1172,6 +1182,154 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     };
   }
   
+  // UI Performance optimization helpers
+  private shouldOptimizeClicks(): boolean {
+    return this.ctx.settings?.optimizeClickHandling !== false;
+  }
+  
+  private shouldDeferUIUpdates(): boolean {
+    return this.ctx.settings?.deferredUIUpdates !== false;
+  }
+  
+  private getClickDebounceMs(): number {
+    return this.ctx.settings?.clickDebounceMs || 100;
+  }
+  
+  private debouncedUIUpdate(updateType: string, callback: () => void): void {
+    if (!this.shouldOptimizeClicks()) {
+      callback();
+      return;
+    }
+    
+    const debounceMs = this.getClickDebounceMs();
+    
+    // Clear existing timeout for this update type
+    if (this.clickDebounceTimeout) {
+      clearTimeout(this.clickDebounceTimeout);
+    }
+    
+    this.LOG(`[PERF] Debouncing ${updateType} update for ${debounceMs}ms`);
+    
+    this.clickDebounceTimeout = setTimeout(() => {
+      callback();
+      this.clickDebounceTimeout = null;
+    }, debounceMs);
+  }
+  
+  private batchUIUpdate(updateType: string, callback: () => void): void {
+    if (!this.shouldDeferUIUpdates()) {
+      callback();
+      return;
+    }
+    
+    this.pendingUIUpdates.add(updateType);
+    
+    if (this.uiUpdateBatch) {
+      clearTimeout(this.uiUpdateBatch);
+    }
+    
+    this.uiUpdateBatch = setTimeout(() => {
+      this.LOG(`[PERF] Processing batched UI updates: ${Array.from(this.pendingUIUpdates).join(', ')}`);
+      callback();
+      this.pendingUIUpdates.clear();
+      this.uiUpdateBatch = null;
+    }, 16); // ~60fps batching
+  }
+  
+  // ECharts batching optimization helpers
+  private shouldBatchEChartsUpdates(): boolean {
+    return this.ctx.settings?.batchEChartsUpdates !== false;
+  }
+  
+  private getEChartsUpdateDelay(): number {
+    return this.ctx.settings?.echartsUpdateDelay || 50;
+  }
+  
+  private shouldDisableAnimationsDuringInteraction(): boolean {
+    return this.ctx.settings?.disableChartAnimationsDuringInteraction !== false;
+  }
+  
+  private batchedDispatchAction(action: {type: string, name: string, legendIndex: number}): void {
+    if (!this.chart || !this.shouldBatchEChartsUpdates()) {
+      // Direct dispatch when batching disabled
+      this.chart?.dispatchAction(action);
+      return;
+    }
+    
+    // Add to batch queue
+    this.pendingChartActions.push(action);
+    
+    // Clear existing batch timeout
+    if (this.chartActionBatch) {
+      clearTimeout(this.chartActionBatch);
+    }
+    
+    // Disable animations for faster interaction
+    this.temporarilyDisableAnimations();
+    
+    const delay = this.getEChartsUpdateDelay();
+    this.LOG(`[PERF] Batching ECharts action: ${action.type} ${action.name} (${this.pendingChartActions.length} queued, ${delay}ms delay)`);
+    
+    this.chartActionBatch = setTimeout(() => {
+      this.flushChartActionBatch();
+    }, delay);
+  }
+  
+  private temporarilyDisableAnimations(): void {
+    if (!this.shouldDisableAnimationsDuringInteraction() || !this.chart) return;
+    
+    // Store original animation state only once
+    if (this.originalAnimationState === null) {
+      const currentOption = this.chart.getOption();
+      this.originalAnimationState = currentOption?.animation !== false;
+      
+      if (this.originalAnimationState) {
+        this.chart.setOption({
+          animation: false,
+          animationDuration: 0,
+          animationDurationUpdate: 0
+        });
+        this.LOG('[PERF] Disabled animations during interaction');
+      }
+    }
+  }
+  
+  private restoreAnimations(): void {
+    if (this.originalAnimationState === true && this.chart) {
+      this.chart.setOption({
+        animation: true,
+        animationDuration: this.getAnimationDuration(),
+        animationDurationUpdate: this.getAnimationUpdateDuration()
+      });
+      this.LOG('[PERF] Restored animations after interaction');
+    }
+    this.originalAnimationState = null;
+  }
+  
+  private flushChartActionBatch(): void {
+    if (!this.chart || this.pendingChartActions.length === 0) {
+      this.chartActionBatch = null;
+      return;
+    }
+    
+    const actionCount = this.pendingChartActions.length;
+    this.LOG(`[PERF] Flushing ${actionCount} batched ECharts actions`);
+    
+    // Process all batched actions
+    this.pendingChartActions.forEach(action => {
+      this.chart.dispatchAction(action);
+    });
+    
+    // Clear batch
+    this.pendingChartActions = [];
+    this.chartActionBatch = null;
+    
+    // Restore animations after a short delay
+    setTimeout(() => {
+      this.restoreAnimations();
+    }, 200);
+  }
+  
   // Check which plots/grids have visible series WITH DATA
   /* private checkPlotVisibility(legendSelected: {[key: string]: boolean}): {[plot: string]: {hasVisibleSeries: boolean, seriesNames: string[]}} {
     const plotVisibility: {[plot: string]: {hasVisibleSeries: boolean, seriesNames: string[]}} = {};
@@ -1488,6 +1646,29 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public toggleEntityVisibility(entityName: string): void {
     if (!this.ctx?.data || !this.chart) return;
     
+    this.LOG(`[PERF] Entity click: ${entityName}`);
+    
+    // Immediate UI feedback - update entity list optimistically
+    this.batchUIUpdate('entity-list', () => {
+      this.updateEntityListOptimistically(entityName);
+    });
+    
+    // Debounced core logic to avoid rapid-fire clicks
+    this.debouncedUIUpdate('entity-toggle', () => {
+      this.performEntityToggle(entityName);
+    });
+  }
+  
+  private updateEntityListOptimistically(entityName: string): void {
+    // Quick visual feedback - find and toggle the entity immediately
+    const entityIndex = this.entityList.findIndex(e => e.name === entityName);
+    if (entityIndex >= 0) {
+      this.entityList[entityIndex].visible = !this.entityList[entityIndex].visible;
+      this.ctx.detectChanges();
+    }
+  }
+  
+  private performEntityToggle(entityName: string): void {
     // Find all series keys for this entity
     const seriesKeys: string[] = [];
     
@@ -1504,7 +1685,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
     
-    // Get current visibility state from controller legend
+    // Get current visibility state from controller legend (cached to avoid multiple calls)
     const opt: any = this.chart.getOption();
     const selected = opt?.legend?.[0]?.selected || {};
     
@@ -1515,14 +1696,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const action = anyVisible ? 'legendUnSelect' : 'legendSelect';
     
     seriesKeys.forEach(key => {
-      this.chart.dispatchAction({
+      this.batchedDispatchAction({
         type: action,
         name: key,
         legendIndex: 0  // Target controller legend
       });
     });
     
-    // After toggling, check if grids need to be recalculated
+    // Optimized post-toggle processing
     setTimeout(() => {
       this.refreshEntityList();
       this.syncCustomLegendFromChart();
@@ -1533,42 +1714,46 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
       const activeSeriesKeys = Object.keys(finalSelected).filter(k => finalSelected[k] !== false);
       
-      // Create detailed debug info
-      const debugInfo = this.createDetailedVisibilityDebugInfo(finalSelected);
-      
-      // Log the detailed visibility information
-      this.LOG('[Device_Plot_Visi: ] ====== VISIBILITY REPORT after toggling "' + entityName + '" ======');
-      this.LOG('[Device_Plot_Visi: ] Summary:', debugInfo.summary);
-      
-      // First, check and report any completely hidden plots
-      const hiddenPlots: string[] = [];
-      Object.keys(debugInfo.plots).forEach(plotKey => {
-        const plot = debugInfo.plots[plotKey];
-        if (plot.allHiddenOrNoData) {
-          hiddenPlots.push(`Plot ${plot.plotNumber} (${plot.plotName})`);
+      // Conditional debug processing based on performance settings
+      if (this.shouldOptimizeClicks()) {
+        // Lightweight debug info when performance mode is enabled
+        this.LOG(`[PERF] Entity toggle completed: ${entityName}, active series: ${activeSeriesKeys.length}`);
+      } else {
+        // Full debug info only when performance optimization is disabled
+        const debugInfo = this.createDetailedVisibilityDebugInfo(finalSelected);
+        this.LOG('[Device_Plot_Visi: ] ====== VISIBILITY REPORT after toggling "' + entityName + '" ======');
+        this.LOG('[Device_Plot_Visi: ] Summary:', debugInfo.summary);
+        
+        // First, check and report any completely hidden plots
+        const hiddenPlots: string[] = [];
+        Object.keys(debugInfo.plots).forEach(plotKey => {
+          const plot = debugInfo.plots[plotKey];
+          if (plot.allHiddenOrNoData) {
+            hiddenPlots.push(`Plot ${plot.plotNumber} (${plot.plotName})`);
+          }
+        });
+        
+        if (hiddenPlots.length > 0) {
+          this.LOG('[Device_Plot_Visi: ] ⚠️  PLOTS WITH NO VISIBLE DATA (hidden or empty):');
+          hiddenPlots.forEach(plotName => {
+            this.LOG('[Device_Plot_Visi: ]     --> ' + plotName + ' has NO VISIBLE DATA');
+          });
         }
-      });
-      
-      if (hiddenPlots.length > 0) {
-        this.LOG('[Device_Plot_Visi: ] ⚠️  PLOTS WITH NO VISIBLE DATA (hidden or empty):');
-        hiddenPlots.forEach(plotName => {
-          this.LOG('[Device_Plot_Visi: ]     --> ' + plotName + ' has NO VISIBLE DATA');
+        
+        // Log each plot with its series
+        Object.keys(debugInfo.plots).forEach(plotKey => {
+          const plot = debugInfo.plots[plotKey];
+          const status = plot.allHiddenOrNoData ? '[NO DATA]' : '[HAS DATA]';
+          this.LOG(`[Device_Plot_Visi: ] Plot ${plot.plotNumber} (${plot.plotName}): ${plot.visibleWithData}/${plot.visibleSeries}/${plot.totalSeries} (with-data/visible/total) ${status}`);
+          plot.series.forEach((s: any) => {
+            const dataInfo = s.dataPoints === 0 ? ' [NO DATA]' : ` [${s.dataPoints} pts]`;
+            this.LOG(`[Device_Plot_Visi: ]     ${s.visible} ${s.name}${dataInfo}`);
+          });
         });
+        
+        this.LOG('[Device_Plot_Visi: ] Full debug object:', JSON.stringify(debugInfo, null, 2));
+        this.LOG('[Device_Plot_Visi: ] ====== END VISIBILITY REPORT ======');
       }
-      
-      // Log each plot with its series
-      Object.keys(debugInfo.plots).forEach(plotKey => {
-        const plot = debugInfo.plots[plotKey];
-        const status = plot.allHiddenOrNoData ? '[NO DATA]' : '[HAS DATA]';
-        this.LOG(`[Device_Plot_Visi: ] Plot ${plot.plotNumber} (${plot.plotName}): ${plot.visibleWithData}/${plot.visibleSeries}/${plot.totalSeries} (with-data/visible/total) ${status}`);
-        plot.series.forEach((s: any) => {
-          const dataInfo = s.dataPoints === 0 ? ' [NO DATA]' : ` [${s.dataPoints} pts]`;
-          this.LOG(`[Device_Plot_Visi: ]     ${s.visible} ${s.name}${dataInfo}`);
-        });
-      });
-      
-      this.LOG('[Device_Plot_Visi: ] Full debug object:', JSON.stringify(debugInfo, null, 2));
-      this.LOG('[Device_Plot_Visi: ] ====== END VISIBILITY REPORT ======');
       
       // NEW APPROACH: Only include series that are visible AND have data
       this.legendOverridesGrids = true;
@@ -4152,6 +4337,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private toggleAllSeriesForLabel(label: string, shouldSelect: boolean): void {
     if (!this.chart) return;
     
+    this.LOG(`[PERF] Legend click: ${label} -> ${shouldSelect ? 'select' : 'unselect'}`);
+    
+    // Optimistic UI update - legend chips are already updated by the caller
+    // This provides immediate visual feedback
+    
+    // Debounced core logic to avoid rapid-fire legend clicks
+    this.debouncedUIUpdate('legend-toggle', () => {
+      this.performLegendToggle(label, shouldSelect);
+    });
+  }
+  
+  private performLegendToggle(label: string, shouldSelect: boolean): void {
     const action = shouldSelect ? 'legendSelect' : 'legendUnSelect';
     
     // Build all controller legend keys for this label
@@ -4164,25 +4361,33 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
     }
     
-    // Dispatch actions for all matching series
+    // Dispatch actions for all matching series using batched approach
     keys.forEach(key => {
-      this.chart.dispatchAction({ 
+      this.batchedDispatchAction({ 
         type: action, 
         name: key, 
         legendIndex: 0 
       });
     });
     
-    // Re-sync UI & possibly recompute grids
+    // Optimized post-toggle processing with batched UI updates
     setTimeout(() => {
-      this.syncCustomLegendFromChart();
-      this.refreshEntityList();
+      // Batch UI updates for better performance
+      this.batchUIUpdate('legend-sync', () => {
+        this.syncCustomLegendFromChart();
+        this.refreshEntityList();
+      });
       
       // Check if grid layout needs to change
       this.legendOverridesGrids = true;
       const chartOption: any = this.chart.getOption();
       const legendSelected = (chartOption?.legend?.[0]?.selected) || {};
       const activeSeriesKeys = Object.keys(legendSelected).filter(k => legendSelected[k] !== false);
+      
+      // Lightweight logging for performance mode
+      if (this.shouldOptimizeClicks()) {
+        this.LOG(`[PERF] Legend toggle completed: ${label}, active series: ${activeSeriesKeys.length}`);
+      }
       
       const previousGridCount = this.currentGrids;
       
@@ -4192,7 +4397,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.setDataGridByNames(activeSeriesKeys);
       
       if (previousGridCount !== this.currentGrids) {
-        this.LOG(`[SCROLL] Mode transition detected: ${previousGridCount} → ${this.currentGrids} grids`);
+        this.LOG(`[SCROLL] Legend mode transition: ${previousGridCount} → ${this.currentGrids} grids`);
         this.resetGrid = true;
         this.applyScrollableHeight();
         this.onDataUpdated();

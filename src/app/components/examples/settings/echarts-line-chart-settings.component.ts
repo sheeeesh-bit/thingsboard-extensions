@@ -80,6 +80,12 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   enableDataSampling?: boolean;
   maxDataPoints?: number;
   enableProgressiveRendering?: boolean;
+  optimizeClickHandling?: boolean;
+  deferredUIUpdates?: boolean;
+  clickDebounceMs?: number;
+  batchEChartsUpdates?: boolean;
+  echartsUpdateDelay?: number;
+  disableChartAnimationsDuringInteraction?: boolean;
 }
 
 @Component({
@@ -144,7 +150,13 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       useCanvasRenderer: false,
       enableDataSampling: true,
       maxDataPoints: 10000,
-      enableProgressiveRendering: false
+      enableProgressiveRendering: false,
+      optimizeClickHandling: true,
+      deferredUIUpdates: true,
+      clickDebounceMs: 100,
+      batchEChartsUpdates: true,
+      echartsUpdateDelay: 50,
+      disableChartAnimationsDuringInteraction: true
     };
   }
 
@@ -206,7 +218,13 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       useCanvasRenderer: [settings.useCanvasRenderer || false],
       enableDataSampling: [settings.enableDataSampling !== false],
       maxDataPoints: [settings.maxDataPoints || 10000],
-      enableProgressiveRendering: [settings.enableProgressiveRendering || false]
+      enableProgressiveRendering: [settings.enableProgressiveRendering || false],
+      optimizeClickHandling: [settings.optimizeClickHandling !== false],
+      deferredUIUpdates: [settings.deferredUIUpdates !== false],
+      clickDebounceMs: [settings.clickDebounceMs || 100],
+      batchEChartsUpdates: [settings.batchEChartsUpdates !== false],
+      echartsUpdateDelay: [settings.echartsUpdateDelay || 50],
+      disableChartAnimationsDuringInteraction: [settings.disableChartAnimationsDuringInteraction !== false]
     });
   }
 

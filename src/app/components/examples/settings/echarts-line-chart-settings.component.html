@@ -403,6 +403,7 @@
       <div fxLayout="column" fxLayoutGap="16px">
         <mat-checkbox formControlName="debugOutput">Use Debug Output</mat-checkbox>
         
+        <h4 style="margin: 16px 0 8px 0; color: #333; font-size: 14px; font-weight: 500;">Page Load Performance</h4>
         <mat-checkbox formControlName="useLazyLoading">
           <div fxLayout="column">
             <span>Use Lazy Loading</span>
@@ -412,6 +413,7 @@
           </div>
         </mat-checkbox>
         
+        <h4 style="margin: 16px 0 8px 0; color: #333; font-size: 14px; font-weight: 500;">ECharts Rendering Settings</h4>
         <mat-checkbox formControlName="enableAnimations">
           <div fxLayout="column">
             <span>Enable Chart Animations</span>
@@ -450,6 +452,56 @@
             <span>Enable Progressive Rendering</span>
             <small style="color: #666; font-size: 11px;">
               Render chart progressively for very large datasets (experimental, may cause visual glitches)
+            </small>
+          </div>
+        </mat-checkbox>
+        
+        <h4 style="margin: 16px 0 8px 0; color: #333; font-size: 14px; font-weight: 500;">UI Interaction Performance</h4>
+        <mat-checkbox formControlName="optimizeClickHandling">
+          <div fxLayout="column">
+            <span>Optimize Click Handling</span>
+            <small style="color: #666; font-size: 11px;">
+              Enable debouncing and batch processing for faster entity/legend click response
+            </small>
+          </div>
+        </mat-checkbox>
+        
+        <mat-checkbox formControlName="deferredUIUpdates">
+          <div fxLayout="column">
+            <span>Deferred UI Updates</span>
+            <small style="color: #666; font-size: 11px;">
+              Batch UI updates to reduce redraws during rapid entity selections
+            </small>
+          </div>
+        </mat-checkbox>
+        
+        <mat-form-field class="mat-block" appearance="outline">
+          <mat-label>Click Debounce (ms)</mat-label>
+          <input matInput type="number" formControlName="clickDebounceMs" min="0" max="1000" step="50">
+          <mat-hint>Delay before processing clicks to avoid rapid-fire actions</mat-hint>
+        </mat-form-field>
+        
+        <h4 style="margin: 16px 0 8px 0; color: #333; font-size: 14px; font-weight: 500;">ECharts Interaction Optimization</h4>
+        <mat-checkbox formControlName="batchEChartsUpdates">
+          <div fxLayout="column">
+            <span>Batch ECharts Updates</span>
+            <small style="color: #666; font-size: 11px;">
+              Group multiple chart.dispatchAction() calls to reduce re-rendering
+            </small>
+          </div>
+        </mat-checkbox>
+        
+        <mat-form-field class="mat-block" appearance="outline">
+          <mat-label>ECharts Update Delay (ms)</mat-label>
+          <input matInput type="number" formControlName="echartsUpdateDelay" min="0" max="500" step="25">
+          <mat-hint>Delay before applying batched ECharts updates</mat-hint>
+        </mat-form-field>
+        
+        <mat-checkbox formControlName="disableChartAnimationsDuringInteraction">
+          <div fxLayout="column">
+            <span>Disable Animations During Interaction</span>
+            <small style="color: #666; font-size: 11px;">
+              Temporarily disable chart animations during legend/entity clicks for faster response
             </small>
           </div>
         </mat-checkbox>
