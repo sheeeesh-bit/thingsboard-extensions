@@ -160,7 +160,7 @@ div[fxFlex] {
   }
 }
 
-// Adjust button position based on sidebar mode
+// Adjust button position based on sidebar mode when visible
 .entity-sidebar[data-mode="compact"] ~ .sidebar-toggle-btn:not(.sidebar-hidden) {
   left: 180px;
 }
@@ -170,6 +170,15 @@ div[fxFlex] {
 }
 
 .entity-sidebar[data-mode="initials"] ~ .sidebar-toggle-btn:not(.sidebar-hidden) {
+  left: 80px;
+}
+
+// Adjust button position when sidebar is collapsed with colors/initials
+.entity-sidebar.sidebar-collapsed-colors ~ .sidebar-toggle-btn {
+  left: 60px;
+}
+
+.entity-sidebar.sidebar-collapsed-initials ~ .sidebar-toggle-btn {
   left: 80px;
 }
 
@@ -193,6 +202,26 @@ div[fxFlex] {
     transform: translateX(-240px);
     pointer-events: none;
     border-right: none;
+  }
+  
+  // Collapsed with colors mode
+  &.sidebar-collapsed-colors {
+    width: 60px;
+    
+    .entity-table,
+    .entity-table-compact {
+      display: none;
+    }
+  }
+  
+  // Collapsed with initials mode
+  &.sidebar-collapsed-initials {
+    width: 80px;
+    
+    .entity-table,
+    .entity-table-compact {
+      display: none;
+    }
   }
   
   // Adjust width based on display mode

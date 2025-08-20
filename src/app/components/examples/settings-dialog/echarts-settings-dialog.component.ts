@@ -3,6 +3,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 export interface SettingsDialogData {
   colorScheme: string;
+  sidebarCollapsedMode: 'hidden' | 'colors' | 'initials';
 }
 
 @Component({
@@ -60,6 +61,25 @@ export interface SettingsDialogData {
           </mat-radio-button>
         </mat-radio-group>
       </div>
+      
+      <div class="settings-section">
+        <h3>Sidebar Collapsed Mode</h3>
+        <p class="settings-description">Choose how the sidebar appears when collapsed</p>
+        <mat-radio-group [(ngModel)]="data.sidebarCollapsedMode" class="sidebar-mode-group">
+          <mat-radio-button value="hidden" class="sidebar-mode-option">
+            <span class="mode-label">Completely Hidden</span>
+            <span class="mode-description">Sidebar disappears completely when collapsed</span>
+          </mat-radio-button>
+          <mat-radio-button value="colors" class="sidebar-mode-option">
+            <span class="mode-label">Colors Only</span>
+            <span class="mode-description">Show only color boxes (minimal space)</span>
+          </mat-radio-button>
+          <mat-radio-button value="initials" class="sidebar-mode-option">
+            <span class="mode-label">Colors with Initials</span>
+            <span class="mode-description">Show color boxes with first 3 letters</span>
+          </mat-radio-button>
+        </mat-radio-group>
+      </div>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button (click)="onCancel()">Cancel</button>
@@ -114,6 +134,37 @@ export interface SettingsDialogData {
       height: 16px;
       border-radius: 50%;
       border: 1px solid rgba(0, 0, 0, 0.12);
+    }
+    .settings-description {
+      margin: 0 0 12px 0;
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.6);
+    }
+    .sidebar-mode-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .sidebar-mode-option {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 8px;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+    .sidebar-mode-option:hover {
+      background-color: rgba(0, 0, 0, 0.04);
+    }
+    .mode-label {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .mode-description {
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.6);
+      margin-left: 24px;
     }
   `]
 })

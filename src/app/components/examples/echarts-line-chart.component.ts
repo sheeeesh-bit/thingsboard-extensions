@@ -197,6 +197,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // Sidebar state
   public isSidebarVisible = true;
   public sidebarDisplayMode: 'full' | 'compact' | 'colors' | 'initials' = 'full';
+  public sidebarCollapsedMode: 'hidden' | 'colors' | 'initials' = 'hidden';
   
   // UI feedback states
   private lastPulsedEntity: string | null = null;
@@ -1573,12 +1574,24 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public openSettingsDialog(): void {
     const dialogRef = this.dialog.open(EchartsSettingsDialogComponent, {
       width: '500px',
-      data: { colorScheme: this.currentColorScheme }
+      data: { 
+        colorScheme: this.currentColorScheme,
+        sidebarCollapsedMode: this.sidebarCollapsedMode
+      }
     });
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
         this.changeColorScheme(result.colorScheme);
+        this.sidebarCollapsedMode = result.sidebarCollapsedMode || 'hidden';
+        // If sidebar is currently collapsed, trigger resize to apply new mode
+        if (!this.isSidebarVisible) {
+          setTimeout(() => {
+            if (this.chart && !this.chart.isDisposed()) {
+              this.chart.resize();
+            }
+          }, 300);
+        }
       }
     });
   }
