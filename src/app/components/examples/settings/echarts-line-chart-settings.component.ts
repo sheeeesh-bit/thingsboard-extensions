@@ -75,6 +75,11 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   // Debug & Performance
   debugOutput?: boolean;
   useLazyLoading?: boolean;
+  enableAnimations?: boolean;
+  useCanvasRenderer?: boolean;
+  enableDataSampling?: boolean;
+  maxDataPoints?: number;
+  enableProgressiveRendering?: boolean;
 }
 
 @Component({
@@ -134,7 +139,12 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       showCustomLegend: true,
       showZoomControls: true,
       debugOutput: false,
-      useLazyLoading: true
+      useLazyLoading: true,
+      enableAnimations: true,
+      useCanvasRenderer: false,
+      enableDataSampling: true,
+      maxDataPoints: 10000,
+      enableProgressiveRendering: false
     };
   }
 
@@ -191,7 +201,12 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       
       // Debug & Performance
       debugOutput: [settings.debugOutput],
-      useLazyLoading: [settings.useLazyLoading !== false]
+      useLazyLoading: [settings.useLazyLoading !== false],
+      enableAnimations: [settings.enableAnimations !== false],
+      useCanvasRenderer: [settings.useCanvasRenderer || false],
+      enableDataSampling: [settings.enableDataSampling !== false],
+      maxDataPoints: [settings.maxDataPoints || 10000],
+      enableProgressiveRendering: [settings.enableProgressiveRendering || false]
     });
   }
 

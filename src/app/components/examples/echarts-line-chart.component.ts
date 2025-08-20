@@ -718,10 +718,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     const myNewOptions: any = {
-      // Smart animation control based on data size
-      animation: this.totalDataPoints < 5000,
-      animationDuration: this.totalDataPoints > 2000 ? 200 : 300,
-      animationDurationUpdate: this.totalDataPoints > 2000 ? 100 : 300,
+      // Configurable animation control based on settings and data size
+      animation: this.getAnimationSettings(),
+      animationDuration: this.getAnimationDuration(),
+      animationDurationUpdate: this.getAnimationUpdateDuration(),
       animationEasing: 'cubicOut'
     };
     myNewOptions.series = [];
@@ -815,13 +815,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         symbolSize: (this.ctx.settings.symbolSize_data || 5) * 2.5,
         showSymbol: this.ctx.settings.showDataPoints && points <= 1000,
         smooth: this.ctx.settings.smooth !== false ? 0.3 : false,  // Subtle smoothing by default
-        // Performance optimizations that don't hurt responsiveness
-        sampling: points > 5000 ? 'lttb' : undefined,  // Only sample for very large datasets
-        large: points > 10000,  // Only use large mode for really big data
-        largeThreshold: 5000,
-        // Progressive rendering for massive datasets
-        progressive: points > 20000 ? 5000 : undefined,
-        progressiveThreshold: points > 20000 ? 10000 : undefined,
+        // Configurable performance optimizations
+        ...this.getDataSamplingSettings(points),
+        ...this.getProgressiveRenderingSettings(points),
         // Keep interactions responsive
         silent: !labelSelected
       };
@@ -1085,6 +1081,95 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private isInScrollingMode(): boolean {
     const scrollThreshold = this.ctx.settings?.scrollingStartsAfter || 3;
     return this.currentGrids > scrollThreshold;
+  }
+  
+  // Check if selected keys actually correspond to visible data series
+  private checkIfSelectedKeysHaveVisibleData(selectedKeys: string[]): boolean {
+    if (!this.chart || !this.ctx?.data || selectedKeys.length === 0) {
+      return false;
+    }
+    
+    // Get current legend selection state
+    const chartOption: any = this.chart.getOption();
+    const legendSelected = (chartOption?.legend?.[0]?.selected) || {};
+    
+    // Check if any selected key is both in legend and visible
+    for (const key of selectedKeys) {
+      const isSeriesVisible = legendSelected[key] !== false;
+      const seriesHasData = this.ctx.data.some(series => {
+        const seriesKey = this.buildSeriesKey(series.datasource?.entityName || '', series.dataKey.label);
+        return seriesKey === key && series.data && Array.isArray(series.data) && series.data.length > 0;
+      });
+      
+      if (isSeriesVisible && seriesHasData) {
+        return true; // Found at least one visible series with data
+      }
+    }
+    
+    return false; // No visible series with data found
+  }
+  
+  // Performance setting helpers
+  private getAnimationSettings(): boolean {
+    const enableAnimations = this.ctx.settings?.enableAnimations !== false;
+    if (!enableAnimations) {
+      this.LOG('[PERF] Animations disabled via settings');
+      return false;
+    }
+    // Smart animation based on data size when enabled
+    const smartAnimation = this.totalDataPoints < 5000;
+    this.LOG(`[PERF] Smart animations: ${smartAnimation} (${this.totalDataPoints} points)`);
+    return smartAnimation;
+  }
+  
+  private getAnimationDuration(): number {
+    const enableAnimations = this.ctx.settings?.enableAnimations !== false;
+    if (!enableAnimations) return 0;
+    return this.totalDataPoints > 2000 ? 200 : 300;
+  }
+  
+  private getAnimationUpdateDuration(): number {
+    const enableAnimations = this.ctx.settings?.enableAnimations !== false;
+    if (!enableAnimations) return 0;
+    return this.totalDataPoints > 2000 ? 100 : 300;
+  }
+  
+  private getDataSamplingSettings(points: number): { sampling?: string; large?: boolean; largeThreshold?: number } {
+    const enableDataSampling = this.ctx.settings?.enableDataSampling !== false;
+    const maxDataPoints = this.ctx.settings?.maxDataPoints || 10000;
+    
+    if (!enableDataSampling) {
+      this.LOG(`[PERF] Data sampling disabled for series with ${points} points`);
+      return {};
+    }
+    
+    const samplingConfig: any = {};
+    
+    if (points > maxDataPoints) {
+      samplingConfig.sampling = 'lttb';
+      samplingConfig.large = true;
+      samplingConfig.largeThreshold = Math.floor(maxDataPoints / 2);
+      this.LOG(`[PERF] Data sampling enabled: ${points} -> ~${samplingConfig.largeThreshold} points`);
+    } else if (points > 5000) {
+      samplingConfig.sampling = 'lttb';
+      this.LOG(`[PERF] Light sampling enabled for ${points} points`);
+    }
+    
+    return samplingConfig;
+  }
+  
+  private getProgressiveRenderingSettings(points: number): { progressive?: number; progressiveThreshold?: number } {
+    const enableProgressiveRendering = this.ctx.settings?.enableProgressiveRendering === true;
+    
+    if (!enableProgressiveRendering || points < 20000) {
+      return {};
+    }
+    
+    this.LOG(`[PERF] Progressive rendering enabled for ${points} points`);
+    return {
+      progressive: 5000,
+      progressiveThreshold: 10000
+    };
   }
   
   // Check which plots/grids have visible series WITH DATA
@@ -1540,9 +1625,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.applyScrollableHeight();
     }
     
-    // Initialize chart with proven performance settings
+    // Initialize chart with configurable performance settings
+    const useCanvasRenderer = this.ctx.settings?.useCanvasRenderer !== false; // Default to canvas for better performance
+    this.LOG(`[PERF] Using renderer: ${useCanvasRenderer ? 'canvas' : 'svg'}`);
+    
     this.chart = echarts.init(containerElement, undefined, {
-      renderer: 'canvas',
+      renderer: useCanvasRenderer ? 'canvas' : 'svg',
       useDirtyRect: true  // Dirty rect rendering for selective updates
     });
     this.LOG('[ECharts Line Chart] Chart instance created:', !!this.chart);
@@ -3098,10 +3186,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
     
-    // Clear no data flag and mark that we've received data
-    this.hasNoVisibleData = false;
-    this.hasReceivedData = true;
-    this.isInitialLoad = false;
+    // Only clear no data flag if we actually have visible data
+    // Check if any of the selected keys correspond to visible series
+    const hasActuallyVisibleData = this.checkIfSelectedKeysHaveVisibleData(selectedKeys);
+    this.hasNoVisibleData = !hasActuallyVisibleData;
+    
+    if (hasActuallyVisibleData) {
+      this.hasReceivedData = true;
+      this.isInitialLoad = false;
+    }
     
     // Get unique axis assignments from selected series
     const selectedGrids = this.checkDataGridByName(selectedKeys);
