@@ -52,6 +52,22 @@
           </mat-select>
         </mat-form-field>
         
+        <h4>Entity Display Names</h4>
+        <mat-form-field class="mat-block" appearance="outline">
+          <mat-label>Entity Name Attribute</mat-label>
+          <mat-select formControlName="entityDisplayAttribute">
+            <mat-option value="label">Label (SERVER_SCOPE)</mat-option>
+            <mat-option value="deviceName">Device Name (SERVER_SCOPE)</mat-option>
+            <mat-option value="name">Entity Name (default)</mat-option>
+            <mat-option value="custom">Custom Attribute</mat-option>
+          </mat-select>
+        </mat-form-field>
+        
+        <mat-form-field class="mat-block" appearance="outline" *ngIf="echartsLineChartSettingsForm.get('entityDisplayAttribute')?.value === 'custom'">
+          <mat-label>Custom Attribute Name</mat-label>
+          <input matInput formControlName="customEntityAttribute" placeholder="e.g., displayName">
+        </mat-form-field>
+        
         <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px;">
           <p style="margin: 8px 0;"><strong>Layout Options:</strong></p>
           <ul style="margin: 4px 0; padding-left: 20px;">

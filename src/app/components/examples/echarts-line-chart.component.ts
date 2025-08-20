@@ -195,7 +195,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private originalAnimationState: boolean | null = null;
   
   // Sidebar state
-  public isSidebarCollapsed = false;
+  public isSidebarVisible = true;
   
   // UI feedback states
   private lastPulsedEntity: string | null = null;
@@ -220,8 +220,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // Toggle sidebar visibility
   public toggleSidebar(): void {
-    this.isSidebarCollapsed = !this.isSidebarCollapsed;
-    this.LOG(`[SIDEBAR] Sidebar ${this.isSidebarCollapsed ? 'collapsed' : 'expanded'}`);
+    this.isSidebarVisible = !this.isSidebarVisible;
+    this.LOG(`[SIDEBAR] Sidebar ${this.isSidebarVisible ? 'shown' : 'hidden'}`);
     
     // Trigger chart resize after animation
     setTimeout(() => {
@@ -1644,136 +1644,124 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return { data, selected };
   }
   
-  // Get display name for entity (deviceName attribute or fallback to entity name)  
+  // Get display name for entity based on configured attribute
   private getEntityDisplayName(entityName: string): string {
     // Check cache first
     if (this.entityDisplayNameCache.has(entityName)) {
       return this.entityDisplayNameCache.get(entityName)!;
     }
     
-    // Try to get deviceName from entity data
+    // Get the configured attribute to display
+    const displayAttribute = this.ctx.settings?.entityDisplayAttribute || 'label';
+    const customAttribute = this.ctx.settings?.customEntityAttribute;
+    
+    // Determine which attribute to look for
+    let attributeToFind = displayAttribute;
+    if (displayAttribute === 'custom' && customAttribute) {
+      attributeToFind = customAttribute;
+    } else if (displayAttribute === 'name') {
+      // Return entity name directly
+      this.entityDisplayNameCache.set(entityName, entityName);
+      return entityName;
+    }
+    
     try {
-      const entityData = this.ctx?.data?.find(d => d.datasource?.entityName === entityName);
-      if (!entityData) {
-        this.LOG(`[DEVICE_NAME] No entity data found for: ${entityName}`);
-        return entityName;
-      }
-
-      const entity = entityData.datasource?.entity;
-      const entityId = entityData.datasource?.entityId;
-      const entityType = entityData.datasource?.entityType;
+      // Find the entity data from context
+      let entity: any = null;
+      let entityData: any = null;
       
-      this.LOG(`[DEVICE_NAME] Processing entity: ${entityName}, ID: ${entityId}, Type: ${entityType}`);
-      
-      // Method 1: Check if deviceName is already in the datasource's resolved attributes
-      if (entityData.datasource?.resolvedAttributes) {
-        const attrs = entityData.datasource.resolvedAttributes;
-        this.LOG(`[DEVICE_NAME] Checking resolved attributes:`, attrs);
-        
-        if (attrs.deviceName) {
-          this.LOG(`[DEVICE_NAME] Found deviceName in resolved attributes: ${attrs.deviceName}`);
-          return attrs.deviceName;
+      // Check in ctx.data
+      for (const series of this.ctx.data) {
+        if (series.datasource?.entityName === entityName) {
+          entityData = series;
+          entity = series.datasource?.entity;
+          break;
         }
       }
       
-      // Method 2: Check if attributes are in the datasource directly
-      if (entityData.datasource) {
-        const ds = entityData.datasource as any;
-        this.LOG(`[DEVICE_NAME] Checking datasource properties:`, Object.keys(ds));
-        
-        // Check for deviceName in various locations
-        if (ds.deviceName) {
-          this.LOG(`[DEVICE_NAME] Found deviceName directly in datasource: ${ds.deviceName}`);
-          return ds.deviceName;
-        }
-        
-        if (ds.attributes?.deviceName) {
-          this.LOG(`[DEVICE_NAME] Found deviceName in datasource.attributes: ${ds.attributes.deviceName}`);
-          return ds.attributes.deviceName;
-        }
-        
-        if (ds.serverAttributes?.deviceName) {
-          this.LOG(`[DEVICE_NAME] Found deviceName in datasource.serverAttributes: ${ds.serverAttributes.deviceName}`);
-          return ds.serverAttributes.deviceName;
-        }
-      }
-      
-      // Method 3: Check the entity object itself
+      // Method 1: Check the entity object itself
       if (entity) {
-        this.LOG(`[DEVICE_NAME] Checking entity object:`, entity);
-        
-        // Try entity label first (commonly used for display names)
-        if (entity.label && entity.label !== entity.name && entity.label.trim() !== '') {
-          this.LOG(`[DEVICE_NAME] Using entity label: ${entity.label}`);
-          return entity.label;
-        }
-        
-        // Check additionalInfo
         const entityObj = entity as any;
-        if (entityObj.additionalInfo) {
-          this.LOG(`[DEVICE_NAME] Checking additionalInfo:`, entityObj.additionalInfo);
-          
-          if (entityObj.additionalInfo.deviceName) {
-            this.LOG(`[DEVICE_NAME] Found deviceName in additionalInfo: ${entityObj.additionalInfo.deviceName}`);
-            return entityObj.additionalInfo.deviceName;
-          }
-          
-          if (entityObj.additionalInfo.description) {
-            this.LOG(`[DEVICE_NAME] Using description as fallback: ${entityObj.additionalInfo.description}`);
-            return entityObj.additionalInfo.description;
-          }
-        }
-      }
-      
-      // Method 4: Check if the widget context has attribute data
-      if (this.ctx.$scope?.deviceAttributes) {
-        const deviceAttrs = this.ctx.$scope.deviceAttributes[entityId];
-        this.LOG(`[DEVICE_NAME] Checking $scope.deviceAttributes for ${entityId}:`, deviceAttrs);
         
-        if (deviceAttrs?.deviceName) {
-          this.LOG(`[DEVICE_NAME] Found deviceName in $scope.deviceAttributes: ${deviceAttrs.deviceName}`);
-          return deviceAttrs.deviceName;
+        // Check for label attribute
+        if (attributeToFind === 'label' && entityObj.label && entityObj.label.trim() !== '') {
+          this.LOG(`[ENTITY_DISPLAY] Found label: ${entityObj.label}`);
+          this.entityDisplayNameCache.set(entityName, entityObj.label);
+          return entityObj.label;
+        }
+        
+        // Check additionalInfo for any attribute
+        if (entityObj.additionalInfo) {
+          const value = entityObj.additionalInfo[attributeToFind];
+          if (value) {
+            this.LOG(`[ENTITY_DISPLAY] Found ${attributeToFind} in additionalInfo: ${value}`);
+            this.entityDisplayNameCache.set(entityName, value);
+            return value;
+          }
         }
       }
       
-      // Method 5: Check data subscription attributes
+      // Method 2: Check datasource attributes
+      if (entityData?.datasource) {
+        const ds = entityData.datasource as any;
+        
+        // Check various locations for the attribute
+        const locations = [
+          { path: ds[attributeToFind], name: 'direct' },
+          { path: ds.attributes?.[attributeToFind], name: 'attributes' },
+          { path: ds.serverAttributes?.[attributeToFind], name: 'serverAttributes' },
+          { path: ds.resolvedAttributes?.[attributeToFind], name: 'resolvedAttributes' }
+        ];
+        
+        for (const loc of locations) {
+          if (loc.path) {
+            const value = typeof loc.path === 'object' ? loc.path.value : loc.path;
+            if (value) {
+              this.LOG(`[ENTITY_DISPLAY] Found ${attributeToFind} in datasource.${loc.name}: ${value}`);
+              this.entityDisplayNameCache.set(entityName, value);
+              return value;
+            }
+          }
+        }
+      }
+      
+      // Method 3: Check datasources array
       if (this.ctx.datasources) {
         for (const ds of this.ctx.datasources) {
           if (ds.entityName === entityName) {
-            this.LOG(`[DEVICE_NAME] Found matching datasource, checking attributes:`, ds);
-            
-            // Check various attribute locations in the datasource
             const dsAny = ds as any;
-            if (dsAny.attributes?.deviceName?.value) {
-              this.LOG(`[DEVICE_NAME] Found deviceName in datasource attributes: ${dsAny.attributes.deviceName.value}`);
-              return dsAny.attributes.deviceName.value;
-            }
             
-            if (dsAny.latestValues?.deviceName) {
-              this.LOG(`[DEVICE_NAME] Found deviceName in latestValues: ${dsAny.latestValues.deviceName}`);
-              return dsAny.latestValues.deviceName;
+            // Check for the attribute in various locations
+            const value = dsAny.attributes?.[attributeToFind]?.value || 
+                         dsAny.latestValues?.[attributeToFind] ||
+                         dsAny[attributeToFind];
+                         
+            if (value) {
+              this.LOG(`[ENTITY_DISPLAY] Found ${attributeToFind} in datasources: ${value}`);
+              this.entityDisplayNameCache.set(entityName, value);
+              return value;
             }
           }
         }
       }
       
     } catch (error) {
-      this.LOG(`[DEVICE_NAME] Error getting display name for ${entityName}:`, error);
+      this.LOG(`[ENTITY_DISPLAY] Error getting display name for ${entityName}:`, error);
     }
     
-    this.LOG(`[DEVICE_NAME] Using fallback entity name: ${entityName}`);
+    this.LOG(`[ENTITY_DISPLAY] Using fallback entity name: ${entityName}`);
     
     // Cache the fallback value for now
     this.entityDisplayNameCache.set(entityName, entityName);
     
     // Try to fetch the attribute asynchronously for next time
-    this.fetchEntityDeviceName(entityName);
+    this.fetchEntityAttribute(entityName, attributeToFind);
     
     return entityName;
   }
   
-  // Fetch deviceName attribute from ThingsBoard server
-  private async fetchEntityDeviceName(entityName: string): Promise<void> {
+  // Fetch entity attribute from ThingsBoard server
+  private async fetchEntityAttribute(entityName: string, attributeName: string): Promise<void> {
     try {
       const entityData = this.ctx?.data?.find(d => d.datasource?.entityName === entityName);
       if (!entityData) return;
@@ -1814,7 +1802,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         return;
       }
       
-      this.LOG(`[DEVICE_NAME] Fetching SERVER_SCOPE attributes for ${entityName} (${entityId})`);
+      this.LOG(`[ENTITY_DISPLAY] Fetching SERVER_SCOPE attribute '${attributeName}' for ${entityName} (${entityId})`);
       
       // Fetch SERVER_SCOPE attributes
       // Note: The API might expect an entity object, not just the type
@@ -1822,28 +1810,32 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const attributes = await this.ctx.attributeService.getEntityAttributes(
         entityObj as any,
         'SERVER_SCOPE' as any,
-        ['deviceName', 'label', 'description']
+        [attributeName, 'label', 'deviceName']  // Try to fetch the requested attribute plus fallbacks
       ).toPromise();
       
-      this.LOG(`[DEVICE_NAME] Fetched attributes for ${entityName}:`, attributes);
+      this.LOG(`[ENTITY_DISPLAY] Fetched attributes for ${entityName}:`, attributes);
       
-      // Find deviceName attribute
+      // Find the requested attribute
       let displayName = entityName;
       
       if (attributes && Array.isArray(attributes)) {
-        const deviceNameAttr = attributes.find(attr => attr.key === 'deviceName');
-        const labelAttr = attributes.find(attr => attr.key === 'label');
-        const descAttr = attributes.find(attr => attr.key === 'description');
-        
-        if (deviceNameAttr?.value) {
-          displayName = deviceNameAttr.value;
-          this.LOG(`[DEVICE_NAME] Found deviceName attribute: ${displayName}`);
-        } else if (labelAttr?.value) {
-          displayName = labelAttr.value;
-          this.LOG(`[DEVICE_NAME] Using label attribute: ${displayName}`);
-        } else if (descAttr?.value) {
-          displayName = descAttr.value;
-          this.LOG(`[DEVICE_NAME] Using description attribute: ${displayName}`);
+        // First try to find the requested attribute
+        const requestedAttr = attributes.find(attr => attr.key === attributeName);
+        if (requestedAttr?.value) {
+          displayName = requestedAttr.value;
+          this.LOG(`[ENTITY_DISPLAY] Found ${attributeName} attribute: ${displayName}`);
+        } else {
+          // Fallback to other attributes
+          const labelAttr = attributes.find(attr => attr.key === 'label');
+          const deviceNameAttr = attributes.find(attr => attr.key === 'deviceName');
+          
+          if (labelAttr?.value) {
+            displayName = labelAttr.value;
+            this.LOG(`[ENTITY_DISPLAY] Using fallback label attribute: ${displayName}`);
+          } else if (deviceNameAttr?.value) {
+            displayName = deviceNameAttr.value;
+            this.LOG(`[ENTITY_DISPLAY] Using fallback deviceName attribute: ${displayName}`);
+          }
         }
       }
       

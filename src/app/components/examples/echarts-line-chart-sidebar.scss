@@ -1,0 +1,76 @@
+// Modern sidebar toggle styles
+.echarts-layout {
+  position: relative;
+}
+
+// Sidebar styles
+.entity-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 100%;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: left;
+  
+  &.sidebar-hidden {
+    width: 0;
+    opacity: 0;
+    transform: translateX(-240px);
+    pointer-events: none;
+    border-right: none;
+  }
+}
+
+// Sidebar toggle button (ChatGPT style)
+.sidebar-toggle-btn {
+  position: absolute;
+  left: 240px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 100;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  padding: 12px 4px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+  
+  &:hover {
+    background: #f8f9fa;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.12);
+    padding-right: 6px;
+  }
+  
+  .material-icons {
+    font-size: 18px;
+    color: #5f6368;
+    display: block;
+    transition: transform 0.3s ease;
+  }
+  
+  &:hover .material-icons {
+    transform: scale(1.1);
+  }
+}
+
+// Adjust button position when sidebar is hidden
+.entity-sidebar.sidebar-hidden ~ .sidebar-toggle-btn {
+  left: 0;
+  border-left: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 0 8px 8px 0;
+}
+
+// Alternative: use container query if supported
+@container (max-width: 100px) {
+  .sidebar-toggle-btn {
+    left: 0;
+  }
+}

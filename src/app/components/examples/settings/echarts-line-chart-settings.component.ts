@@ -14,6 +14,10 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   yAxisLabelLines?: 1 | 2 | 3;  // Number of lines for Y-axis labels
   colorScheme?: 'default' | 'dark' | 'vibrant' | 'pastel' | 'monochrome';
   
+  // Entity Display Settings
+  entityDisplayAttribute?: 'label' | 'deviceName' | 'name' | 'custom';  // Which attribute to show for entities
+  customEntityAttribute?: string;  // Custom attribute name if 'custom' is selected
+  
   // Y-Axis Settings
   yAxisLeftTitle?: string;
   yAxisLeftUnit?: string;
@@ -111,6 +115,8 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       legendcolortext: '#000000',
       yAxisLabelLines: 3,  // Default to 3 lines
       colorScheme: 'default',
+      entityDisplayAttribute: 'label',  // Default to label attribute
+      customEntityAttribute: '',
       yAxisLeftTitle: '',
       yAxisLeftUnit: 'ml',
       yAxisLeftAutoScale: true,
@@ -169,6 +175,10 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       // Design Settings
       yAxisLabelLines: [settings.yAxisLabelLines || 3],
       colorScheme: [settings.colorScheme || 'default'],
+      
+      // Entity Display Settings
+      entityDisplayAttribute: [settings.entityDisplayAttribute || 'label'],
+      customEntityAttribute: [settings.customEntityAttribute || ''],
       
       // Graph Settings
       smooth: [settings.smooth],
