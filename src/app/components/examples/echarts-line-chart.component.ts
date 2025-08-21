@@ -408,11 +408,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private initializeImmediate(): void {
     // Set initial legend padding to prevent cutoff on first render
     // This ensures the CSS custom properties are set before the legend renders
-    const initialLeftMargin = this.currentSize === 'small' ? 15 : 13;
-    const sidebarAdjustment = (this.isSidebarVisible && this.ctx.settings?.showEntitySidebar !== false) ? 5 : 0;
-    const leftMargin = `${initialLeftMargin + sidebarAdjustment}%`;
-    const rightMargin = '1%';
-    this.syncLegendToGridMargins(leftMargin, rightMargin);
+    const margins = this.getPlotMargins();
+    this.syncLegendToGridMargins(margins.left, margins.right);
     
     // Delay initialization to ensure layout is complete
     setTimeout(() => {
@@ -984,6 +981,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const legendH = this.getLegendPx(); // floating
     const zoomH = this.getZoomPx();   // floating
 
+    // Expose heights as CSS custom properties for sidebar alignment
+    if (outer) {
+      outer.style.setProperty('--legend-height', `${legendH}px`);
+      outer.style.setProperty('--zoom-height', `${zoomH}px`);
+    }
+
     const viewport = Math.max(0, this.ctx.height - buttonBarHeight - legendH - zoomH);
 
     // Scale plot canvas by grid count (scroll only the canvas area)
@@ -1009,7 +1012,26 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private pxToPct(px: number): number {
     const el = this.chartContainer?.nativeElement?.querySelector('#echartContainer') as HTMLElement;
     const h = el?.clientHeight || this.ctx.height || 0;
-    return h ? (px / h) * 100 : 0;
+    // Round to 0.01% to avoid fractional pixel issues
+    return h ? Math.round((px / h) * 10000) / 100 : 0;
+  }
+  
+  // Unified helper for consistent plot margins across all modes
+  private getPlotMargins(): { left: string; right: string } {
+    const isScrollable = this.currentGrids > (this.ctx.settings?.scrollingStartsAfter || 3);
+    
+    // Use consistent base margins
+    const baseLeftMargin = isScrollable ? 
+      (this.currentSize === 'small' ? 12 : 10) :
+      (this.currentSize === 'small' ? 15 : 13);
+    
+    // Add sidebar adjustment if visible
+    const sidebarAdjustment = (this.isSidebarVisible && this.ctx.settings?.showEntitySidebar !== false) ? 5 : 0;
+    
+    return {
+      left: `${baseLeftMargin + sidebarAdjustment}%`,
+      right: '1%'
+    };
   }
 
   // Get the gap between grids as a percentage, converted from pixels
@@ -3400,15 +3422,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('currentGridArray called with currentGrids:', this.currentGrids, 'currentSize:', this.currentSize);
     let gridArray = [];
     
-    // Determine margins based on size and sidebar visibility
-    // Add extra margin when sidebar is visible to prevent Y-axis labels from clipping
-    const baseLeftMargin = this.currentSize === 'small' ? 15 : 13;
-    const sidebarAdjustment = (this.isSidebarVisible && this.ctx.settings?.showEntitySidebar !== false) ? 5 : 0;
-    const leftMargin = `${baseLeftMargin + sidebarAdjustment}%`;
-    const rightMargin = '1%';
+    // Use unified margins for consistency
+    const margins = this.getPlotMargins();
     
     // Sync legend overlay to use same margins as grids
-    this.syncLegendToGridMargins(leftMargin, rightMargin);
+    this.syncLegendToGridMargins(margins.left, margins.right);
     
     // Use scrolling threshold from settings to determine layout type
     const scrollThreshold = this.ctx.settings?.scrollingStartsAfter || 3;
@@ -3442,8 +3460,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         grids.push({
           id: i === 0 ? 'main' : `sub${i}`,
           top: `${topPosition}%`,
-          left: leftMargin,
-          right: rightMargin,
+          left: margins.left,
+          right: margins.right,
           height: `${gridHeight}%`
         });
       }
@@ -3457,11 +3475,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   private calculateScrollableGrids(numGrids: number): any[] {
     const grids = [];
-    // Add extra margin when sidebar is visible to prevent Y-axis labels from clipping
-    const baseLeftMargin = this.currentSize === 'small' ? 12 : 10;
-    const sidebarAdjustment = (this.isSidebarVisible && this.ctx.settings?.showEntitySidebar !== false) ? 5 : 0;
-    const leftMargin = `${baseLeftMargin + sidebarAdjustment}%`;
-    const rightMargin = '1%';
+    // Use unified margins for consistency
+    const margins = this.getPlotMargins();
     
     // [CLAUDE] Use dynamic top reserve based on actual legend height
     const topReserved = this.getTopReservePct();
@@ -3488,8 +3503,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const grid: any = {
         id: i === 0 ? 'main' : `sub${i}`,
         top: `${topPosition}%`,
-        left: leftMargin,
-        right: rightMargin,
+        left: margins.left,
+        right: margins.right,
         height: `${gridHeight}%`
       };
       

@@ -196,8 +196,9 @@ div[fxFlex] {
   .sidebar-header {
     position: sticky;
     top: 0;
-    height: 48px;
-    min-height: 48px;
+    // Use the same height as legend overlay from CSS custom property
+    height: var(--legend-height, 48px);
+    min-height: var(--legend-height, 48px);
     display: flex;
     align-items: center;
     justify-content: center;
