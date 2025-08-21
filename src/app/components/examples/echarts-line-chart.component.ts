@@ -229,12 +229,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.isSidebarVisible = !this.isSidebarVisible;
     this.LOG(`[SIDEBAR] Sidebar ${this.isSidebarVisible ? 'shown' : 'hidden'}`);
     
-    // Trigger chart resize after animation
+    // Update grid margins immediately
+    this.onDataUpdated();
+    
+    // Trigger chart resize and legend recalculation after animation
     setTimeout(() => {
       if (this.chart && !this.chart.isDisposed()) {
         this.chart.resize();
         this.LOG('[SIDEBAR] Chart resized after sidebar toggle');
       }
+      
+      // Recalculate legend pagination with new width
+      this.calculateItemsPerPage();
+      this.ctx.detectChanges();
     }, 300); // Wait for CSS transition
   }
 
@@ -4598,12 +4605,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const paddingLeft = parseFloat(overlayStyle.paddingLeft) || 0;
       const paddingRight = parseFloat(overlayStyle.paddingRight) || 0;
       
+      // Account for the extra margin we added for sidebar
+      const sidebarExtraMargin = (this.isSidebarVisible && this.ctx.settings?.showEntitySidebar !== false) ? 
+        viewportWidth * 0.05 : 0; // 5% extra margin when sidebar is visible
+      
       // If paddings seem too small (< 10px total), it might mean percentages haven't resolved
       if (paddingLeft + paddingRight < 10) {
         // Apply a safety margin to prevent clipping
-        const safetyMargin = viewportWidth * 0.15; // 15% safety margin
+        const safetyMargin = viewportWidth * 0.15 + sidebarExtraMargin; 
         viewportWidth = viewportWidth - safetyMargin;
         this.LOG(`Applied safety margin during transition: effective width = ${viewportWidth}`);
+      } else {
+        // Subtract sidebar extra margin from available width
+        viewportWidth = viewportWidth - sidebarExtraMargin;
       }
     }
     
