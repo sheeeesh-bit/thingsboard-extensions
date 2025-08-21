@@ -2009,10 +2009,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.calculateDynamicSidebarWidth();
     
     this.ctx.detectChanges();
+    
+    // Recalculate legend pagination after entity list updates
+    // This is important for initial load when labels are fetched
+    setTimeout(() => {
+      this.calculateItemsPerPage();
+      this.ctx.detectChanges();
+    }, 150);
   }
   
   // Calculate sidebar width based on longest entity name
   private calculateDynamicSidebarWidth(): void {
+    const previousWidth = this.sidebarWidth;
+    
     if (!this.entityList || this.entityList.length === 0) {
       this.sidebarWidth = 240; // Default width
       return;
@@ -2041,6 +2050,22 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.sidebarWidth = Math.min(Math.max(calculatedWidth, minWidth), maxAllowedWidth);
     
     this.LOG(`[SIDEBAR] Calculated width: ${calculatedWidth}px, Final width: ${this.sidebarWidth}px (max: ${maxAllowedWidth}px)`);
+    
+    // If sidebar width changed, recalculate legend pagination
+    if (previousWidth !== this.sidebarWidth && this.isSidebarVisible) {
+      this.LOG(`[SIDEBAR] Width changed from ${previousWidth}px to ${this.sidebarWidth}px, recalculating legend`);
+      
+      // Update chart grids with new margins
+      if (this.chart && !this.chart.isDisposed()) {
+        this.onDataUpdated();
+      }
+      
+      // Recalculate legend pagination after a short delay for DOM update
+      setTimeout(() => {
+        this.calculateItemsPerPage();
+        this.ctx.detectChanges();
+      }, 100);
+    }
   }
   
   // Toggle visibility for all series of an entity
