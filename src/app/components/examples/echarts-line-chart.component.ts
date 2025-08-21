@@ -1822,14 +1822,21 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         this.minMaxLineWidth = result.minMaxLineWidth;
         
         // Update alarm settings
+        const wasAlarmVisible = this.alarmStatusVisible;
         this.alarmStatusVisible = result.alarmStatusVisible;
         this.alarmOpacity = result.alarmOpacity;
         this.alarmShowCritical = result.alarmShowCritical;
         this.alarmShowWarning = result.alarmShowWarning;
         this.alarmShowInfo = result.alarmShowInfo;
         
-        // Re-render chart with new settings
-        this.onDataUpdated();
+        // If alarm status was just enabled and we don't have alarm data, fetch it
+        if (this.alarmStatusVisible && !wasAlarmVisible && !this.alarmData && !this.alarmFetchPromise) {
+          this.LOG('[Settings] Alarm status enabled - fetching alarm data');
+          this.alarmFetchPromise = this.fetchAlarmsForDevices();
+        } else {
+          // Re-render chart with new settings
+          this.onDataUpdated();
+        }
         
         // If sidebar is currently collapsed, trigger resize to apply new mode
         if (!this.isSidebarVisible) {
@@ -5401,7 +5408,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
    * Add min/max reference lines showing global min/max across ALL devices
    */
   private addMinMaxLines(options: any): void {
-    if (!options.series?.length || !this.minMaxVisible) return;
+    this.LOG(`[Min/Max] Adding min/max lines - visible: ${this.minMaxVisible}, series count: ${options.series?.length}`);
+    if (!options.series?.length || !this.minMaxVisible) {
+      this.LOG(`[Min/Max] Skipping - visible: ${this.minMaxVisible}, has series: ${!!options.series?.length}`);
+      return;
+    }
     
     // Find base series with data for time domain
     const baseSeries = options.series.find((s: any) => s.data?.length && !/Min Line|Max Line|Alarm Area/.test(s.name));
@@ -5433,7 +5444,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Calculate GLOBAL min/max across ALL devices
     const { min, max } = this.calcGlobalMinMax(options.series, visibleRange);
     
-    this.LOG(`Global Min/Max: min=${min}, max=${max}`);
+    this.LOG(`[Min/Max] Global values calculated: min=${min}, max=${max}`);
+    this.LOG(`[Min/Max] Line style: ${this.minMaxStyle}, color: ${this.minMaxColor}, width: ${this.minMaxLineWidth}`);
     
     // Determine which grids to show the lines on
     const gridsToUse = new Set<number>();
@@ -5444,6 +5456,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     });
     
     // Add min/max lines to each active grid showing the SAME global values
+    this.LOG(`[Min/Max] Adding lines to ${gridsToUse.size} grids`);
     gridsToUse.forEach(gridIndex => {
       // Min line
       options.series.push({
@@ -5487,6 +5500,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         tooltip: { show: false }
       });
     });
+    
+    // Log how many min/max series were added
+    const minMaxSeriesCount = options.series.filter((s: any) => /Min Line|Max Line/.test(s.name)).length;
+    this.LOG(`[Min/Max] Added ${minMaxSeriesCount} min/max line series to chart`);
   }
   
   /**
@@ -5567,7 +5584,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
    * Add alarm overlay areas showing ALL device thresholds
    */
   private addAlarmAreas(options: any): void {
-    if (!this.alarmStatusVisible || !this.alarmData?.size || !options.series?.length) return;
+    this.LOG(`[Alarms] Adding alarm areas - visible: ${this.alarmStatusVisible}, has data: ${!!this.alarmData?.size}, series: ${options.series?.length}`);
+    if (!this.alarmStatusVisible || !this.alarmData?.size || !options.series?.length) {
+      this.LOG(`[Alarms] Skipping - visible: ${this.alarmStatusVisible}, has alarm data: ${!!this.alarmData?.size}`);
+      return;
+    }
     
     // Find base series for time domain
     const baseSeries = options.series.find((s: any) => s.data?.length && !/Min Line|Max Line|Alarm Area/.test(s.name));
