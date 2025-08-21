@@ -155,6 +155,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // ThingsBoard example properties
   private DEBUG = true;
+  private PERF_DEBUG = false; // Independent performance logging
   private CHART_VERSION = "1.2";
   private currentConfig: any;
   private containerHeightLimit = [1000, 1200];
@@ -279,6 +280,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Initialize debug output first
     this.DEBUG = this.ctx.settings.debugOutput;
+    this.PERF_DEBUG = this.ctx.settings.performanceDebug !== false; // Default enabled
     
     // Log data series details
     this.LOG('=== DATA SERIES ANALYSIS ===');
@@ -653,10 +655,21 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.hoveredGridIndex = null;
     
     // Count total data points for optimization decisions
+    const dataCountStart = performance.now();
     this.totalDataPoints = this.ctx.data?.reduce((sum, series) => 
       sum + (series.data?.length || 0), 0) || 0;
+    const dataCountDuration = performance.now() - dataCountStart;
     
     this.LOG('Total data points:', this.totalDataPoints);
+    this.PERF_LOG(`📊 Data point counting: ${dataCountDuration.toFixed(2)}ms (${this.totalDataPoints} points, ${this.ctx.data?.length || 0} series)`);
+    
+    // Performance threshold warnings
+    if (this.totalDataPoints > 10000) {
+      this.PERF_LOG(`⚠️  Large dataset detected: ${this.totalDataPoints} points - using optimizations`);
+    }
+    if (this.totalDataPoints > 50000) {
+      this.PERF_LOG(`🚨 Very large dataset: ${this.totalDataPoints} points - aggressive optimization needed`);
+    }
     
     // Process update immediately
     // Clear legend override if this is fresh data from ThingsBoard
@@ -935,15 +948,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // Use scheduled updates for large datasets to prevent INP issues
       const shouldCoalesce = this.ctx.settings?.coalesceRapidUpdates !== false;
       if (shouldCoalesce && this.totalDataPoints > 1000) {
-        this.LOG(`[PERF] Scheduling coalesced update for ${this.totalDataPoints} data points`);
+        this.PERF_LOG(`🚀 Using coalesced updates for ${this.totalDataPoints} data points`);
         this.scheduleDataUpdate(myNewOptions);
       } else {
         // Use incremental updates with lazyUpdate for better performance
+        const updateStart = performance.now();
         this.chart.setOption(myNewOptions, { 
           notMerge: false, 
           lazyUpdate: true,
           replaceMerge: ['series']  // Only replace series data
         });
+        const updateDuration = performance.now() - updateStart;
+        this.PERF_LOG(`⚡ Direct ECharts update took: ${updateDuration.toFixed(2)}ms (${this.totalDataPoints} points)`);
       }
     }
     
@@ -969,6 +985,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public onResize(): void {
     this.LOG("ONRESIZE!!!");
     this.LOG(`[HEIGHT DEBUG] onResize triggered - ctx.height: ${this.ctx.height}, ctx.width: ${this.ctx.width}`);
+    this.PERF_LOG(`🔄 Resize event triggered - ${this.ctx.width}x${this.ctx.height}`);
     
     // Debounce resize to prevent thrashing
     if (this.resizeDebounceTimer) {
@@ -981,7 +998,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
       if (this.chart) {
         this.LOG(`[HEIGHT DEBUG] Calling chart.resize()`);
+        const resizeStart = performance.now();
         this.chart.resize();
+        const resizeDuration = performance.now() - resizeStart;
+        this.PERF_LOG(`📏 ECharts resize took: ${resizeDuration.toFixed(2)}ms`);
       }
       
       const oldSize = this.currentSize;
@@ -1357,8 +1377,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private scheduleDataUpdate(options: any): void {
     // Coalesce rapid updates to prevent jank
     this.pendingDataUpdates.push(options);
+    this.PERF_LOG('📊 Scheduling data update, queue size:', this.pendingDataUpdates.length);
     
     if (this.rafId) {
+      this.PERF_LOG('🔄 Update already scheduled, coalescing...');
       return; // Update already scheduled
     }
     
@@ -1375,9 +1397,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
     this.isUpdating = true;
     const now = performance.now();
+    const timeSinceLastUpdate = now - this.lastUpdateTime;
+    
+    this.PERF_LOG(`⏱️  Processing ${this.pendingDataUpdates.length} coalesced updates`);
+    this.PERF_LOG(`🕐 Time since last update: ${timeSinceLastUpdate.toFixed(2)}ms`);
     
     // If we're updating too frequently, defer to prevent jank
-    if (now - this.lastUpdateTime < 16) { // 60fps throttle
+    if (timeSinceLastUpdate < 16) { // 60fps throttle
+      this.PERF_LOG('⚡ Rate limiting: deferring update (60fps throttle)');
       this.rafId = requestAnimationFrame(() => {
         this.processCoalescedUpdates();
         this.rafId = null;
@@ -1386,21 +1413,36 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
 
     // Use the latest update options (discard older ones)
+    const discardedUpdates = this.pendingDataUpdates.length - 1;
     const latestOptions = this.pendingDataUpdates[this.pendingDataUpdates.length - 1];
     this.pendingDataUpdates.length = 0;
 
+    if (discardedUpdates > 0) {
+      this.PERF_LOG(`🗑️  Discarded ${discardedUpdates} older updates (coalescing)`);
+    }
+
     // Apply the update with minimal work
     if (this.chart && !this.chart.isDisposed()) {
+      const updateStart = performance.now();
       this.chart.setOption(latestOptions, { 
         notMerge: false, 
         lazyUpdate: true,
         replaceMerge: ['series'],
         silent: true  // Prevent events during update
       });
+      const updateDuration = performance.now() - updateStart;
+      this.PERF_LOG(`📈 ECharts setOption took: ${updateDuration.toFixed(2)}ms`);
     }
 
     this.lastUpdateTime = now;
     this.isUpdating = false;
+    this.PERF_LOG('✅ Update completed');
+    
+    // Memory usage monitoring (if available)
+    if ((window as any).performance?.memory) {
+      const memory = (window as any).performance.memory;
+      this.PERF_LOG(`💾 Memory: ${Math.round(memory.usedJSHeapSize / 1024 / 1024)}MB used, ${Math.round(memory.totalJSHeapSize / 1024 / 1024)}MB total`);
+    }
   }
   
   private shouldDisableAnimationsDuringInteraction(): boolean {
@@ -2338,12 +2380,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Initialize chart with configurable performance settings
     const useCanvasRenderer = this.ctx.settings?.useCanvasRenderer !== false; // Default to canvas for better performance
-    this.LOG(`[PERF] Using renderer: ${useCanvasRenderer ? 'canvas' : 'svg'}`);
+    this.PERF_LOG(`🎨 Initializing ECharts with renderer: ${useCanvasRenderer ? 'canvas' : 'svg'}`);
     
+    const initStart = performance.now();
     this.chart = echarts.init(containerElement, undefined, {
       renderer: useCanvasRenderer ? 'canvas' : 'svg',
       useDirtyRect: true  // Dirty rect rendering for selective updates
     });
+    const initDuration = performance.now() - initStart;
+    this.PERF_LOG(`🏗️  ECharts initialization took: ${initDuration.toFixed(2)}ms`);
     this.LOG('[ECharts Line Chart] Chart instance created:', !!this.chart);
     
     // Show loading spinner immediately
@@ -4341,6 +4386,31 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private LOG(...args: any[]): void {
     if (this.DEBUG) {
       console.log("[sc chart v6.1 3sub production]", ...args);
+    }
+  }
+
+  /**
+   * Performance-specific logging (independent toggle)
+   * 
+   * Usage: Set performanceDebug: true in widget settings to enable
+   * 
+   * Monitors:
+   * - ECharts operations (setOption, resize, init)
+   * - Update coalescing and throttling
+   * - Data processing timing
+   * - Memory usage indicators
+   * - Rendering performance bottlenecks
+   * 
+   * Example output:
+   * [PERF] 14:30:45.123 (1234.56ms) 📈 ECharts setOption took: 42.30ms (5000 points)
+   */
+  private PERF_LOG(...args: any[]): void {
+    if (this.PERF_DEBUG) {
+      const perfTime = performance.now().toFixed(2);
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0]; // HH:MM:SS
+      const msStr = now.getMilliseconds().toString().padStart(3, '0');
+      console.log(`[PERF] ${timeStr}.${msStr} (${perfTime}ms)`, ...args);
     }
   }
 
