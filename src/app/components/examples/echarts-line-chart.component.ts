@@ -196,8 +196,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // Sidebar state
   public isSidebarVisible = true;
-  public sidebarDisplayMode: 'full' | 'compact' | 'colors' | 'initials' = 'full';
-  public sidebarCollapsedMode: 'hidden' | 'colors' | 'initials' = 'hidden';
+  public sidebarDisplayMode: 'full' | 'compact' | 'colors' = 'full';
+  public sidebarCollapsedMode: 'hidden' | 'colors' = 'hidden';
+  public sidebarWidth = 240; // Default width, will be calculated dynamically
   
   // UI feedback states
   private lastPulsedEntity: string | null = null;
@@ -234,10 +235,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }, 300); // Wait for CSS transition
   }
 
-  // Get initials from entity name (first 3 letters)
-  public getEntityInitials(name: string): string {
-    return name.substring(0, 3).toUpperCase();
-  }
 
   ngOnInit(): void {
     this.LOG(this.ctx);
@@ -1925,7 +1922,42 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       };
     }).sort((a, b) => a.displayName.localeCompare(b.displayName)); // Sort by display name
     
+    // Calculate dynamic sidebar width based on longest name
+    this.calculateDynamicSidebarWidth();
+    
     this.ctx.detectChanges();
+  }
+  
+  // Calculate sidebar width based on longest entity name
+  private calculateDynamicSidebarWidth(): void {
+    if (!this.entityList || this.entityList.length === 0) {
+      this.sidebarWidth = 240; // Default width
+      return;
+    }
+    
+    // Find the longest display name
+    let maxNameLength = 0;
+    for (const entity of this.entityList) {
+      if (entity.displayName.length > maxNameLength) {
+        maxNameLength = entity.displayName.length;
+      }
+    }
+    
+    // Calculate width based on character count
+    // Approximate: 8px per character + padding + color box + count
+    const charWidth = 8;
+    const paddingAndExtras = 120; // Color box (32px) + count (60px) + padding (28px)
+    const calculatedWidth = (maxNameLength * charWidth) + paddingAndExtras;
+    
+    // Get the container width
+    const containerWidth = this.ctx.width || window.innerWidth;
+    const maxAllowedWidth = containerWidth * 0.5; // Maximum 50% of container width
+    
+    // Set width with constraints
+    const minWidth = 180; // Minimum width
+    this.sidebarWidth = Math.min(Math.max(calculatedWidth, minWidth), maxAllowedWidth);
+    
+    this.LOG(`[SIDEBAR] Calculated width: ${calculatedWidth}px, Final width: ${this.sidebarWidth}px (max: ${maxAllowedWidth}px)`);
   }
   
   // Toggle visibility for all series of an entity

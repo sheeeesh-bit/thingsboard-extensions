@@ -17,7 +17,7 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   // Entity Display Settings
   entityDisplayAttribute?: 'label' | 'deviceName' | 'name' | 'custom';  // Which attribute to show for entities
   customEntityAttribute?: string;  // Custom attribute name if 'custom' is selected
-  sidebarDisplayMode?: 'full' | 'compact' | 'colors' | 'initials';  // How to display the sidebar
+  sidebarDisplayMode?: 'full' | 'compact' | 'colors';  // How to display the sidebar
   
   // Y-Axis Settings
   yAxisLeftTitle?: string;

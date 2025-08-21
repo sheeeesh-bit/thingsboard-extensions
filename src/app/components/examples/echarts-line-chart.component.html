@@ -66,6 +66,7 @@
             [title]="isSidebarVisible ? 'Hide sidebar' : 'Show sidebar'"
             [attr.data-sidebar-state]="!isSidebarVisible ? sidebarCollapsedMode : 'visible'"
             [attr.data-sidebar-mode]="isSidebarVisible ? sidebarDisplayMode : sidebarCollapsedMode"
+            [style.left.px]="isSidebarVisible && sidebarDisplayMode !== 'colors' ? sidebarWidth : null"
             *ngIf="ctx.settings.showEntitySidebar !== false">
       <i class="material-icons">{{ isSidebarVisible ? 'chevron_left' : 'chevron_right' }}</i>
     </button>
@@ -74,8 +75,8 @@
     <aside class="entity-sidebar" 
            [class.sidebar-hidden]="!isSidebarVisible && sidebarCollapsedMode === 'hidden'"
            [class.sidebar-collapsed-colors]="!isSidebarVisible && sidebarCollapsedMode === 'colors'"
-           [class.sidebar-collapsed-initials]="!isSidebarVisible && sidebarCollapsedMode === 'initials'"
            [attr.data-mode]="isSidebarVisible ? sidebarDisplayMode : sidebarCollapsedMode"
+           [style.width.px]="isSidebarVisible && sidebarDisplayMode !== 'colors' ? sidebarWidth : null"
            *ngIf="ctx.settings.showEntitySidebar !== false">
       
       <!-- Permanent header (visible in all modes except completely hidden) -->
@@ -137,17 +138,6 @@
         </div>
       </div>
       
-      <!-- Colors with initials mode (when visible or collapsed with initials mode) -->
-      <div class="initials-container" *ngIf="(isSidebarVisible && sidebarDisplayMode === 'initials') || (!isSidebarVisible && sidebarCollapsedMode === 'initials')">
-        <div *ngFor="let entity of entityList" 
-             class="initial-box"
-             [class.initial-box--disabled]="!entity.visible"
-             [style.background-color]="entity.color"
-             [title]="entity.displayName + ' - Click to toggle'"
-             (click)="toggleEntityVisibility(entity.name)">
-          <span class="initial-text">{{ getEntityInitials(entity.displayName) }}</span>
-        </div>
-      </div>
     </aside>
     
     <!-- Chart area with floating overlays -->

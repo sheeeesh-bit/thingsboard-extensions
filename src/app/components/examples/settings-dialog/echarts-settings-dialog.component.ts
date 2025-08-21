@@ -3,7 +3,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 export interface SettingsDialogData {
   colorScheme: string;
-  sidebarCollapsedMode: 'hidden' | 'colors' | 'initials';
+  sidebarCollapsedMode: 'hidden' | 'colors';
 }
 
 @Component({
@@ -152,25 +152,6 @@ export interface SettingsDialogData {
               </div>
             </label>
             
-            <label class="sidebar-option" [class.selected]="data.sidebarCollapsedMode === 'initials'">
-              <input type="radio" name="sidebarMode" value="initials" 
-                     [(ngModel)]="data.sidebarCollapsedMode">
-              <div class="option-content">
-                <div class="option-icon">
-                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                    <rect x="2" y="4" width="8" height="24" rx="1" fill="#f0f0f0"/>
-                    <rect x="3" y="6" width="6" height="4" rx="0.5" fill="#007aff"/>
-                    <text x="6" y="9" text-anchor="middle" fill="white" font-size="3" font-weight="600">ABC</text>
-                    <rect x="3" y="12" width="6" height="4" rx="0.5" fill="#ff9500"/>
-                    <text x="6" y="15" text-anchor="middle" fill="white" font-size="3" font-weight="600">DEF</text>
-                    <rect x="3" y="18" width="6" height="4" rx="0.5" fill="#34c759"/>
-                    <text x="6" y="21" text-anchor="middle" fill="white" font-size="3" font-weight="600">GHI</text>
-                    <rect x="12" y="4" width="18" height="24" rx="2" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
-                  </svg>
-                </div>
-                <span class="option-label">Initials</span>
-              </div>
-            </label>
           </div>
         </div>
       </div>

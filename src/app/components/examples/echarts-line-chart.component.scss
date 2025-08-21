@@ -156,11 +156,9 @@ div[fxFlex] {
 
 // Button positioning based on sidebar state and mode
 .sidebar-toggle-btn[data-sidebar-state="visible"] {
-  // Position based on visible mode
-  &[data-sidebar-mode="full"] { left: 240px; }
-  &[data-sidebar-mode="compact"] { left: 180px; }
+  // Position is set dynamically via [style.left.px] binding for full/compact modes
+  // Only colors mode has fixed position
   &[data-sidebar-mode="colors"] { left: 60px; }
-  &[data-sidebar-mode="initials"] { left: 80px; }
 }
 
 .sidebar-toggle-btn[data-sidebar-state="hidden"] {
@@ -178,18 +176,10 @@ div[fxFlex] {
   -webkit-backdrop-filter: saturate(180%) blur(12px);
 }
 
-.sidebar-toggle-btn[data-sidebar-state="initials"] {
-  // Collapsed to initials mode
-  left: 80px;
-  border-left: none;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: saturate(180%) blur(12px);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
-}
 
 
 .entity-sidebar {
-  width: 240px;
+  // Width is set dynamically via [style.width.px] binding
   flex-shrink: 0;
   border-right: 1px solid rgba(0, 0, 0, 0.08);
   background: rgba(255, 255, 255, 0.95);
@@ -260,34 +250,10 @@ div[fxFlex] {
     }
   }
   
-  // Collapsed with initials mode
-  &.sidebar-collapsed-initials {
-    width: 80px;
-    
-    .entity-table,
-    .entity-table-compact {
-      display: none;
-    }
-    
-    // Ensure consistent spacing when collapsed
-    .initials-container {
-      gap: 10px; // Match the open mode spacing
-      padding: 12px 16px;
-      align-items: center;
-    }
-  }
   
-  // Adjust width based on display mode
-  &[data-mode="compact"] {
-    width: 180px;
-  }
-  
+  // Adjust width for colors mode (other modes use dynamic width)
   &[data-mode="colors"] {
-    width: 60px;
-  }
-  
-  &[data-mode="initials"] {
-    width: 80px;
+    width: 60px !important; // Override dynamic width for colors mode
   }
   
   // Scrollable container for tables
@@ -374,52 +340,6 @@ div[fxFlex] {
     }
   }
   
-  // Initials container
-  .initials-container {
-    display: flex;
-    flex-direction: column;
-    gap: 10px; // Consistent spacing
-    padding: 12px;
-    flex: 1; // Take remaining space in flex container
-    overflow-y: auto;
-    overflow-x: hidden;
-    min-height: 0; // Important for flex scrolling
-    
-    .initial-box {
-      width: 56px;
-      height: 36px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      
-      &:hover {
-        transform: scale(1.05);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-      }
-      
-      &.initial-box--disabled {
-        opacity: 0.3;
-        filter: grayscale(0.5);
-        
-        .initial-text {
-          text-decoration: line-through;
-        }
-      }
-      
-      .initial-text {
-        color: white;
-        font-size: 11px;
-        font-weight: 600;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-        letter-spacing: 0.5px;
-      }
-    }
-  }
   
   
   .sidebar-toggle {
