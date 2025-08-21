@@ -49,6 +49,15 @@ button[mat-icon-button]:hover {
   transition: background-color 0.3s ease;
 }
 
+button[mat-icon-button].tb-button-active {
+  background-color: #00796b; /* Dark cyan for active state */
+  color: #ffffff; /* White icon color */
+}
+
+button[mat-icon-button].tb-button-active:hover {
+  background-color: #004d40; /* Even darker on hover when active */
+}
+
 .tb-button-container {
   margin-top: 0px;
   margin-bottom: 30px;

@@ -177,6 +177,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public currentColorScheme = 'default';
   private currentGrids = 3;
   private currentGridNames: string[] = [];
+  
+  // Min/Max reference lines state
+  private minMaxVisible = false;
+  private minMaxCache = new Map<number, { min: number; max: number }>();
+  
+  // Alarm overlay state
+  private alarmStatusVisible = false;
+  private alarmData: Map<string, { min?: number; max?: number; severity?: string }> | null = null;
+  private alarmFetchPromise: Promise<void> | null = null;
   private resetGrid = false;
   private usedFormatter: any;
   private legendOverridesGrids = false;
@@ -947,6 +956,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       animation: false,  // Disable legend animation for faster response
       animationDurationUpdate: 0  // No animation delay on updates
     }];
+    
+    // Add min/max reference lines if enabled
+    this.addMinMaxLines(myNewOptions);
+    
+    // Add alarm overlay areas if enabled
+    this.addAlarmAreas(myNewOptions);
     
     this.LOG("myNewOptions:", myNewOptions);
     
@@ -5315,6 +5330,340 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       requestAnimationFrame(checkFrameRate);
     };
     requestAnimationFrame(checkFrameRate);
+  }
+  
+  /**
+   * Calculate min/max values per grid for visible time range
+   */
+  private calcMinMaxPerGrid(series: any[], visibleRange?: { start: number; end: number }): Map<number, { min: number; max: number }> {
+    const gridMinMax = new Map<number, { min: number; max: number }>();
+    
+    series.forEach(s => {
+      // Ignore helper series we add ourselves
+      if (!s.data?.length || /Min Line|Max Line|Alarm Area/.test(s.name)) return;
+      
+      const gridIndex = s.xAxisIndex || 0;
+      const values = s.data
+        .filter(([t]: [number, number]) => !visibleRange || (t >= visibleRange.start && t <= visibleRange.end))
+        .map(([, v]: [number, number]) => v)
+        .filter((v: number) => v != null && !isNaN(v));
+      
+      if (!values.length) return;
+      
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      
+      const current = gridMinMax.get(gridIndex) || { 
+        min: Number.POSITIVE_INFINITY, 
+        max: Number.NEGATIVE_INFINITY 
+      };
+      
+      current.min = Math.min(current.min, min);
+      current.max = Math.max(current.max, max);
+      gridMinMax.set(gridIndex, current);
+    });
+    
+    return gridMinMax;
+  }
+  
+  /**
+   * Add dashed min/max reference lines to chart options
+   */
+  private addMinMaxLines(options: any): void {
+    if (!options.series?.length || !this.minMaxVisible) return;
+    
+    // Find base series with data for time domain
+    const baseSeries = options.series.find((s: any) => s.data?.length && !/Min Line|Max Line|Alarm Area/.test(s.name));
+    if (!baseSeries) return;
+    
+    const timeDomain = {
+      start: baseSeries.data[0][0],
+      end: baseSeries.data[baseSeries.data.length - 1][0]
+    };
+    
+    // Get visible range from dataZoom if available
+    let visibleRange: { start: number; end: number } | undefined;
+    if (this.chart && !this.chart.isDisposed()) {
+      try {
+        const option = this.chart.getOption() as any;
+        if (option?.dataZoom?.[0]) {
+          const zoom = option.dataZoom[0];
+          const totalRange = timeDomain.end - timeDomain.start;
+          visibleRange = {
+            start: timeDomain.start + (totalRange * zoom.start / 100),
+            end: timeDomain.start + (totalRange * zoom.end / 100)
+          };
+        }
+      } catch (e) {
+        this.LOG('Could not get visible range from dataZoom:', e);
+      }
+    }
+    
+    // Calculate min/max per grid
+    const gridMinMax = this.calcMinMaxPerGrid(options.series, visibleRange);
+    this.minMaxCache = gridMinMax;
+    
+    // Add min/max lines for each grid
+    gridMinMax.forEach(({ min, max }, gridIndex) => {
+      // Min line
+      options.series.push({
+        name: `Min Line ${gridIndex}`,
+        type: 'line',
+        xAxisIndex: gridIndex,
+        yAxisIndex: gridIndex,
+        data: [[timeDomain.start, min], [timeDomain.end, min]],
+        lineStyle: { 
+          type: 'dashed', 
+          width: 2,
+          color: 'rgba(128, 128, 128, 0.5)'
+        },
+        symbol: 'none',
+        animation: false,
+        z: 100,
+        emphasis: { disabled: true },
+        legendHoverLink: false,
+        silent: true,
+        tooltip: { show: false }
+      });
+      
+      // Max line
+      options.series.push({
+        name: `Max Line ${gridIndex}`,
+        type: 'line',
+        xAxisIndex: gridIndex,
+        yAxisIndex: gridIndex,
+        data: [[timeDomain.start, max], [timeDomain.end, max]],
+        lineStyle: { 
+          type: 'dashed', 
+          width: 2,
+          color: 'rgba(128, 128, 128, 0.5)'
+        },
+        symbol: 'none',
+        animation: false,
+        z: 100,
+        emphasis: { disabled: true },
+        legendHoverLink: false,
+        silent: true,
+        tooltip: { show: false }
+      });
+    });
+  }
+  
+  /**
+   * Fetch alarms for all devices
+   */
+  private async fetchAlarmsForDevices(): Promise<void> {
+    // Check if alarmApi is available (might not be in all ThingsBoard versions)
+    const alarmApi = (this.ctx as any).alarmApi;
+    if (!alarmApi) {
+      this.LOG('Alarm API not available in this context');
+      return;
+    }
+    
+    // Get unique device IDs from data
+    const deviceIds = new Set<string>();
+    this.ctx.data.forEach(series => {
+      if (series.datasource?.entityId) {
+        deviceIds.add(series.datasource.entityId);
+      }
+    });
+    
+    if (deviceIds.size === 0) {
+      this.LOG('No device IDs found for alarm fetching');
+      return;
+    }
+    
+    try {
+      const promises: Promise<any>[] = [];
+      deviceIds.forEach(deviceId => {
+        promises.push(
+          alarmApi.getAlarms(deviceId, {
+            pageSize: 100,
+            page: 0,
+            sortProperty: 'createdTime',
+            sortOrder: 'DESC'
+          }).toPromise()
+        );
+      });
+      
+      const responses = await Promise.all(promises);
+      this.alarmData = this.processAlarmResponses(responses);
+      this.LOG('Fetched alarms:', this.alarmData);
+      
+      // Re-render chart with alarm overlays
+      this.onDataUpdated();
+    } catch (error) {
+      this.LOG('Error fetching alarms:', error);
+    }
+  }
+  
+  /**
+   * Process alarm responses into usable format
+   */
+  private processAlarmResponses(responses: any[]): Map<string, { min?: number; max?: number; severity?: string }> {
+    const alarmMap = new Map<string, { min?: number; max?: number; severity?: string }>();
+    
+    responses.forEach(response => {
+      if (!response?.data) return;
+      
+      response.data.forEach((alarm: any) => {
+        const deviceId = alarm.originator?.id;
+        if (!deviceId) return;
+        
+        // Extract thresholds from alarm details
+        const details = alarm.details || {};
+        alarmMap.set(deviceId, {
+          min: details.minValue ?? undefined,
+          max: details.maxValue ?? undefined,
+          severity: alarm.severity || 'CRITICAL'
+        });
+      });
+    });
+    
+    return alarmMap;
+  }
+  
+  /**
+   * Add alarm overlay areas to chart
+   */
+  private addAlarmAreas(options: any): void {
+    if (!this.alarmStatusVisible || !this.alarmData?.size || !options.series?.length) return;
+    
+    // Find base series for time domain
+    const baseSeries = options.series.find((s: any) => s.data?.length && !/Min Line|Max Line|Alarm Area/.test(s.name));
+    if (!baseSeries) return;
+    
+    const timeDomain = {
+      start: baseSeries.data[0][0],
+      end: baseSeries.data[baseSeries.data.length - 1][0]
+    };
+    
+    // Add alarm areas for each threshold
+    this.alarmData.forEach((threshold, deviceId) => {
+      if (threshold.max == null && threshold.min == null) return;
+      
+      // Find series matching this device
+      options.series.forEach((s: any) => {
+        if (!s.data?.length || /Min Line|Max Line|Alarm Area/.test(s.name)) return;
+        
+        // Check if series belongs to this device
+        const seriesDeviceId = s.deviceId || this.ctx.data.find((d: any) => 
+          d.dataKey?.label === s.name?.split(' :: ')[1]
+        )?.datasource?.entityId;
+        
+        if (seriesDeviceId !== deviceId) return;
+        
+        const gridIndex = s.xAxisIndex || 0;
+        const alarmColor = threshold.severity === 'CRITICAL' ? 'rgba(255, 0, 0, 0.1)' : 'rgba(255, 165, 0, 0.1)';
+        
+        // Upper threshold band
+        if (threshold.max != null) {
+          // Get Y-axis max to create filled area
+          const yMax = this.getYAxisMax(options, gridIndex) || threshold.max * 2;
+          
+          options.series.push({
+            name: `Alarm Area MAX ${gridIndex}`,
+            type: 'line',
+            xAxisIndex: gridIndex,
+            yAxisIndex: gridIndex,
+            data: [
+              [timeDomain.start, threshold.max],
+              [timeDomain.end, threshold.max],
+              [timeDomain.end, yMax],
+              [timeDomain.start, yMax]
+            ],
+            areaStyle: {
+              opacity: this.ctx.settings?.alarmOpacity ?? 0.12,
+              color: alarmColor
+            },
+            lineStyle: {
+              opacity: 0
+            },
+            symbol: 'none',
+            silent: true,
+            z: 1,
+            legendHoverLink: false,
+            tooltip: { show: false },
+            animation: false
+          });
+        }
+        
+        // Lower threshold band
+        if (threshold.min != null) {
+          // Get Y-axis min to create filled area
+          const yMin = this.getYAxisMin(options, gridIndex) || 0;
+          
+          options.series.push({
+            name: `Alarm Area MIN ${gridIndex}`,
+            type: 'line',
+            xAxisIndex: gridIndex,
+            yAxisIndex: gridIndex,
+            data: [
+              [timeDomain.start, yMin],
+              [timeDomain.end, yMin],
+              [timeDomain.end, threshold.min],
+              [timeDomain.start, threshold.min]
+            ],
+            areaStyle: {
+              opacity: this.ctx.settings?.alarmOpacity ?? 0.12,
+              color: alarmColor
+            },
+            lineStyle: {
+              opacity: 0
+            },
+            symbol: 'none',
+            silent: true,
+            z: 1,
+            legendHoverLink: false,
+            tooltip: { show: false },
+            animation: false
+          });
+        }
+      });
+    });
+  }
+  
+  /**
+   * Get Y-axis max value for a grid
+   */
+  private getYAxisMax(options: any, gridIndex: number): number | null {
+    if (!options.yAxis?.[gridIndex]) return null;
+    return options.yAxis[gridIndex].max || null;
+  }
+  
+  /**
+   * Get Y-axis min value for a grid
+   */
+  private getYAxisMin(options: any, gridIndex: number): number | null {
+    if (!options.yAxis?.[gridIndex]) return null;
+    return options.yAxis[gridIndex].min || null;
+  }
+  
+  /**
+   * Toggle min/max reference lines visibility
+   */
+  public toggleMinMaxLines(): void {
+    this.minMaxVisible = !this.minMaxVisible;
+    this.LOG(`Min/Max lines ${this.minMaxVisible ? 'enabled' : 'disabled'}`);
+    
+    // Re-render chart
+    this.onDataUpdated();
+  }
+  
+  /**
+   * Toggle alarm overlay visibility
+   */
+  public toggleAlarmStatus(): void {
+    this.alarmStatusVisible = !this.alarmStatusVisible;
+    this.LOG(`Alarm overlays ${this.alarmStatusVisible ? 'enabled' : 'disabled'}`);
+    
+    if (this.alarmStatusVisible && !this.alarmData && !this.alarmFetchPromise) {
+      // First time - fetch alarms
+      this.alarmFetchPromise = this.fetchAlarmsForDevices();
+    } else {
+      // Just toggle visibility
+      this.onDataUpdated();
+    }
   }
 
 }

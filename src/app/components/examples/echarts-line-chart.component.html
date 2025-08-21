@@ -56,6 +56,26 @@
                 matTooltip="Widget Settings">
             <i class="material-icons">settings</i>
         </button>
+        
+        <!-- Min/Max Lines Toggle -->
+        <button mat-icon-button 
+                (click)="toggleMinMaxLines()" 
+                class="tb-button"
+                [class.tb-button-active]="minMaxVisible"
+                matTooltipPosition="above" 
+                matTooltip="Toggle Min/Max Lines">
+            <i class="material-icons">show_chart</i>
+        </button>
+        
+        <!-- Alarm Overlays Toggle -->
+        <button mat-icon-button 
+                (click)="toggleAlarmStatus()" 
+                class="tb-button"
+                [class.tb-button-active]="alarmStatusVisible"
+                matTooltipPosition="above" 
+                matTooltip="Toggle Alarm Overlays">
+            <i class="material-icons">warning</i>
+        </button>
     </div>
   
   <!-- Chart and sidebar container -->
