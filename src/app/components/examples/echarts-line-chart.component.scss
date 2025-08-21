@@ -290,15 +290,20 @@ div[fxFlex] {
     width: 80px;
   }
   
+  // Scrollable container for tables
+  .table-scroll-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0; // Important for flexbox scrolling
+  }
+  
   // Compact table styles
   .entity-table-compact {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
-    flex: 1; // Take remaining space in flex container
-    overflow-y: auto;
-    overflow-x: hidden;
-    min-height: 0; // Important for flex scrolling
+    display: table; // Ensure proper table display
     
     .entity-row-compact {
       cursor: pointer;
@@ -498,10 +503,7 @@ div[fxFlex] {
   border-collapse: collapse;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
   font-size: 13px;
-  flex: 1; // Take remaining space in flex container
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0; // Important for flex scrolling
+  display: table; // Ensure proper table display
   
   tbody {
     
