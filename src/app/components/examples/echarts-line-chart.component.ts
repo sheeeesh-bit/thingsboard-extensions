@@ -106,6 +106,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public entityList: Array<{
     name: string;           // Original entity name (for functionality)
     displayName: string;    // Display name (deviceName attribute or fallback)
+    label: string;          // Label attribute for tooltip
+    deviceName: string;     // DeviceName attribute for tooltip
     color: string;
     count: number;
     dataPoints: number;
@@ -1663,6 +1665,33 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return { data, selected };
   }
   
+  // Get both label and deviceName for tooltip display
+  private getEntityAttributes(entityName: string): { label: string; deviceName: string } {
+    let label = entityName;
+    let deviceName = '';
+    
+    try {
+      // Find the datasource for this entity
+      const datasource = this.ctx.data?.find(d => d.datasource?.entityName === entityName)?.datasource;
+      
+      if (datasource && datasource.latestDataKeys) {
+        // Try to get label attribute from latestDataKeys
+        for (const key of datasource.latestDataKeys) {
+          const keyAny = key as any;
+          if (key.name === 'label' && keyAny.lastValue !== undefined) {
+            label = String(keyAny.lastValue);
+          } else if (key.name === 'deviceName' && keyAny.lastValue !== undefined) {
+            deviceName = String(keyAny.lastValue);
+          }
+        }
+      }
+    } catch (error) {
+      this.LOG(`[ENTITY_ATTRS] Error getting attributes for ${entityName}:`, error);
+    }
+    
+    return { label, deviceName };
+  }
+  
   // Get display name for entity based on configured attribute
   private getEntityDisplayName(entityName: string): string {
     // Check cache first
@@ -1912,9 +1941,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // Entity is visible if any of its series are visible
       const visible = group.seriesKeys.some(seriesKey => selected[seriesKey] !== false);
       
+      // Get both label and deviceName for tooltip
+      const attrs = this.getEntityAttributes(entityName);
+      
       return {
         name: entityName,                                    // Original entity name (for functionality)
         displayName: this.getEntityDisplayName(entityName), // Display name (deviceName or fallback)
+        label: attrs.label,                                 // Label attribute for tooltip
+        deviceName: attrs.deviceName,                       // DeviceName attribute for tooltip
         color: group.color,
         count: group.seriesKeys.length,
         dataPoints: group.dataPoints,
