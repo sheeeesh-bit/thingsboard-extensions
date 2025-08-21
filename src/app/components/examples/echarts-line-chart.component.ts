@@ -783,7 +783,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       animation: this.getAnimationSettings(),
       animationDuration: this.getAnimationDuration(),
       animationDurationUpdate: this.getAnimationUpdateDuration(),
-      animationEasing: 'cubicOut'
+      animationEasing: 'linear',  // Use linear for better performance
+      animationEasingUpdate: 'linear',  // Linear easing on updates
+      useUTC: true  // Use UTC for cheaper date math
     };
     myNewOptions.series = [];
     
@@ -843,6 +845,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const labelSelected = this.legendItems.find(item => item.label === label)?.selected !== false;
       
       const seriesElement = {
+        id: `series_${i}_${seriesKey}`,  // Add ID for incremental updates
         name: seriesKey,  // Use unique key instead of just label
         itemStyle: {
           normal: {
@@ -917,8 +920,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       });
       this.resetGrid = false;
     } else {
-      // Use notMerge for faster data updates
-      this.chart.setOption(myNewOptions, true);  // true = notMerge for better performance
+      // Use incremental updates with lazyUpdate for better performance
+      this.chart.setOption(myNewOptions, { 
+        notMerge: false, 
+        lazyUpdate: true,
+        replaceMerge: ['series']  // Only replace series data
+      });
     }
     
     // Hide the loading spinner after data is rendered
@@ -4089,7 +4096,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         trigger: 'axis',
         triggerOn: 'mousemove|click',
         confine: true,
-        animation: false,  // [CLAUDE EDIT] Disable tooltip animation
+        animation: false,  // Disable tooltip animation for performance
+        transitionDuration: 0,  // No transition delay for better responsiveness
+        renderMode: 'html',  // Use HTML for better performance with large datasets
         // [CLAUDE] Apple-style tooltip design
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
         borderColor: 'rgba(0, 0, 0, 0.1)',
@@ -4240,7 +4249,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         show: false, 
         xAxisIndex: 'all', 
         start: this.zoomStart, 
-        end: this.zoomEnd 
+        end: this.zoomEnd,
+        filterMode: 'filter'  // Actually filter out non-visible points
       },
       // INSIDE zoom: wheel & pinch should just work anywhere over the plots
       {
@@ -4252,6 +4262,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         moveOnMouseWheel: false,  // wheel zooms, not pans
         moveOnMouseMove: true,    // drag pans
         zoomOnTouch: true,        // enable touch
+        filterMode: 'filter',     // Filter out hidden points for performance
         throttle: 50
       }
     ];
