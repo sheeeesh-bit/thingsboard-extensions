@@ -181,11 +181,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // Min/Max reference lines state
   private minMaxVisible = false;
   private minMaxCache = new Map<number, { min: number; max: number }>();
+  private minMaxStyle: 'dashed' | 'solid' | 'dotted' = 'dashed';
+  private minMaxColor = 'rgba(128, 128, 128, 0.5)';
+  private minMaxLineWidth = 2;
   
   // Alarm overlay state
   private alarmStatusVisible = false;
   private alarmData: Map<string, { min?: number; max?: number; severity?: string }> | null = null;
   private alarmFetchPromise: Promise<void> | null = null;
+  private alarmOpacity = 0.12;
+  private alarmShowCritical = true;
+  private alarmShowWarning = true;
+  private alarmShowInfo = false;
   private resetGrid = false;
   private usedFormatter: any;
   private legendOverridesGrids = false;
@@ -1790,7 +1797,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       width: '500px',
       data: { 
         colorScheme: this.currentColorScheme,
-        sidebarCollapsedMode: this.sidebarCollapsedMode
+        sidebarCollapsedMode: this.sidebarCollapsedMode,
+        minMaxVisible: this.minMaxVisible,
+        minMaxStyle: this.minMaxStyle || 'dashed',
+        minMaxColor: this.minMaxColor || 'rgba(128, 128, 128, 0.5)',
+        minMaxLineWidth: this.minMaxLineWidth || 2,
+        alarmStatusVisible: this.alarmStatusVisible,
+        alarmOpacity: this.alarmOpacity || 0.12,
+        alarmShowCritical: this.alarmShowCritical !== false,
+        alarmShowWarning: this.alarmShowWarning !== false,
+        alarmShowInfo: this.alarmShowInfo !== false
       }
     });
 
@@ -1798,6 +1814,23 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       if (result) {
         this.changeColorScheme(result.colorScheme);
         this.sidebarCollapsedMode = result.sidebarCollapsedMode || 'hidden';
+        
+        // Update min/max settings
+        this.minMaxVisible = result.minMaxVisible;
+        this.minMaxStyle = result.minMaxStyle;
+        this.minMaxColor = result.minMaxColor;
+        this.minMaxLineWidth = result.minMaxLineWidth;
+        
+        // Update alarm settings
+        this.alarmStatusVisible = result.alarmStatusVisible;
+        this.alarmOpacity = result.alarmOpacity;
+        this.alarmShowCritical = result.alarmShowCritical;
+        this.alarmShowWarning = result.alarmShowWarning;
+        this.alarmShowInfo = result.alarmShowInfo;
+        
+        // Re-render chart with new settings
+        this.onDataUpdated();
+        
         // If sidebar is currently collapsed, trigger resize to apply new mode
         if (!this.isSidebarVisible) {
           setTimeout(() => {
@@ -5333,16 +5366,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   /**
-   * Calculate min/max values per grid for visible time range
+   * Calculate min/max values across ALL devices for visible time range
+   * This shows the global min/max across all series, not per grid
    */
-  private calcMinMaxPerGrid(series: any[], visibleRange?: { start: number; end: number }): Map<number, { min: number; max: number }> {
-    const gridMinMax = new Map<number, { min: number; max: number }>();
+  private calcGlobalMinMax(series: any[], visibleRange?: { start: number; end: number }): { min: number; max: number } {
+    let globalMin = Number.POSITIVE_INFINITY;
+    let globalMax = Number.NEGATIVE_INFINITY;
     
     series.forEach(s => {
       // Ignore helper series we add ourselves
       if (!s.data?.length || /Min Line|Max Line|Alarm Area/.test(s.name)) return;
       
-      const gridIndex = s.xAxisIndex || 0;
       const values = s.data
         .filter(([t]: [number, number]) => !visibleRange || (t >= visibleRange.start && t <= visibleRange.end))
         .map(([, v]: [number, number]) => v)
@@ -5353,21 +5387,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const min = Math.min(...values);
       const max = Math.max(...values);
       
-      const current = gridMinMax.get(gridIndex) || { 
-        min: Number.POSITIVE_INFINITY, 
-        max: Number.NEGATIVE_INFINITY 
-      };
-      
-      current.min = Math.min(current.min, min);
-      current.max = Math.max(current.max, max);
-      gridMinMax.set(gridIndex, current);
+      globalMin = Math.min(globalMin, min);
+      globalMax = Math.max(globalMax, max);
     });
     
-    return gridMinMax;
+    return {
+      min: globalMin === Number.POSITIVE_INFINITY ? 0 : globalMin,
+      max: globalMax === Number.NEGATIVE_INFINITY ? 100 : globalMax
+    };
   }
   
   /**
-   * Add dashed min/max reference lines to chart options
+   * Add min/max reference lines showing global min/max across ALL devices
    */
   private addMinMaxLines(options: any): void {
     if (!options.series?.length || !this.minMaxVisible) return;
@@ -5399,12 +5430,21 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
     }
     
-    // Calculate min/max per grid
-    const gridMinMax = this.calcMinMaxPerGrid(options.series, visibleRange);
-    this.minMaxCache = gridMinMax;
+    // Calculate GLOBAL min/max across ALL devices
+    const { min, max } = this.calcGlobalMinMax(options.series, visibleRange);
     
-    // Add min/max lines for each grid
-    gridMinMax.forEach(({ min, max }, gridIndex) => {
+    this.LOG(`Global Min/Max: min=${min}, max=${max}`);
+    
+    // Determine which grids to show the lines on
+    const gridsToUse = new Set<number>();
+    options.series.forEach((s: any) => {
+      if (s.data?.length && !/Min Line|Max Line|Alarm Area/.test(s.name)) {
+        gridsToUse.add(s.xAxisIndex || 0);
+      }
+    });
+    
+    // Add min/max lines to each active grid showing the SAME global values
+    gridsToUse.forEach(gridIndex => {
       // Min line
       options.series.push({
         name: `Min Line ${gridIndex}`,
@@ -5413,9 +5453,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         yAxisIndex: gridIndex,
         data: [[timeDomain.start, min], [timeDomain.end, min]],
         lineStyle: { 
-          type: 'dashed', 
-          width: 2,
-          color: 'rgba(128, 128, 128, 0.5)'
+          type: this.minMaxStyle, 
+          width: this.minMaxLineWidth,
+          color: this.minMaxColor
         },
         symbol: 'none',
         animation: false,
@@ -5434,9 +5474,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         yAxisIndex: gridIndex,
         data: [[timeDomain.start, max], [timeDomain.end, max]],
         lineStyle: { 
-          type: 'dashed', 
-          width: 2,
-          color: 'rgba(128, 128, 128, 0.5)'
+          type: this.minMaxStyle, 
+          width: this.minMaxLineWidth,
+          color: this.minMaxColor
         },
         symbol: 'none',
         animation: false,
@@ -5524,7 +5564,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   /**
-   * Add alarm overlay areas to chart
+   * Add alarm overlay areas showing ALL device thresholds
    */
   private addAlarmAreas(options: any): void {
     if (!this.alarmStatusVisible || !this.alarmData?.size || !options.series?.length) return;
@@ -5538,46 +5578,72 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       end: baseSeries.data[baseSeries.data.length - 1][0]
     };
     
-    // Add alarm areas for each threshold
+    // Determine which grids are active
+    const gridsToUse = new Set<number>();
+    options.series.forEach((s: any) => {
+      if (s.data?.length && !/Min Line|Max Line|Alarm Area/.test(s.name)) {
+        gridsToUse.add(s.xAxisIndex || 0);
+      }
+    });
+    
+    // Collect all unique alarm thresholds across all devices
+    const allThresholds: Array<{ value: number; type: 'min' | 'max'; severity: string }> = [];
+    
     this.alarmData.forEach((threshold, deviceId) => {
-      if (threshold.max == null && threshold.min == null) return;
+      // Filter by severity settings
+      if (threshold.severity === 'CRITICAL' && !this.alarmShowCritical) return;
+      if (threshold.severity === 'WARNING' && !this.alarmShowWarning) return;
+      if (threshold.severity === 'INFO' && !this.alarmShowInfo) return;
       
-      // Find series matching this device
-      options.series.forEach((s: any) => {
-        if (!s.data?.length || /Min Line|Max Line|Alarm Area/.test(s.name)) return;
+      if (threshold.max != null) {
+        allThresholds.push({ value: threshold.max, type: 'max', severity: threshold.severity || 'CRITICAL' });
+      }
+      if (threshold.min != null) {
+        allThresholds.push({ value: threshold.min, type: 'min', severity: threshold.severity || 'CRITICAL' });
+      }
+    });
+    
+    // Remove duplicate threshold values
+    const uniqueThresholds = Array.from(new Map(
+      allThresholds.map(t => [`${t.value}_${t.type}`, t])
+    ).values());
+    
+    this.LOG(`Alarm thresholds found: ${uniqueThresholds.length} unique thresholds across all devices`);
+    
+    // Add alarm areas for each unique threshold on each grid
+    gridsToUse.forEach(gridIndex => {
+      uniqueThresholds.forEach((threshold, index) => {
+        const alarmColor = threshold.severity === 'CRITICAL' ? 
+          `rgba(255, 0, 0, ${this.alarmOpacity})` : 
+          threshold.severity === 'WARNING' ? 
+          `rgba(255, 165, 0, ${this.alarmOpacity})` : 
+          `rgba(0, 122, 255, ${this.alarmOpacity})`;
         
-        // Check if series belongs to this device
-        const seriesDeviceId = s.deviceId || this.ctx.data.find((d: any) => 
-          d.dataKey?.label === s.name?.split(' :: ')[1]
-        )?.datasource?.entityId;
-        
-        if (seriesDeviceId !== deviceId) return;
-        
-        const gridIndex = s.xAxisIndex || 0;
-        const alarmColor = threshold.severity === 'CRITICAL' ? 'rgba(255, 0, 0, 0.1)' : 'rgba(255, 165, 0, 0.1)';
-        
-        // Upper threshold band
-        if (threshold.max != null) {
-          // Get Y-axis max to create filled area
-          const yMax = this.getYAxisMax(options, gridIndex) || threshold.max * 2;
+        if (threshold.type === 'max') {
+          // Upper threshold band
+          const yMax = this.getYAxisMax(options, gridIndex) || threshold.value * 2;
           
           options.series.push({
-            name: `Alarm Area MAX ${gridIndex}`,
+            name: `Alarm Area MAX ${gridIndex}_${index}`,
             type: 'line',
             xAxisIndex: gridIndex,
             yAxisIndex: gridIndex,
             data: [
-              [timeDomain.start, threshold.max],
-              [timeDomain.end, threshold.max],
+              [timeDomain.start, threshold.value],
+              [timeDomain.end, threshold.value],
               [timeDomain.end, yMax],
               [timeDomain.start, yMax]
             ],
             areaStyle: {
-              opacity: this.ctx.settings?.alarmOpacity ?? 0.12,
+              opacity: 1, // Opacity is already in the color
               color: alarmColor
             },
             lineStyle: {
-              opacity: 0
+              type: 'dashed',
+              width: 1,
+              color: threshold.severity === 'CRITICAL' ? '#ff3b30' : 
+                     threshold.severity === 'WARNING' ? '#ff9500' : '#007aff',
+              opacity: 0.5
             },
             symbol: 'none',
             silent: true,
@@ -5586,30 +5652,31 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             tooltip: { show: false },
             animation: false
           });
-        }
-        
-        // Lower threshold band
-        if (threshold.min != null) {
-          // Get Y-axis min to create filled area
+        } else {
+          // Lower threshold band
           const yMin = this.getYAxisMin(options, gridIndex) || 0;
           
           options.series.push({
-            name: `Alarm Area MIN ${gridIndex}`,
+            name: `Alarm Area MIN ${gridIndex}_${index}`,
             type: 'line',
             xAxisIndex: gridIndex,
             yAxisIndex: gridIndex,
             data: [
               [timeDomain.start, yMin],
               [timeDomain.end, yMin],
-              [timeDomain.end, threshold.min],
-              [timeDomain.start, threshold.min]
+              [timeDomain.end, threshold.value],
+              [timeDomain.start, threshold.value]
             ],
             areaStyle: {
-              opacity: this.ctx.settings?.alarmOpacity ?? 0.12,
+              opacity: 1, // Opacity is already in the color
               color: alarmColor
             },
             lineStyle: {
-              opacity: 0
+              type: 'dashed',
+              width: 1,
+              color: threshold.severity === 'CRITICAL' ? '#ff3b30' : 
+                     threshold.severity === 'WARNING' ? '#ff9500' : '#007aff',
+              opacity: 0.5
             },
             symbol: 'none',
             silent: true,

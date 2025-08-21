@@ -4,6 +4,15 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 export interface SettingsDialogData {
   colorScheme: string;
   sidebarCollapsedMode: 'hidden' | 'colors';
+  minMaxVisible?: boolean;
+  minMaxStyle?: 'dashed' | 'solid' | 'dotted';
+  minMaxColor?: string;
+  minMaxLineWidth?: number;
+  alarmStatusVisible?: boolean;
+  alarmOpacity?: number;
+  alarmShowCritical?: boolean;
+  alarmShowWarning?: boolean;
+  alarmShowInfo?: boolean;
 }
 
 @Component({
@@ -152,6 +161,141 @@ export interface SettingsDialogData {
               </div>
             </label>
             
+          </div>
+        </div>
+        
+        <!-- Min/Max Lines Section -->
+        <div class="settings-card">
+          <div class="card-header">
+            <div class="icon-wrapper minmax-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M3 12H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 2"/>
+                <path d="M3 6H21" stroke="#007aff" stroke-width="2" stroke-linecap="round"/>
+                <path d="M3 18H21" stroke="#ff3b30" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="card-title">Min/Max Reference Lines</h3>
+              <p class="card-subtitle">Show minimum and maximum values across all devices</p>
+            </div>
+          </div>
+          
+          <div class="settings-controls">
+            <div class="toggle-row">
+              <label class="toggle-label">Show Min/Max Lines</label>
+              <label class="apple-switch">
+                <input type="checkbox" [(ngModel)]="data.minMaxVisible">
+                <span class="slider"></span>
+              </label>
+            </div>
+            
+            <div class="control-group" *ngIf="data.minMaxVisible">
+              <label class="control-label">Line Style</label>
+              <div class="segmented-control">
+                <button class="segment" 
+                        [class.active]="data.minMaxStyle === 'dashed'"
+                        (click)="data.minMaxStyle = 'dashed'">
+                  <svg width="24" height="2" viewBox="0 0 24 2">
+                    <path d="M0 1H5 M8 1H13 M16 1H21 M24 1H29" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <span>Dashed</span>
+                </button>
+                <button class="segment"
+                        [class.active]="data.minMaxStyle === 'solid'"
+                        (click)="data.minMaxStyle = 'solid'">
+                  <svg width="24" height="2" viewBox="0 0 24 2">
+                    <path d="M0 1H24" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <span>Solid</span>
+                </button>
+                <button class="segment"
+                        [class.active]="data.minMaxStyle === 'dotted'"
+                        (click)="data.minMaxStyle = 'dotted'">
+                  <svg width="24" height="2" viewBox="0 0 24 2">
+                    <path d="M0 1H1 M3 1H4 M6 1H7 M9 1H10 M12 1H13 M15 1H16 M18 1H19 M21 1H22" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <span>Dotted</span>
+                </button>
+              </div>
+            </div>
+            
+            <div class="control-group" *ngIf="data.minMaxVisible">
+              <label class="control-label">Line Width</label>
+              <div class="slider-control">
+                <input type="range" min="1" max="5" step="1" 
+                       [(ngModel)]="data.minMaxLineWidth"
+                       class="apple-slider">
+                <span class="slider-value">{{data.minMaxLineWidth || 2}}px</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Alarm Overlays Section -->
+        <div class="settings-card">
+          <div class="card-header">
+            <div class="icon-wrapper alarm-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L2 7V11C2 16.55 5.84 21.74 11 22.95C16.16 21.74 22 16.55 22 11V7L12 2Z" 
+                      fill="#ff3b30" opacity="0.2"/>
+                <path d="M12 9V13M12 17H12.01" stroke="#ff3b30" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="card-title">Alarm Overlays</h3>
+              <p class="card-subtitle">Display alarm thresholds for all devices</p>
+            </div>
+          </div>
+          
+          <div class="settings-controls">
+            <div class="toggle-row">
+              <label class="toggle-label">Show Alarm Overlays</label>
+              <label class="apple-switch">
+                <input type="checkbox" [(ngModel)]="data.alarmStatusVisible">
+                <span class="slider"></span>
+              </label>
+            </div>
+            
+            <div class="control-group" *ngIf="data.alarmStatusVisible">
+              <label class="control-label">Overlay Opacity</label>
+              <div class="slider-control">
+                <input type="range" min="5" max="30" step="1" 
+                       [(ngModel)]="opacityPercent"
+                       (input)="data.alarmOpacity = opacityPercent / 100"
+                       class="apple-slider">
+                <span class="slider-value">{{opacityPercent}}%</span>
+              </div>
+            </div>
+            
+            <div class="control-group" *ngIf="data.alarmStatusVisible">
+              <label class="control-label">Alarm Severity Levels</label>
+              <div class="checkbox-group">
+                <label class="apple-checkbox">
+                  <input type="checkbox" [(ngModel)]="data.alarmShowCritical">
+                  <span class="checkbox-box"></span>
+                  <span class="checkbox-label">
+                    <span class="severity-dot critical"></span>
+                    Critical
+                  </span>
+                </label>
+                <label class="apple-checkbox">
+                  <input type="checkbox" [(ngModel)]="data.alarmShowWarning">
+                  <span class="checkbox-box"></span>
+                  <span class="checkbox-label">
+                    <span class="severity-dot warning"></span>
+                    Warning
+                  </span>
+                </label>
+                <label class="apple-checkbox">
+                  <input type="checkbox" [(ngModel)]="data.alarmShowInfo">
+                  <span class="checkbox-box"></span>
+                  <span class="checkbox-label">
+                    <span class="severity-dot info"></span>
+                    Info
+                  </span>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -440,13 +584,289 @@ export interface SettingsDialogData {
     .dialog-content::-webkit-scrollbar-thumb:hover {
       background: #86868b;
     }
+    
+    /* New Apple-style Controls */
+    .minmax-icon {
+      background: linear-gradient(135deg, #007aff, #5856d6);
+      color: white;
+    }
+    
+    .alarm-icon {
+      background: linear-gradient(135deg, #ff3b30, #ff6482);
+      color: white;
+    }
+    
+    .settings-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #e5e5e7;
+    }
+    
+    .toggle-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: #1d1d1f;
+    }
+    
+    /* Apple-style toggle switch */
+    .apple-switch {
+      position: relative;
+      display: inline-block;
+      width: 51px;
+      height: 31px;
+    }
+    
+    .apple-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .apple-switch .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #c7c7cc;
+      transition: .3s;
+      border-radius: 31px;
+    }
+    
+    .apple-switch .slider:before {
+      position: absolute;
+      content: "";
+      height: 27px;
+      width: 27px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .apple-switch input:checked + .slider {
+      background-color: #34c759;
+    }
+    
+    .apple-switch input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+    
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .control-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #86868b;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    
+    /* Segmented Control */
+    .segmented-control {
+      display: flex;
+      background: #f2f2f7;
+      border-radius: 9px;
+      padding: 2px;
+      gap: 2px;
+    }
+    
+    .segment {
+      flex: 1;
+      padding: 8px 12px;
+      border: none;
+      background: transparent;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #1d1d1f;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .segment:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+    
+    .segment.active {
+      background: white;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+    }
+    
+    .segment svg {
+      height: 12px;
+      width: auto;
+    }
+    
+    /* Slider Control */
+    .slider-control {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .apple-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      background: #e5e5e7;
+      border-radius: 3px;
+      outline: none;
+    }
+    
+    .apple-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
+    }
+    
+    .apple-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.1);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    .apple-slider::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
+    }
+    
+    .slider-value {
+      min-width: 40px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #1d1d1f;
+      text-align: right;
+    }
+    
+    /* Checkbox Group */
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .apple-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      position: relative;
+    }
+    
+    .apple-checkbox input[type="checkbox"] {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .checkbox-box {
+      width: 22px;
+      height: 22px;
+      border: 2px solid #c7c7cc;
+      border-radius: 6px;
+      background: white;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    
+    .apple-checkbox input:checked ~ .checkbox-box {
+      background: #007aff;
+      border-color: #007aff;
+    }
+    
+    .apple-checkbox input:checked ~ .checkbox-box:after {
+      content: '';
+      position: absolute;
+      left: 7px;
+      top: 3px;
+      width: 5px;
+      height: 10px;
+      border: solid white;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+    
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #1d1d1f;
+    }
+    
+    .severity-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    
+    .severity-dot.critical {
+      background: #ff3b30;
+    }
+    
+    .severity-dot.warning {
+      background: #ff9500;
+    }
+    
+    .severity-dot.info {
+      background: #007aff;
+    }
   `]
 })
 export class EchartsSettingsDialogComponent {
+  opacityPercent: number;
+  
   constructor(
     public dialogRef: MatDialogRef<EchartsSettingsDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: SettingsDialogData
-  ) {}
+  ) {
+    // Initialize default values if not provided
+    this.data.minMaxVisible = this.data.minMaxVisible ?? false;
+    this.data.minMaxStyle = this.data.minMaxStyle ?? 'dashed';
+    this.data.minMaxColor = this.data.minMaxColor ?? 'rgba(128, 128, 128, 0.5)';
+    this.data.minMaxLineWidth = this.data.minMaxLineWidth ?? 2;
+    
+    this.data.alarmStatusVisible = this.data.alarmStatusVisible ?? false;
+    this.data.alarmOpacity = this.data.alarmOpacity ?? 0.12;
+    this.data.alarmShowCritical = this.data.alarmShowCritical ?? true;
+    this.data.alarmShowWarning = this.data.alarmShowWarning ?? true;
+    this.data.alarmShowInfo = this.data.alarmShowInfo ?? false;
+    
+    // Convert opacity to percentage for slider
+    this.opacityPercent = Math.round((this.data.alarmOpacity ?? 0.12) * 100);
+  }
 
   onCancel(): void {
     this.dialogRef.close();
