@@ -1197,32 +1197,34 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // Performance setting helpers
   private getAnimationSettings(): boolean {
-    const enableAnimations = this.ctx.settings?.enableAnimations !== false;
+    // Default to false for better performance
+    const enableAnimations = this.ctx.settings?.enableAnimations === true;
     if (!enableAnimations) {
-      this.LOG('[PERF] Animations disabled via settings');
+      this.LOG('[PERF] Animations disabled (default)');
       return false;
     }
-    // Smart animation based on data size when enabled
-    const smartAnimation = this.totalDataPoints < 5000;
+    // Smart animation based on data size when explicitly enabled
+    const smartAnimation = this.totalDataPoints < 2000;
     this.LOG(`[PERF] Smart animations: ${smartAnimation} (${this.totalDataPoints} points)`);
     return smartAnimation;
   }
   
   private getAnimationDuration(): number {
-    const enableAnimations = this.ctx.settings?.enableAnimations !== false;
+    const enableAnimations = this.ctx.settings?.enableAnimations === true;
     if (!enableAnimations) return 0;
-    return this.totalDataPoints > 2000 ? 200 : 300;
+    return this.totalDataPoints > 1000 ? 100 : 200;
   }
   
   private getAnimationUpdateDuration(): number {
-    const enableAnimations = this.ctx.settings?.enableAnimations !== false;
+    const enableAnimations = this.ctx.settings?.enableAnimations === true;
     if (!enableAnimations) return 0;
-    return this.totalDataPoints > 2000 ? 100 : 300;
+    // Always 0 for updates to maintain performance
+    return 0;
   }
   
-  private getDataSamplingSettings(points: number): { sampling?: string; large?: boolean; largeThreshold?: number } {
+  private getDataSamplingSettings(points: number): { sampling?: string; large?: boolean; largeThreshold?: number; hoverLayerThreshold?: number } {
     const enableDataSampling = this.ctx.settings?.enableDataSampling !== false;
-    const maxDataPoints = this.ctx.settings?.maxDataPoints || 10000;
+    const maxDataPoints = this.ctx.settings?.maxDataPoints || 5000;
     
     if (!enableDataSampling) {
       this.LOG(`[PERF] Data sampling disabled for series with ${points} points`);
@@ -1231,12 +1233,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     const samplingConfig: any = {};
     
+    // More aggressive sampling thresholds
     if (points > maxDataPoints) {
       samplingConfig.sampling = 'lttb';
       samplingConfig.large = true;
-      samplingConfig.largeThreshold = Math.floor(maxDataPoints / 2);
-      this.LOG(`[PERF] Data sampling enabled: ${points} -> ~${samplingConfig.largeThreshold} points`);
-    } else if (points > 5000) {
+      samplingConfig.largeThreshold = Math.floor(maxDataPoints / 3);
+      samplingConfig.hoverLayerThreshold = 3000;
+      this.LOG(`[PERF] Heavy sampling enabled: ${points} -> ~${samplingConfig.largeThreshold} points`);
+    } else if (points > 2000) {
       samplingConfig.sampling = 'lttb';
       this.LOG(`[PERF] Light sampling enabled for ${points} points`);
     }
@@ -1244,17 +1248,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return samplingConfig;
   }
   
-  private getProgressiveRenderingSettings(points: number): { progressive?: number; progressiveThreshold?: number } {
-    const enableProgressiveRendering = this.ctx.settings?.enableProgressiveRendering === true;
+  private getProgressiveRenderingSettings(points: number): { progressive?: number; progressiveThreshold?: number; hoverAnimation?: boolean } {
+    // Enable progressive rendering by default for large datasets
+    const enableProgressiveRendering = this.ctx.settings?.enableProgressiveRendering !== false;
     
-    if (!enableProgressiveRendering || points < 20000) {
+    if (!enableProgressiveRendering || points < 10000) {
       return {};
     }
     
     this.LOG(`[PERF] Progressive rendering enabled for ${points} points`);
     return {
-      progressive: 5000,
-      progressiveThreshold: 10000
+      progressive: 4000,  // Points per frame
+      progressiveThreshold: 10000,  // Start progressive sooner
+      hoverAnimation: false  // Disable hover animation for performance
     };
   }
   
