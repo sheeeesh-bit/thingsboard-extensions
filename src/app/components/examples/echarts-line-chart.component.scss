@@ -484,16 +484,22 @@ div[fxFlex] {
   border-collapse: collapse;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
   font-size: 13px;
-  flex: 1;
+  display: block; // Changed to block for scrolling
   overflow-y: auto;
   overflow-x: hidden;
-  max-height: calc(100% - 48px); // Account for header height
+  max-height: calc(100vh - 150px); // Use viewport height minus estimated header/button space
   
   tbody {
+    display: block;
+    width: 100%;
+    
     tr.entity-row {
       cursor: pointer;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       position: relative;
+      display: table;
+      width: 100%;
+      table-layout: fixed;
       
       &::after {
         content: '';
