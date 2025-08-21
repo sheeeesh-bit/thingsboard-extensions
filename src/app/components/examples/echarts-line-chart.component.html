@@ -99,7 +99,7 @@
               <td class="swatch-cell">
                 <div class="swatch-box" [style.background-color]="entity.color"></div>
               </td>
-              <td class="entity-name" [title]="'label: ' + entity.label + (entity.deviceName ? ' (deviceName: ' + entity.deviceName + ')' : '') + '\nData from entity server scope attributes'">{{ entity.displayName }}</td>
+              <td class="entity-name" [title]="entity.label + (entity.deviceName ? '(' + entity.deviceName + ')' : '')">{{ entity.displayName }}</td>
               <td class="entity-count" [title]="'Series: ' + entity.count + ', Points: ' + entity.dataPoints">
                 {{ entity.count }}<span class="data-points"> ({{ entity.dataPoints }})</span>
               </td>
@@ -119,7 +119,7 @@
               <td class="swatch-cell">
                 <div class="swatch-box" [style.background-color]="entity.color"></div>
               </td>
-              <td class="entity-name-compact" [title]="'label: ' + entity.label + (entity.deviceName ? ' (deviceName: ' + entity.deviceName + ')' : '') + '\nData from entity server scope attributes'">
+              <td class="entity-name-compact" [title]="entity.label + (entity.deviceName ? '(' + entity.deviceName + ')' : '')">
                 {{ entity.displayName }}
               </td>
             </tr>

@@ -21,7 +21,7 @@ import {
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import * as XLSX from 'xlsx';
-import { Observable, of } from 'rxjs';
+import { Observable, of, firstValueFrom } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { MatDialog } from '@angular/material/dialog';
 import { EchartsSettingsDialogComponent } from './settings-dialog/echarts-settings-dialog.component';
@@ -207,6 +207,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // Cache for entity display names
   private entityDisplayNameCache = new Map<string, string>();
+  private entityAttributesCache = new Map<string, { label: string; deviceName: string }>();
   
   // Time formatters
   private zoomTimeWithSeconds = 60 * 60 * 1000;       // 1 day
@@ -1667,28 +1668,53 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // Get both label and deviceName for tooltip display
   private getEntityAttributes(entityName: string): { label: string; deviceName: string } {
-    let label = entityName;
+    // First check if we have cached attributes from the SERVER_SCOPE fetch
+    if (this.entityAttributesCache.has(entityName)) {
+      const cached = this.entityAttributesCache.get(entityName)!;
+      this.LOG(`[ENTITY_ATTRS] Using cached attributes for ${entityName}: label="${cached.label}", deviceName="${cached.deviceName}"`);
+      return cached;
+    }
+    
+    let label = entityName;   // default to entity name
     let deviceName = '';
     
     try {
-      // Find the datasource for this entity
-      const datasource = this.ctx.data?.find(d => d.datasource?.entityName === entityName)?.datasource;
-      
-      if (datasource && datasource.latestDataKeys) {
-        // Try to get label attribute from latestDataKeys
-        for (const key of datasource.latestDataKeys) {
-          const keyAny = key as any;
-          if (key.name === 'label' && keyAny.lastValue !== undefined) {
-            label = String(keyAny.lastValue);
-          } else if (key.name === 'deviceName' && keyAny.lastValue !== undefined) {
-            deviceName = String(keyAny.lastValue);
+      // Look through the data to find the entity
+      for (const series of this.ctx.data) {
+        if (series.datasource?.entityName === entityName) {
+          const entity = series.datasource?.entity as any;
+          
+          if (entity) {
+            // First check direct properties
+            if (entity.label && entity.label.trim() !== '') {
+              label = entity.label;
+            }
+            if (entity.deviceName && entity.deviceName.trim() !== '') {
+              deviceName = entity.deviceName;
+            }
+            
+            // Also check additionalInfo
+            if (entity.additionalInfo) {
+              if (!label || label === entityName) {
+                if (entity.additionalInfo.label) {
+                  label = entity.additionalInfo.label;
+                }
+              }
+              if (!deviceName && entity.additionalInfo.deviceName) {
+                deviceName = entity.additionalInfo.deviceName;
+              }
+            }
           }
+          
+          break; // Found the entity, stop searching
         }
       }
+      
     } catch (error) {
       this.LOG(`[ENTITY_ATTRS] Error getting attributes for ${entityName}:`, error);
     }
     
+    this.LOG(`[ENTITY_ATTRS] Returning for ${entityName}: label="${label}", deviceName="${deviceName}"`);
     return { label, deviceName };
   }
   
@@ -1855,39 +1881,55 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // Fetch SERVER_SCOPE attributes
       // Note: The API might expect an entity object, not just the type
       const entityObj = { entityType, id: entityId };
-      const attributes = await this.ctx.attributeService.getEntityAttributes(
+      const attributes = await firstValueFrom(this.ctx.attributeService.getEntityAttributes(
         entityObj as any,
         'SERVER_SCOPE' as any,
         [attributeName, 'label', 'deviceName']  // Try to fetch the requested attribute plus fallbacks
-      ).toPromise();
+      ));
       
       this.LOG(`[ENTITY_DISPLAY] Fetched attributes for ${entityName}:`, attributes);
       
       // Find the requested attribute
       let displayName = entityName;
+      let fetchedLabel = '';
+      let fetchedDeviceName = '';
       
       if (attributes && Array.isArray(attributes)) {
-        // First try to find the requested attribute
+        // Get all the attributes we fetched
+        const labelAttr = attributes.find(attr => attr.key === 'label');
+        const deviceNameAttr = attributes.find(attr => attr.key === 'deviceName');
+        
+        // Store what we found
+        if (labelAttr?.value) {
+          fetchedLabel = labelAttr.value;
+          this.LOG(`[ENTITY_DISPLAY] Found label attribute: ${fetchedLabel}`);
+        }
+        if (deviceNameAttr?.value) {
+          fetchedDeviceName = deviceNameAttr.value;
+          this.LOG(`[ENTITY_DISPLAY] Found deviceName attribute: ${fetchedDeviceName}`);
+        }
+        
+        // Cache both attributes
+        this.entityAttributesCache.set(entityName, {
+          label: fetchedLabel || entityName,
+          deviceName: fetchedDeviceName
+        });
+        
+        // Set display name based on what was requested
         const requestedAttr = attributes.find(attr => attr.key === attributeName);
         if (requestedAttr?.value) {
           displayName = requestedAttr.value;
-          this.LOG(`[ENTITY_DISPLAY] Found ${attributeName} attribute: ${displayName}`);
-        } else {
-          // Fallback to other attributes
-          const labelAttr = attributes.find(attr => attr.key === 'label');
-          const deviceNameAttr = attributes.find(attr => attr.key === 'deviceName');
-          
-          if (labelAttr?.value) {
-            displayName = labelAttr.value;
-            this.LOG(`[ENTITY_DISPLAY] Using fallback label attribute: ${displayName}`);
-          } else if (deviceNameAttr?.value) {
-            displayName = deviceNameAttr.value;
-            this.LOG(`[ENTITY_DISPLAY] Using fallback deviceName attribute: ${displayName}`);
-          }
+          this.LOG(`[ENTITY_DISPLAY] Found requested ${attributeName} attribute: ${displayName}`);
+        } else if (fetchedLabel) {
+          displayName = fetchedLabel;
+          this.LOG(`[ENTITY_DISPLAY] Using fallback label attribute: ${displayName}`);
+        } else if (fetchedDeviceName) {
+          displayName = fetchedDeviceName;
+          this.LOG(`[ENTITY_DISPLAY] Using fallback deviceName attribute: ${displayName}`);
         }
       }
       
-      // Cache the result
+      // Cache the display name result
       this.entityDisplayNameCache.set(entityName, displayName);
       
       // Update the entity list if the display name changed
