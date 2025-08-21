@@ -671,6 +671,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.PERF_LOG(`🚨 Very large dataset: ${this.totalDataPoints} points - aggressive optimization needed`);
     }
     
+    // Series count performance warnings
+    const seriesCount = this.ctx.data?.length || 0;
+    if (seriesCount > 50) {
+      this.PERF_LOG(`📊 Many series detected: ${seriesCount} series - recommend Canvas renderer`);
+    }
+    if (seriesCount > 100) {
+      this.PERF_LOG(`🚨 Excessive series count: ${seriesCount} series - performance will be degraded`);
+    }
+    
     // Process update immediately
     // Clear legend override if this is fresh data from ThingsBoard
     const hasNewData = this.ctx.data?.some((series, idx) => 
@@ -960,6 +969,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         });
         const updateDuration = performance.now() - updateStart;
         this.PERF_LOG(`⚡ Direct ECharts update took: ${updateDuration.toFixed(2)}ms (${this.totalDataPoints} points)`);
+        
+        // Direct update performance warnings
+        if (updateDuration > 100) {
+          this.PERF_LOG(`🐌 Slow direct update: ${updateDuration.toFixed(2)}ms - consider coalescing or Canvas renderer`);
+        }
       }
     }
     
@@ -1002,6 +1016,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         this.chart.resize();
         const resizeDuration = performance.now() - resizeStart;
         this.PERF_LOG(`📏 ECharts resize took: ${resizeDuration.toFixed(2)}ms`);
+        
+        // Resize performance warnings
+        if (resizeDuration > 50) {
+          this.PERF_LOG(`🐌 Slow resize detected: ${resizeDuration.toFixed(2)}ms - consider reducing chart complexity`);
+        }
       }
       
       const oldSize = this.currentSize;
@@ -1432,6 +1451,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       });
       const updateDuration = performance.now() - updateStart;
       this.PERF_LOG(`📈 ECharts setOption took: ${updateDuration.toFixed(2)}ms`);
+      
+      // Update performance warnings
+      if (updateDuration > 100) {
+        this.PERF_LOG(`🐌 Slow update detected: ${updateDuration.toFixed(2)}ms - check data complexity or renderer`);
+      }
     }
 
     this.lastUpdateTime = now;
@@ -2389,6 +2413,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     });
     const initDuration = performance.now() - initStart;
     this.PERF_LOG(`🏗️  ECharts initialization took: ${initDuration.toFixed(2)}ms`);
+    
+    // Renderer performance recommendation
+    if (!useCanvasRenderer && this.totalDataPoints > 1000) {
+      this.PERF_LOG(`⚠️  Using SVG renderer with ${this.totalDataPoints} points - consider Canvas for better performance`);
+    }
     this.LOG('[ECharts Line Chart] Chart instance created:', !!this.chart);
     
     // Show loading spinner immediately
