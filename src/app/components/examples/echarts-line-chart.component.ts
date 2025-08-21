@@ -3565,7 +3565,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Get the actual series label and unit for this grid
     const plotName1 = visibleGridNames[0] ? this.getFirstLabelForGrid(visibleGridNames[0]) : 'Top';
-    const unit1 = tempUnits[0] ? `(${tempUnits[0]})` : '';
+    const unit1 = tempUnits[0] ? `[${tempUnits[0]}]` : '';
     
     this.LOG(`Y-Axis 1 - Plot: ${plotNumber1}, Label: ${plotName1}, Unit: ${unit1}`);
     
@@ -3574,13 +3574,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     let multiLineLabel1: string;
     
     if (numLines === 1) {
-      // 1 line: "Temperature (°C) - 1"
+      // 1 line: "Temperature [°C] - 1"
       multiLineLabel1 = `{singleLine|${plotName1} ${unit1} - ${plotNumber1}}`;
     } else if (numLines === 2) {
-      // 2 lines: "Temperature" / "(°C) - 1"
+      // 2 lines: "Temperature" / "[°C] - 1"
       multiLineLabel1 = `{topLine|${plotName1}}\n{bottomLine|${unit1} - ${plotNumber1}}`;
     } else {
-      // 3 lines: "1" / "Temperature" / "(°C)"
+      // 3 lines: "1" / "Temperature" / "[°C]"
       multiLineLabel1 = `{plotNum|${plotNumber1}}\n{plotName|${plotName1}}\n{plotUnit|${unit1}}`;
     }
     
@@ -3628,7 +3628,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
       // Get the actual series label and unit for this grid
       const plotName = visibleGridNames[i] ? this.getFirstLabelForGrid(visibleGridNames[i]) : `Plot${i + 1}`;
-      const unit = tempUnits[i] ? `(${tempUnits[i]})` : '';
+      const unit = tempUnits[i] ? `[${tempUnits[i]}]` : '';
       
       this.LOG(`Y-Axis ${i + 1} - Plot: ${plotNumber}, Label: ${plotName}, Unit: ${unit}`);
       
@@ -3636,13 +3636,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       let multiLineLabel: string;
       
       if (numLines === 1) {
-        // 1 line: "Temperature (°C) - 1"
+        // 1 line: "Temperature [°C] - 1"
         multiLineLabel = `{singleLine|${plotName} ${unit} - ${plotNumber}}`;
       } else if (numLines === 2) {
-        // 2 lines: "Temperature" / "(°C) - 1"
+        // 2 lines: "Temperature" / "[°C] - 1"
         multiLineLabel = `{topLine|${plotName}}\n{bottomLine|${unit} - ${plotNumber}}`;
       } else {
-        // 3 lines: "1" / "Temperature" / "(°C)"
+        // 3 lines: "1" / "Temperature" / "[°C]"
         multiLineLabel = `{plotNum|${plotNumber}}\n{plotName|${plotName}}\n{plotUnit|${unit}}`;
       }
       
