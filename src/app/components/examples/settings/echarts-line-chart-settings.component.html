@@ -1,548 +1,601 @@
-<form [formGroup]="echartsLineChartSettingsForm" *ngIf="echartsLineChartSettingsForm" style="width: 100%;">
-  <div class="mat-content mat-padding" fxLayout="column" style="width: 100%;">
+<form [formGroup]="echartsLineChartSettingsForm" *ngIf="echartsLineChartSettingsForm" class="apple-settings-form">
+  <div class="settings-container">
     
-    <!-- Design Settings -->
-    <mat-expansion-panel expanded>
-      <mat-expansion-panel-header>
-        <mat-panel-title>Design</mat-panel-title>
-      </mat-expansion-panel-header>
+    <!-- Design & Appearance Section (Collapsible) -->
+    <div class="settings-section" [class.collapsed]="!expandedSections['design']">
+      <div class="section-header" (click)="toggleSection('design')">
+        <div class="section-icon design-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7V11C2 16.55 5.84 21.74 11 22.95C16.16 21.74 22 16.55 22 11V7L12 2Z" fill="currentColor" opacity="0.2"/>
+            <path d="M17 8L9 16L5 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="section-info">
+          <h3 class="section-title">Design & Appearance</h3>
+          <p class="section-subtitle">Customize chart visuals and layout</p>
+        </div>
+        <div class="section-chevron">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
       
-      <div fxLayout="column" fxLayoutGap="16px">
-        
-        <h4>Y-Axis Label Layout</h4>
-        <mat-form-field class="mat-block" appearance="outline">
-          <mat-label>Number of Lines</mat-label>
-          <mat-select formControlName="yAxisLabelLines">
-            <mat-option [value]="1">
-              <div fxLayout="row" fxLayoutAlign="start center" fxLayoutGap="16px">
-                <div fxFlex="30" style="font-weight: 500">1 Line</div>
-                <div fxFlex style="font-size: 11px; color: #666; font-family: monospace">
-                  Temperature (°C) - 1
-                </div>
+      <div class="settings-content" *ngIf="expandedSections['design']">
+        <!-- Color Scheme -->
+        <div class="setting-group">
+          <label class="setting-label">Color Scheme</label>
+          <div class="color-scheme-selector">
+            <div class="color-option" 
+                 [class.selected]="echartsLineChartSettingsForm.get('colorScheme')?.value === 'default'"
+                 (click)="echartsLineChartSettingsForm.get('colorScheme')?.setValue('default')">
+              <div class="color-preview">
+                <span class="color-dot" style="background: #007aff"></span>
+                <span class="color-dot" style="background: #ff9500"></span>
+                <span class="color-dot" style="background: #34c759"></span>
               </div>
-            </mat-option>
-            <mat-option [value]="2">
-              <div fxLayout="row" fxLayoutAlign="start center" fxLayoutGap="16px">
-                <div fxFlex="30" style="font-weight: 500">2 Lines</div>
-                <div fxFlex style="font-size: 11px; color: #666; font-family: monospace; line-height: 1.4">
-                  Temperature<br>(°C) - 1
-                </div>
+              <span class="color-name">Default</span>
+            </div>
+            <div class="color-option"
+                 [class.selected]="echartsLineChartSettingsForm.get('colorScheme')?.value === 'dark'"
+                 (click)="echartsLineChartSettingsForm.get('colorScheme')?.setValue('dark')">
+              <div class="color-preview">
+                <span class="color-dot" style="background: #1e3a8a"></span>
+                <span class="color-dot" style="background: #7c2d12"></span>
+                <span class="color-dot" style="background: #14532d"></span>
               </div>
-            </mat-option>
-            <mat-option [value]="3">
-              <div fxLayout="row" fxLayoutAlign="start center" fxLayoutGap="16px">
-                <div fxFlex="30" style="font-weight: 500">3 Lines</div>
-                <div fxFlex style="font-size: 11px; color: #666; font-family: monospace; line-height: 1.4">
-                  1<br>Temperature<br>(°C)
-                </div>
+              <span class="color-name">Dark</span>
+            </div>
+            <div class="color-option"
+                 [class.selected]="echartsLineChartSettingsForm.get('colorScheme')?.value === 'vibrant'"
+                 (click)="echartsLineChartSettingsForm.get('colorScheme')?.setValue('vibrant')">
+              <div class="color-preview">
+                <span class="color-dot" style="background: #ff006e"></span>
+                <span class="color-dot" style="background: #fb5607"></span>
+                <span class="color-dot" style="background: #ffbe0b"></span>
               </div>
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-        
-        <h4>Color Scheme</h4>
-        <mat-form-field class="mat-block" appearance="outline">
-          <mat-label>Chart Color Scheme</mat-label>
-          <mat-select formControlName="colorScheme">
-            <mat-option value="default">Default (Blue/Orange/Green)</mat-option>
-            <mat-option value="dark">Dark (Deep Colors)</mat-option>
-            <mat-option value="vibrant">Vibrant (Bright Colors)</mat-option>
-            <mat-option value="pastel">Pastel (Soft Colors)</mat-option>
-            <mat-option value="monochrome">Monochrome (Blue Shades)</mat-option>
-          </mat-select>
-        </mat-form-field>
-        
-        <h4>Entity Display Names</h4>
-        <mat-form-field class="mat-block" appearance="outline">
-          <mat-label>Entity Name Attribute</mat-label>
-          <mat-select formControlName="entityDisplayAttribute">
-            <mat-option value="label">Label (SERVER_SCOPE)</mat-option>
-            <mat-option value="deviceName">Device Name (SERVER_SCOPE)</mat-option>
-            <mat-option value="name">Entity Name (default)</mat-option>
-            <mat-option value="custom">Custom Attribute</mat-option>
-          </mat-select>
-        </mat-form-field>
-        
-        <mat-form-field class="mat-block" appearance="outline" *ngIf="echartsLineChartSettingsForm.get('entityDisplayAttribute')?.value === 'custom'">
-          <mat-label>Custom Attribute Name</mat-label>
-          <input matInput formControlName="customEntityAttribute" placeholder="e.g., displayName">
-        </mat-form-field>
-        
-        <h4>Sidebar Display Mode</h4>
-        <mat-form-field class="mat-block" appearance="outline">
-          <mat-label>Sidebar View Mode</mat-label>
-          <mat-select formControlName="sidebarDisplayMode">
-            <mat-option value="full">Full Table (Name + Count)</mat-option>
-            <mat-option value="compact">Compact (Name only)</mat-option>
-            <mat-option value="colors">Colors Only</mat-option>
-            <mat-option value="initials">Colors with Initials (3 letters)</mat-option>
-          </mat-select>
-        </mat-form-field>
-        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px;">
-          <p style="margin: 8px 0;"><strong>Display Modes:</strong></p>
-          <ul style="margin: 4px 0; padding-left: 20px;">
-            <li><strong>Full Table:</strong> Shows entity names with series count</li>
-            <li><strong>Compact:</strong> Shows entity names only in smaller format</li>
-            <li><strong>Colors Only:</strong> Shows only color boxes (minimal space)</li>
-            <li><strong>Colors with Initials:</strong> Shows color boxes with first 3 letters</li>
-          </ul>
+              <span class="color-name">Vibrant</span>
+            </div>
+            <div class="color-option"
+                 [class.selected]="echartsLineChartSettingsForm.get('colorScheme')?.value === 'pastel'"
+                 (click)="echartsLineChartSettingsForm.get('colorScheme')?.setValue('pastel')">
+              <div class="color-preview">
+                <span class="color-dot" style="background: #ffd6ff"></span>
+                <span class="color-dot" style="background: #e7c6ff"></span>
+                <span class="color-dot" style="background: #c8b6ff"></span>
+              </div>
+              <span class="color-name">Pastel</span>
+            </div>
+            <div class="color-option"
+                 [class.selected]="echartsLineChartSettingsForm.get('colorScheme')?.value === 'monochrome'"
+                 (click)="echartsLineChartSettingsForm.get('colorScheme')?.setValue('monochrome')">
+              <div class="color-preview">
+                <span class="color-dot" style="background: #001f3f"></span>
+                <span class="color-dot" style="background: #003366"></span>
+                <span class="color-dot" style="background: #004080"></span>
+              </div>
+              <span class="color-name">Mono</span>
+            </div>
+          </div>
         </div>
-        
-        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px;">
-          <p style="margin: 8px 0;"><strong>Layout Options:</strong></p>
-          <ul style="margin: 4px 0; padding-left: 20px;">
-            <li><strong>Stacked:</strong> Traditional 3-line layout with plot number, label, and units on separate lines</li>
-            <li><strong>Compact:</strong> Space-saving single line format: "Label (units) · ①"</li>
-          </ul>
+
+        <!-- Y-Axis Label Layout -->
+        <div class="setting-group">
+          <label class="setting-label">Y-Axis Label Layout</label>
+          <div class="segmented-control">
+            <button type="button" class="segment"
+                    [class.active]="echartsLineChartSettingsForm.get('yAxisLabelLines')?.value === 1"
+                    (click)="echartsLineChartSettingsForm.get('yAxisLabelLines')?.setValue(1)">
+              1 Line
+            </button>
+            <button type="button" class="segment"
+                    [class.active]="echartsLineChartSettingsForm.get('yAxisLabelLines')?.value === 2"
+                    (click)="echartsLineChartSettingsForm.get('yAxisLabelLines')?.setValue(2)">
+              2 Lines
+            </button>
+            <button type="button" class="segment"
+                    [class.active]="echartsLineChartSettingsForm.get('yAxisLabelLines')?.value === 3"
+                    (click)="echartsLineChartSettingsForm.get('yAxisLabelLines')?.setValue(3)">
+              3 Lines
+            </button>
+          </div>
+        </div>
+
+        <!-- Sidebar Display Mode -->
+        <div class="setting-group">
+          <label class="setting-label">Sidebar Display</label>
+          <div class="segmented-control">
+            <button type="button" class="segment"
+                    [class.active]="echartsLineChartSettingsForm.get('sidebarDisplayMode')?.value === 'full'"
+                    (click)="echartsLineChartSettingsForm.get('sidebarDisplayMode')?.setValue('full')">
+              Full
+            </button>
+            <button type="button" class="segment"
+                    [class.active]="echartsLineChartSettingsForm.get('sidebarDisplayMode')?.value === 'compact'"
+                    (click)="echartsLineChartSettingsForm.get('sidebarDisplayMode')?.setValue('compact')">
+              Compact
+            </button>
+            <button type="button" class="segment"
+                    [class.active]="echartsLineChartSettingsForm.get('sidebarDisplayMode')?.value === 'colors'"
+                    (click)="echartsLineChartSettingsForm.get('sidebarDisplayMode')?.setValue('colors')">
+              Colors
+            </button>
+          </div>
+        </div>
+
+        <!-- Toggle Settings -->
+        <div class="toggle-group">
+          <div class="toggle-row">
+            <label class="toggle-label">Smooth Lines</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="smooth">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Show Data Points</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="showDataPoints">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row" *ngIf="echartsLineChartSettingsForm.get('showDataPoints')?.value">
+            <label class="toggle-label">Point Size: {{echartsLineChartSettingsForm.get('symbolSize_data')?.value}}</label>
+            <input type="range" class="apple-slider" min="1" max="15" step="1" formControlName="symbolSize_data">
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Show Legend</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="showlegend">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Multiple Devices Mode</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="multipleDevices">
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
       </div>
-    </mat-expansion-panel>
+    </div>
 
-    <!-- Legend Style Settings -->
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title>Legend Style Settings</mat-panel-title>
-      </mat-expansion-panel-header>
+
+    <!-- Grid Layout (Collapsible) -->
+    <div class="settings-section" [class.collapsed]="!expandedSections['grid']">
+      <div class="section-header" (click)="toggleSection('grid')">
+        <div class="section-icon grid-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+            <line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" stroke-width="2"/>
+            <line x1="3" y1="15" x2="21" y2="15" stroke="currentColor" stroke-width="2"/>
+            <line x1="9" y1="3" x2="9" y2="21" stroke="currentColor" stroke-width="2"/>
+            <line x1="15" y1="3" x2="15" y2="21" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="section-info">
+          <h3 class="section-title">Grid Layout</h3>
+          <p class="section-subtitle">Adjust chart grid margins and spacing</p>
+        </div>
+        <div class="section-chevron">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
       
-      <div fxLayout="column" fxLayoutGap="16px">
-        <mat-checkbox formControlName="showlegend">Show Legend</mat-checkbox>
-        
-        <mat-form-field class="mat-block" appearance="outline">
-          <mat-label>Legend Color</mat-label>
-          <input matInput type="color" formControlName="legendcolortext">
-        </mat-form-field>
+      <div class="settings-content" *ngIf="expandedSections['grid']">
+        <div class="grid-inputs">
+          <div class="input-group">
+            <label class="input-label">Top Margin</label>
+            <input type="number" class="apple-input" formControlName="grid_layout_top" placeholder="40">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Bottom Margin</label>
+            <input type="number" class="apple-input" formControlName="grid_layout_bottom" placeholder="240">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Left Margin</label>
+            <input type="number" class="apple-input" formControlName="grid_layout_left" placeholder="130">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Right Margin</label>
+            <input type="number" class="apple-input" formControlName="grid_layout_right" placeholder="40">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Scrolling Starts After (plots)</label>
+            <input type="number" class="apple-input" formControlName="scrollingStartsAfter" placeholder="3">
+          </div>
+        </div>
       </div>
-    </mat-expansion-panel>
+    </div>
 
-    <!-- Graph Settings -->
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title>Graph Settings</mat-panel-title>
-      </mat-expansion-panel-header>
+    <!-- Tooltip Settings (Collapsible) -->
+    <div class="settings-section" [class.collapsed]="!expandedSections['tooltip']">
+      <div class="section-header" (click)="toggleSection('tooltip')">
+        <div class="section-icon tooltip-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <rect x="4" y="6" width="16" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
+            <path d="M8 10H16M8 14H12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="section-info">
+          <h3 class="section-title">Tooltip Settings</h3>
+          <p class="section-subtitle">Configure tooltip behavior and display</p>
+        </div>
+        <div class="section-chevron">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
       
-      <div fxLayout="column" fxLayoutGap="16px">
-        <mat-checkbox formControlName="smooth">Smooth out</mat-checkbox>
-        
-        <!-- Multiple Devices Mode -->
-        <mat-checkbox formControlName="multipleDevices">
-          Multiple Devices Mode (7 Subplots)
-        </mat-checkbox>
-        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
-          Enable to support up to 7 subplots for multiple devices. When disabled, uses standard 3 subplot mode.
+      <div class="settings-content" *ngIf="expandedSections['tooltip']">
+        <div class="toggle-row">
+          <label class="toggle-label">Only Show Hovered Grid</label>
+          <label class="apple-switch">
+            <input type="checkbox" formControlName="tooltipOnlyHoveredGrid">
+            <span class="slider"></span>
+          </label>
         </div>
-        
-        <!-- Left Y-Axis Settings -->
-        <div class="axis-section">
-          <h4>Left Y-Axis</h4>
-          <mat-form-field class="mat-block" appearance="outline">
-            <mat-label>Title Left Y-Axis</mat-label>
-            <input matInput formControlName="yAxisLeftTitle">
-          </mat-form-field>
-          
-          <mat-form-field class="mat-block" appearance="outline">
-            <mat-label>Unit Left Y-Axis</mat-label>
-            <input matInput formControlName="yAxisLeftUnit">
-          </mat-form-field>
-          
-          <mat-checkbox formControlName="yAxisLeftAutoScale">Left Y-Axis Autoscale</mat-checkbox>
-          
-          <div fxLayout="row" fxLayoutGap="16px" *ngIf="!echartsLineChartSettingsForm.get('yAxisLeftAutoScale')?.value">
-            <mat-form-field fxFlex appearance="outline">
-              <mat-label>Left Y-Axis Min-Value</mat-label>
-              <input matInput type="number" formControlName="yAxisLeftMinScale">
-            </mat-form-field>
-            
-            <mat-form-field fxFlex appearance="outline">
-              <mat-label>Left Y-Axis Max-Value</mat-label>
-              <input matInput type="number" formControlName="yAxisLeftMaxScale">
-            </mat-form-field>
-          </div>
+        <div class="input-group">
+          <label class="input-label">Max Items to Display</label>
+          <input type="number" class="apple-input" formControlName="tooltipMaxItems" placeholder="10">
         </div>
-
-        <!-- Right Y-Axis Settings -->
-        <div class="axis-section">
-          <h4>Right Y-Axis</h4>
-          <mat-form-field class="mat-block" appearance="outline">
-            <mat-label>Title Right Y-Axis</mat-label>
-            <input matInput formControlName="yAxisRightTitle">
-          </mat-form-field>
-          
-          <mat-form-field class="mat-block" appearance="outline">
-            <mat-label>Unit Right Y-Axis</mat-label>
-            <input matInput formControlName="yAxisRightUnit">
-          </mat-form-field>
-          
-          <mat-checkbox formControlName="yAxisRightAutoScale">Right Y-Axis Autoscale</mat-checkbox>
-          
-          <div fxLayout="row" fxLayoutGap="16px" *ngIf="!echartsLineChartSettingsForm.get('yAxisRightAutoScale')?.value">
-            <mat-form-field fxFlex appearance="outline">
-              <mat-label>Right Y-Axis Min-Value</mat-label>
-              <input matInput type="number" formControlName="yAxisRightMinScale">
-            </mat-form-field>
-            
-            <mat-form-field fxFlex appearance="outline">
-              <mat-label>Right Y-Axis Max-Value</mat-label>
-              <input matInput type="number" formControlName="yAxisRightMaxScale">
-            </mat-form-field>
-          </div>
-          
-          <mat-form-field class="mat-block" appearance="outline">
-            <mat-label>Right y-Axis Color</mat-label>
-            <input matInput type="color" formControlName="yAxisRightColorChoser">
-          </mat-form-field>
+        <div class="input-group">
+          <label class="input-label">Show All if Series Count ≤</label>
+          <input type="number" class="apple-input" formControlName="tooltipShowAllIfSeriesCountLTE" placeholder="0">
         </div>
-
-        <!-- Data Points Settings -->
-        <mat-checkbox formControlName="showDataPoints">Show Data points</mat-checkbox>
-        
-        <mat-form-field class="mat-block" appearance="outline" *ngIf="echartsLineChartSettingsForm.get('showDataPoints')?.value">
-          <mat-label>Size of Data points</mat-label>
-          <input matInput type="number" formControlName="symbolSize_data">
-        </mat-form-field>
-        
-        <mat-checkbox formControlName="showPanZoomTool">Show Pan and Zoom tool</mat-checkbox>
-        
-        <!-- Grid Layout Settings -->
-        <h4>Grid Layout</h4>
-        
-        <mat-form-field class="mat-block" appearance="outline">
-          <mat-label>Start Scrolling After (Number of Plots)</mat-label>
-          <mat-select formControlName="scrollingStartsAfter">
-            <mat-option [value]="1">1 Plot (Always scroll)</mat-option>
-            <mat-option [value]="2">2 Plots</mat-option>
-            <mat-option [value]="3">3 Plots (Default)</mat-option>
-            <mat-option [value]="4">4 Plots</mat-option>
-            <mat-option [value]="5">5 Plots</mat-option>
-            <mat-option [value]="6">6 Plots</mat-option>
-            <mat-option [value]="7">7 Plots</mat-option>
-          </mat-select>
-          <mat-hint>Plots will fit without scrolling up to this number</mat-hint>
-        </mat-form-field>
-        <div fxLayout="row" fxLayoutGap="16px">
-          <mat-form-field fxFlex appearance="outline">
-            <mat-label>Markline Left or Right</mat-label>
-            <input matInput type="number" formControlName="markline_layout_left_or_right">
-          </mat-form-field>
-          
-          <mat-form-field fxFlex appearance="outline">
-            <mat-label>Chart to the left</mat-label>
-            <input matInput type="number" formControlName="grid_layout_left">
-          </mat-form-field>
-        </div>
-        
-        <div fxLayout="row" fxLayoutGap="16px">
-          <mat-form-field fxFlex appearance="outline">
-            <mat-label>Chart to the right</mat-label>
-            <input matInput type="number" formControlName="grid_layout_right">
-          </mat-form-field>
-          
-          <mat-form-field fxFlex appearance="outline">
-            <mat-label>Chart to the top</mat-label>
-            <input matInput type="number" formControlName="grid_layout_top">
-          </mat-form-field>
-        </div>
-        
-        <mat-form-field class="mat-block" appearance="outline">
-          <mat-label>Chart to the bottom</mat-label>
-          <input matInput type="number" formControlName="grid_layout_bottom">
-        </mat-form-field>
-
-        <!-- Annotations -->
-        <h4>Annotations</h4>
-        <div formArrayName="annotations">
-          <div *ngFor="let annotation of annotationsFormArray.controls; let i = index" [formGroupName]="i" class="annotation-item">
-            <mat-card>
-              <mat-card-content>
-                <div fxLayout="row" fxLayoutGap="16px">
-                  <mat-form-field fxFlex appearance="outline">
-                    <mat-label>Annotations Type</mat-label>
-                    <mat-select formControlName="annotationsType">
-                      <mat-option value="Fixed">Fixed</mat-option>
-                      <mat-option value="Attribute">Attribute</mat-option>
-                    </mat-select>
-                  </mat-form-field>
-                  
-                  <mat-form-field fxFlex appearance="outline" *ngIf="annotation.get('annotationsType')?.value === 'Fixed'">
-                    <mat-label>Fixed Number</mat-label>
-                    <input matInput type="number" formControlName="fixedNumber">
-                  </mat-form-field>
-                  
-                  <mat-form-field fxFlex appearance="outline" *ngIf="annotation.get('annotationsType')?.value === 'Attribute'">
-                    <mat-label>Attribute</mat-label>
-                    <input matInput formControlName="attribute">
-                  </mat-form-field>
-                </div>
-                
-                <div fxLayout="row" fxLayoutGap="16px">
-                  <mat-form-field fxFlex appearance="outline">
-                    <mat-label>Description</mat-label>
-                    <input matInput formControlName="description">
-                  </mat-form-field>
-                  
-                  <mat-form-field appearance="outline">
-                    <mat-label>Color</mat-label>
-                    <mat-select formControlName="color">
-                      <mat-option value="Red">Red</mat-option>
-                      <mat-option value="Green">Green</mat-option>
-                      <mat-option value="Blue">Blue</mat-option>
-                      <mat-option value="Yellow">Yellow</mat-option>
-                    </mat-select>
-                  </mat-form-field>
-                  
-                  <mat-form-field appearance="outline" *ngIf="annotation.get('annotationsType')?.value === 'Attribute'">
-                    <mat-label>Attribute Type</mat-label>
-                    <mat-select formControlName="attributeType">
-                      <mat-option value="Client">Client</mat-option>
-                      <mat-option value="Server">Server</mat-option>
-                    </mat-select>
-                  </mat-form-field>
-                  
-                  <mat-form-field appearance="outline">
-                    <mat-label>Axis Assignment</mat-label>
-                    <mat-select formControlName="axisAssignment">
-                      <mat-option value="Left">Left</mat-option>
-                      <mat-option value="Right">Right</mat-option>
-                    </mat-select>
-                  </mat-form-field>
-                  
-                  <button mat-icon-button color="warn" (click)="removeAnnotation(i)">
-                    <mat-icon>delete</mat-icon>
-                  </button>
-                </div>
-              </mat-card-content>
-            </mat-card>
-          </div>
-        </div>
-        
-        <button mat-raised-button color="primary" (click)="addAnnotation()">
-          <mat-icon>add</mat-icon>
-          Add Annotation
-        </button>
       </div>
-    </mat-expansion-panel>
+    </div>
 
-    <!-- Export Settings -->
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title>Export Settings</mat-panel-title>
-      </mat-expansion-panel-header>
+    <!-- Export Settings (Collapsible) -->
+    <div class="settings-section" [class.collapsed]="!expandedSections['export']">
+      <div class="section-header" (click)="toggleSection('export')">
+        <div class="section-icon export-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 3V15M12 15L8 11M12 15L16 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M3 17V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="section-info">
+          <h3 class="section-title">Export Settings</h3>
+          <p class="section-subtitle">Configure data export options</p>
+        </div>
+        <div class="section-chevron">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
       
-      <div fxLayout="column" fxLayoutGap="16px">
-        <mat-form-field class="mat-block" appearance="outline">
-          <mat-label>Export Decimal Places</mat-label>
-          <input matInput type="number" min="0" max="10" formControlName="exportDecimals">
-          <mat-hint>Number of decimal places for exported data in CSV, XLS, and XLSX files</mat-hint>
-        </mat-form-field>
-        
-        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px;">
-          <p style="margin: 8px 0;"><strong>Note:</strong> This setting controls the precision of numeric values in all exported files.</p>
-          <ul style="margin: 4px 0; padding-left: 20px;">
-            <li>Default: 6 decimal places (matches ThingsBoard standard)</li>
-            <li>Trailing zeros are automatically removed</li>
-            <li>Applies to CSV, XLS, and XLSX formats</li>
-          </ul>
+      <div class="settings-content" *ngIf="expandedSections['export']">
+        <div class="input-group">
+          <label class="input-label">Decimal Places</label>
+          <input type="number" class="apple-input" formControlName="exportDecimals" min="0" max="10" placeholder="6">
+        </div>
+        <div class="toggle-row">
+          <label class="toggle-label">Show Pan/Zoom Tool</label>
+          <label class="apple-switch">
+            <input type="checkbox" formControlName="showPanZoomTool">
+            <span class="slider"></span>
+          </label>
         </div>
       </div>
-    </mat-expansion-panel>
+    </div>
 
-    <!-- Tooltip Settings -->
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title>Tooltip Settings</mat-panel-title>
-      </mat-expansion-panel-header>
+    <!-- Min/Max Reference Lines (Always Expanded) -->
+    <div class="settings-section">
+      <div class="section-header">
+        <div class="section-icon minmax-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M3 12H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 2"/>
+            <path d="M3 6H21" stroke="#007aff" stroke-width="2" stroke-linecap="round"/>
+            <path d="M3 18H21" stroke="#ff3b30" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="section-info">
+          <h3 class="section-title">Min/Max Reference Lines</h3>
+          <p class="section-subtitle">Show global minimum and maximum values</p>
+        </div>
+      </div>
       
-      <div fxLayout="column" fxLayoutGap="16px">
-        <mat-checkbox formControlName="tooltipOnlyHoveredGrid">
-          Show Only Hovered Grid Series
-        </mat-checkbox>
-        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
-          When enabled, tooltip will only display series from the grid/subplot that the mouse is hovering over.
+      <div class="settings-content">
+        <div class="toggle-row">
+          <label class="toggle-label">Enable Min/Max Lines</label>
+          <label class="apple-switch">
+            <input type="checkbox" formControlName="minMaxVisible">
+            <span class="slider"></span>
+          </label>
         </div>
         
-        <mat-form-field class="mat-block" appearance="outline">
-          <mat-label>Maximum Tooltip Items</mat-label>
-          <input matInput type="number" min="1" max="50" formControlName="tooltipMaxItems">
-          <mat-hint>Maximum number of series to display in tooltip (1-50)</mat-hint>
-        </mat-form-field>
-        
-        <mat-form-field class="mat-block" appearance="outline" *ngIf="echartsLineChartSettingsForm.get('tooltipOnlyHoveredGrid')?.value">
-          <mat-label>Show All Tooltip If Total Series Count ≤</mat-label>
-          <input matInput type="number" min="0" max="50" formControlName="tooltipShowAllIfSeriesCountLTE">
-          <mat-hint>Show all series from all grids if the total visible series count across all grids is ≤ this value (0 = disabled)</mat-hint>
-        </mat-form-field>
+        <div class="subsettings" *ngIf="echartsLineChartSettingsForm.get('minMaxVisible')?.value">
+          <div class="setting-group">
+            <label class="setting-label">Line Style</label>
+            <div class="segmented-control">
+              <button type="button" class="segment"
+                      [class.active]="echartsLineChartSettingsForm.get('minMaxStyle')?.value === 'dashed'"
+                      (click)="echartsLineChartSettingsForm.get('minMaxStyle')?.setValue('dashed')">
+                <svg width="24" height="2" viewBox="0 0 24 2">
+                  <path d="M0 1H5 M8 1H13 M16 1H21" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </button>
+              <button type="button" class="segment"
+                      [class.active]="echartsLineChartSettingsForm.get('minMaxStyle')?.value === 'solid'"
+                      (click)="echartsLineChartSettingsForm.get('minMaxStyle')?.setValue('solid')">
+                <svg width="24" height="2" viewBox="0 0 24 2">
+                  <path d="M0 1H24" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </button>
+              <button type="button" class="segment"
+                      [class.active]="echartsLineChartSettingsForm.get('minMaxStyle')?.value === 'dotted'"
+                      (click)="echartsLineChartSettingsForm.get('minMaxStyle')?.setValue('dotted')">
+                <svg width="24" height="2" viewBox="0 0 24 2">
+                  <path d="M0 1H1 M3 1H4 M6 1H7 M9 1H10 M12 1H13" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          
+          <div class="setting-group">
+            <label class="setting-label">Line Width: {{echartsLineChartSettingsForm.get('minMaxLineWidth')?.value}}px</label>
+            <input type="range" class="apple-slider" min="1" max="5" step="1" formControlName="minMaxLineWidth">
+          </div>
+        </div>
       </div>
-    </mat-expansion-panel>
+    </div>
 
-    <!-- Features Tab - Control UI Element Visibility -->
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title>Features</mat-panel-title>
-      </mat-expansion-panel-header>
-      
-      <div fxLayout="column" fxLayoutGap="16px">
-        <h4>Button Visibility</h4>
-        
-        <mat-checkbox formControlName="showImageButton">
-          Show Image Export Button
-        </mat-checkbox>
-        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
-          Enable to show the camera button for exporting chart as image
+    <!-- Alarm Overlays (Always Expanded) -->
+    <div class="settings-section">
+      <div class="section-header">
+        <div class="section-icon alarm-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7V11C2 16.55 5.84 21.74 11 22.95C16.16 21.74 22 16.55 22 11V7L12 2Z" 
+                  fill="#ff3b30" opacity="0.2"/>
+            <path d="M12 9V13M12 17H12.01" stroke="#ff3b30" stroke-width="2" stroke-linecap="round"/>
+          </svg>
         </div>
-        
-        <mat-checkbox formControlName="showExportButton">
-          Show Data Export Button
-        </mat-checkbox>
-        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
-          Enable to show the export dropdown (CSV, XLS, XLSX)
-        </div>
-        
-        <mat-checkbox formControlName="showResetZoomButton">
-          Show Reset Zoom Button
-        </mat-checkbox>
-        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
-          Enable to show the reset zoom button
-        </div>
-        
-        <h4>Sidebar Features</h4>
-        
-        <mat-checkbox formControlName="showEntitySidebar">
-          Show Entity Sidebar
-        </mat-checkbox>
-        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
-          Enable to show the entity list on the left side
-        </div>
-        
-        <h4>Chart Features</h4>
-        
-        <mat-checkbox formControlName="showCustomLegend">
-          Show Custom Legend
-        </mat-checkbox>
-        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
-          Enable to show the custom legend with plot numbers
-        </div>
-        
-        <mat-checkbox formControlName="showZoomControls">
-          Show Zoom Controls
-        </mat-checkbox>
-        <div class="info-text" style="color: rgba(0,0,0,0.6); font-size: 12px; margin-left: 32px; margin-top: -8px;">
-          Enable to show the bottom zoom slider controls
+        <div class="section-info">
+          <h3 class="section-title">Alarm Overlays</h3>
+          <p class="section-subtitle">Display device alarm thresholds</p>
         </div>
       </div>
-    </mat-expansion-panel>
+      
+      <div class="settings-content">
+        <div class="toggle-row">
+          <label class="toggle-label">Enable Alarm Overlays</label>
+          <label class="apple-switch">
+            <input type="checkbox" formControlName="alarmStatusVisible">
+            <span class="slider"></span>
+          </label>
+        </div>
+        
+        <div class="subsettings" *ngIf="echartsLineChartSettingsForm.get('alarmStatusVisible')?.value">
+          <div class="setting-group">
+            <label class="setting-label">Opacity: {{Math.round((echartsLineChartSettingsForm.get('alarmOpacity')?.value || 0.12) * 100)}}%</label>
+            <input type="range" class="apple-slider" min="0.05" max="0.3" step="0.01" formControlName="alarmOpacity">
+          </div>
+          
+          <div class="checkbox-group">
+            <label class="apple-checkbox">
+              <input type="checkbox" formControlName="alarmShowCritical">
+              <span class="checkbox-box"></span>
+              <span class="checkbox-label">
+                <span class="severity-dot critical"></span>
+                Critical Alarms
+              </span>
+            </label>
+            <label class="apple-checkbox">
+              <input type="checkbox" formControlName="alarmShowWarning">
+              <span class="checkbox-box"></span>
+              <span class="checkbox-label">
+                <span class="severity-dot warning"></span>
+                Warning Alarms
+              </span>
+            </label>
+            <label class="apple-checkbox">
+              <input type="checkbox" formControlName="alarmShowInfo">
+              <span class="checkbox-box"></span>
+              <span class="checkbox-label">
+                <span class="severity-dot info"></span>
+                Info Alarms
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <!-- Debug Settings -->
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title>Debug & Performance</mat-panel-title>
-      </mat-expansion-panel-header>
-      
-      <div fxLayout="column" fxLayoutGap="16px">
-        <mat-checkbox formControlName="debugOutput">Use Debug Output</mat-checkbox>
-        
-        <h4 style="margin: 16px 0 8px 0; color: #333; font-size: 14px; font-weight: 500;">Page Load Performance</h4>
-        <mat-checkbox formControlName="useLazyLoading">
-          <div fxLayout="column">
-            <span>Use Lazy Loading</span>
-            <small style="color: #666; font-size: 11px;">
-              Enable deferred chart rendering for better initial load performance with large datasets
-            </small>
-          </div>
-        </mat-checkbox>
-        
-        <h4 style="margin: 16px 0 8px 0; color: #333; font-size: 14px; font-weight: 500;">ECharts Rendering Settings</h4>
-        <mat-checkbox formControlName="enableAnimations">
-          <div fxLayout="column">
-            <span>Enable Chart Animations</span>
-            <small style="color: #666; font-size: 11px;">
-              Enable smooth transitions and animations (disable for better performance with large datasets)
-            </small>
-          </div>
-        </mat-checkbox>
-        
-        <mat-checkbox formControlName="useCanvasRenderer">
-          <div fxLayout="column">
-            <span>Use Canvas Renderer</span>
-            <small style="color: #666; font-size: 11px;">
-              Use Canvas instead of SVG for rendering (better performance for large datasets, lower quality)
-            </small>
-          </div>
-        </mat-checkbox>
-        
-        <mat-checkbox formControlName="enableDataSampling">
-          <div fxLayout="column">
-            <span>Enable Data Sampling</span>
-            <small style="color: #666; font-size: 11px;">
-              Automatically reduce data points for better performance when dataset exceeds threshold
-            </small>
-          </div>
-        </mat-checkbox>
-        
-        <mat-form-field class="mat-block" appearance="outline">
-          <mat-label>Max Data Points</mat-label>
-          <input matInput type="number" formControlName="maxDataPoints" min="1000" max="100000" step="1000">
-          <mat-hint>Maximum data points per series before sampling kicks in</mat-hint>
-        </mat-form-field>
-        
-        <mat-checkbox formControlName="enableProgressiveRendering">
-          <div fxLayout="column">
-            <span>Enable Progressive Rendering</span>
-            <small style="color: #666; font-size: 11px;">
-              Render chart progressively for very large datasets (experimental, may cause visual glitches)
-            </small>
-          </div>
-        </mat-checkbox>
-        
-        <h4 style="margin: 16px 0 8px 0; color: #333; font-size: 14px; font-weight: 500;">UI Interaction Performance</h4>
-        <mat-checkbox formControlName="optimizeClickHandling">
-          <div fxLayout="column">
-            <span>Optimize Click Handling</span>
-            <small style="color: #666; font-size: 11px;">
-              Enable debouncing and batch processing for faster entity/legend click response
-            </small>
-          </div>
-        </mat-checkbox>
-        
-        <mat-checkbox formControlName="deferredUIUpdates">
-          <div fxLayout="column">
-            <span>Deferred UI Updates</span>
-            <small style="color: #666; font-size: 11px;">
-              Batch UI updates to reduce redraws during rapid entity selections
-            </small>
-          </div>
-        </mat-checkbox>
-        
-        <mat-form-field class="mat-block" appearance="outline">
-          <mat-label>Click Debounce (ms)</mat-label>
-          <input matInput type="number" formControlName="clickDebounceMs" min="0" max="1000" step="50">
-          <mat-hint>Delay before processing clicks to avoid rapid-fire actions</mat-hint>
-        </mat-form-field>
-        
-        <h4 style="margin: 16px 0 8px 0; color: #333; font-size: 14px; font-weight: 500;">ECharts Interaction Optimization</h4>
-        <mat-checkbox formControlName="batchEChartsUpdates">
-          <div fxLayout="column">
-            <span>Batch ECharts Updates</span>
-            <small style="color: #666; font-size: 11px;">
-              Group multiple chart.dispatchAction() calls to reduce re-rendering
-            </small>
-          </div>
-        </mat-checkbox>
-        
-        <mat-form-field class="mat-block" appearance="outline">
-          <mat-label>ECharts Update Delay (ms)</mat-label>
-          <input matInput type="number" formControlName="echartsUpdateDelay" min="0" max="500" step="25">
-          <mat-hint>Delay before applying batched ECharts updates</mat-hint>
-        </mat-form-field>
-        
-        <mat-checkbox formControlName="disableChartAnimationsDuringInteraction">
-          <div fxLayout="column">
-            <span>Disable Animations During Interaction</span>
-            <small style="color: #666; font-size: 11px;">
-              Temporarily disable chart animations during legend/entity clicks for faster response
-            </small>
-          </div>
-        </mat-checkbox>
+    <!-- UI Elements (Collapsible) -->
+    <div class="settings-section" [class.collapsed]="!expandedSections['ui']">
+      <div class="section-header" (click)="toggleSection('ui')">
+        <div class="section-icon ui-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="3" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2"/>
+            <rect x="13" y="3" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2"/>
+            <rect x="3" y="13" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2"/>
+            <rect x="13" y="13" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="section-info">
+          <h3 class="section-title">UI Elements</h3>
+          <p class="section-subtitle">Control visibility of interface components</p>
+        </div>
+        <div class="section-chevron">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
       </div>
-    </mat-expansion-panel>
+      
+      <div class="settings-content" *ngIf="expandedSections['ui']">
+        <div class="toggle-group">
+          <div class="toggle-row">
+            <label class="toggle-label">Image Button</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="showImageButton">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Export Button</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="showExportButton">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Reset Zoom Button</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="showResetZoomButton">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Entity Sidebar</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="showEntitySidebar">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Custom Legend</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="showCustomLegend">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Zoom Controls</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="showZoomControls">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Performance (Collapsible) -->
+    <div class="settings-section" [class.collapsed]="!expandedSections['performance']">
+      <div class="section-header" (click)="toggleSection('performance')">
+        <div class="section-icon perf-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M13 2.05V12H22.95C22.45 17 18.03 21 12.94 21C7.85 21 3.58 16.73 3.08 11.64L3.05 11.37C3.05 6.29 7.34 2 12.42 2C12.61 2 12.79 2.02 12.97 2.05H13Z" fill="currentColor" opacity="0.2"/>
+            <path d="M12 2V12H22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="section-info">
+          <h3 class="section-title">Performance</h3>
+          <p class="section-subtitle">Optimize chart rendering and responsiveness</p>
+        </div>
+        <div class="section-chevron">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+      
+      <div class="settings-content" *ngIf="expandedSections['performance']">
+        <div class="toggle-group">
+          <div class="toggle-row">
+            <label class="toggle-label">Lazy Loading</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="useLazyLoading">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Animations</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="enableAnimations">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Data Sampling</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="enableDataSampling">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="input-group" *ngIf="echartsLineChartSettingsForm.get('enableDataSampling')?.value">
+            <label class="input-label">Max Data Points</label>
+            <input type="number" class="apple-input" formControlName="maxDataPoints" placeholder="10000">
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Progressive Rendering</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="enableProgressiveRendering">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Optimize Click Handling</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="optimizeClickHandling">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Deferred UI Updates</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="deferredUIUpdates">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Batch ECharts Updates</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="batchEChartsUpdates">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Canvas Renderer</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="useCanvasRenderer">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Debug Output</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="debugOutput">
+              <span class="slider"></span>
+            </label>
+          </div>
+          
+          <!-- Debug Logging Configuration -->
+          <div class="subsection">
+            <h4 class="subsection-title">Debug Logging Configuration</h4>
+            <p class="setting-description">Configure which types of debug logs to enable for troubleshooting</p>
+            <button type="button" class="debug-config-button" (click)="openDebugLoggingDialog()">
+              <div class="button-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M10.5 6L9.5 4H4.5L3.5 6V18L4.5 20H19.5L20.5 18V6L19.5 4H14.5L13.5 6H10.5Z" stroke="currentColor" stroke-width="2" fill="none"/>
+                  <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <span>Configure Debug Logs</span>
+              <div class="button-arrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+            </button>
+            <div class="debug-status" *ngIf="echartsLineChartSettingsForm.get('debugNormalLogs')?.value || 
+                                              echartsLineChartSettingsForm.get('debugPerformanceLogs')?.value || 
+                                              echartsLineChartSettingsForm.get('debugMinMaxLogs')?.value || 
+                                              echartsLineChartSettingsForm.get('debugAlarmLogs')?.value">
+              <div class="status-indicator active"></div>
+              <span class="status-text">Debug logging is active</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
   </div>
 </form>

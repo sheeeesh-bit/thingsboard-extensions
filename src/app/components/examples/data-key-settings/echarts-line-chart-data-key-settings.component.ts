@@ -27,6 +27,10 @@ export class EchartsLineChartDataKeySettingsComponent extends WidgetSettingsComp
     super(store);
   }
 
+  selectChartType(type: string): void {
+    this.dataKeySettingsForm.patchValue({ chartType: type });
+  }
+
   protected defaultSettings(): WidgetSettings {
     return {
       chartType: 'Line',

@@ -7,12 +7,19 @@ export interface SettingsDialogData {
   minMaxVisible?: boolean;
   minMaxStyle?: 'dashed' | 'solid' | 'dotted';
   minMaxColor?: string;
+  minColor?: string;
+  maxColor?: string;
   minMaxLineWidth?: number;
   alarmStatusVisible?: boolean;
   alarmOpacity?: number;
   alarmShowCritical?: boolean;
   alarmShowWarning?: boolean;
   alarmShowInfo?: boolean;
+  alarmLinesVisible?: boolean;
+  alarmLineStyle?: 'dashed' | 'solid' | 'dotted';
+  alarmLineWidth?: number;
+  alarmMinColor?: string;
+  alarmMaxColor?: string;
 }
 
 @Component({
@@ -47,7 +54,7 @@ export interface SettingsDialogData {
             </div>
           </div>
           
-          <div class="color-options">
+          <div class="color-scheme-selector">
             <div class="color-option" 
                  [class.selected]="data.colorScheme === 'default'"
                  (click)="data.colorScheme = 'default'">
@@ -55,9 +62,8 @@ export interface SettingsDialogData {
                 <span class="color-dot" style="background: #007aff"></span>
                 <span class="color-dot" style="background: #ff9500"></span>
                 <span class="color-dot" style="background: #34c759"></span>
-                <span class="color-dot" style="background: #5856d6"></span>
               </div>
-              <span class="color-label">Default</span>
+              <span class="color-name">Default</span>
             </div>
             
             <div class="color-option"
@@ -67,9 +73,8 @@ export interface SettingsDialogData {
                 <span class="color-dot" style="background: #1e3a8a"></span>
                 <span class="color-dot" style="background: #7c2d12"></span>
                 <span class="color-dot" style="background: #14532d"></span>
-                <span class="color-dot" style="background: #581c87"></span>
               </div>
-              <span class="color-label">Dark</span>
+              <span class="color-name">Dark</span>
             </div>
             
             <div class="color-option"
@@ -79,9 +84,8 @@ export interface SettingsDialogData {
                 <span class="color-dot" style="background: #ff006e"></span>
                 <span class="color-dot" style="background: #fb5607"></span>
                 <span class="color-dot" style="background: #ffbe0b"></span>
-                <span class="color-dot" style="background: #8338ec"></span>
               </div>
-              <span class="color-label">Vibrant</span>
+              <span class="color-name">Vibrant</span>
             </div>
             
             <div class="color-option"
@@ -91,9 +95,8 @@ export interface SettingsDialogData {
                 <span class="color-dot" style="background: #ffd6ff"></span>
                 <span class="color-dot" style="background: #e7c6ff"></span>
                 <span class="color-dot" style="background: #c8b6ff"></span>
-                <span class="color-dot" style="background: #b8c0ff"></span>
               </div>
-              <span class="color-label">Pastel</span>
+              <span class="color-name">Pastel</span>
             </div>
             
             <div class="color-option"
@@ -103,9 +106,8 @@ export interface SettingsDialogData {
                 <span class="color-dot" style="background: #001f3f"></span>
                 <span class="color-dot" style="background: #003366"></span>
                 <span class="color-dot" style="background: #004080"></span>
-                <span class="color-dot" style="background: #0059b3"></span>
               </div>
-              <span class="color-label">Monochrome</span>
+              <span class="color-name">Mono</span>
             </div>
           </div>
         </div>
@@ -228,6 +230,32 @@ export interface SettingsDialogData {
                 <span class="slider-value">{{data.minMaxLineWidth || 2}}px</span>
               </div>
             </div>
+            
+            <div class="control-group" *ngIf="data.minMaxVisible">
+              <label class="control-label">Minimum Line Color</label>
+              <div class="color-picker-control">
+                <input type="color" 
+                       [(ngModel)]="data.minColor"
+                       class="apple-color-picker">
+                <span class="color-preview" 
+                      [style.background-color]="data.minColor">
+                </span>
+                <span class="color-picker-label">Min</span>
+              </div>
+            </div>
+            
+            <div class="control-group" *ngIf="data.minMaxVisible">
+              <label class="control-label">Maximum Line Color</label>
+              <div class="color-picker-control">
+                <input type="color" 
+                       [(ngModel)]="data.maxColor"
+                       class="apple-color-picker">
+                <span class="color-preview" 
+                      [style.background-color]="data.maxColor">
+                </span>
+                <span class="color-picker-label">Max</span>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -294,6 +322,83 @@ export interface SettingsDialogData {
                     Info
                   </span>
                 </label>
+              </div>
+            </div>
+            
+            <!-- Alarm Lines Section -->
+            <div class="divider-line"></div>
+            
+            <div class="toggle-row">
+              <label class="toggle-label">Show Alarm Lines</label>
+              <label class="apple-switch">
+                <input type="checkbox" [(ngModel)]="data.alarmLinesVisible">
+                <span class="slider"></span>
+              </label>
+            </div>
+            
+            <div class="control-group" *ngIf="data.alarmLinesVisible">
+              <label class="control-label">Line Style</label>
+              <div class="segmented-control">
+                <button class="segment" 
+                        [class.active]="data.alarmLineStyle === 'dashed'"
+                        (click)="data.alarmLineStyle = 'dashed'">
+                  <svg width="24" height="2" viewBox="0 0 24 2">
+                    <path d="M0 1H5 M8 1H13 M16 1H21 M24 1H29" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <span>Dashed</span>
+                </button>
+                <button class="segment"
+                        [class.active]="data.alarmLineStyle === 'solid'"
+                        (click)="data.alarmLineStyle = 'solid'">
+                  <svg width="24" height="2" viewBox="0 0 24 2">
+                    <path d="M0 1H24" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <span>Solid</span>
+                </button>
+                <button class="segment"
+                        [class.active]="data.alarmLineStyle === 'dotted'"
+                        (click)="data.alarmLineStyle = 'dotted'">
+                  <svg width="24" height="2" viewBox="0 0 24 2">
+                    <path d="M0 1H1 M3 1H4 M6 1H7 M9 1H10 M12 1H13 M15 1H16 M18 1H19 M21 1H22" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <span>Dotted</span>
+                </button>
+              </div>
+            </div>
+            
+            <div class="control-group" *ngIf="data.alarmLinesVisible">
+              <label class="control-label">Line Width</label>
+              <div class="slider-control">
+                <input type="range" min="1" max="5" step="1" 
+                       [(ngModel)]="data.alarmLineWidth"
+                       class="apple-slider">
+                <span class="slider-value">{{data.alarmLineWidth || 2}}px</span>
+              </div>
+            </div>
+            
+            <div class="control-group" *ngIf="data.alarmLinesVisible">
+              <label class="control-label">Minimum Threshold Color</label>
+              <div class="color-picker-control">
+                <input type="color" 
+                       [(ngModel)]="data.alarmMinColor"
+                       class="apple-color-picker">
+                <span class="color-preview" 
+                      [style.background-color]="data.alarmMinColor">
+                </span>
+                <span class="color-picker-label">Min Threshold</span>
+              </div>
+            </div>
+            
+            <div class="control-group" *ngIf="data.alarmLinesVisible">
+              <label class="control-label">Maximum Threshold Color</label>
+              <div class="color-picker-control">
+                <input type="color" 
+                       [(ngModel)]="data.alarmMaxColor"
+                       class="apple-color-picker">
+                <span class="color-preview" 
+                      [style.background-color]="data.alarmMaxColor">
+                </span>
+                <span class="color-picker-label">Max Threshold</span>
               </div>
             </div>
           </div>
@@ -415,29 +520,28 @@ export interface SettingsDialogData {
       line-height: 1.4;
     }
     
-    /* Color Options */
-    .color-options {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-      gap: 12px;
+    /* Color Scheme Selector */
+    .color-scheme-selector {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
     
     .color-option {
       display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 8px;
-      padding: 12px 8px;
-      border-radius: 10px;
+      padding: 12px 16px;
+      border-radius: 8px;
       cursor: pointer;
       transition: all 0.2s ease;
       border: 2px solid transparent;
       background: #f5f5f7;
+      justify-content: space-between;
     }
     
     .color-option:hover {
       background: #ebebed;
-      transform: translateY(-2px);
+      transform: translateY(-1px);
     }
     
     .color-option.selected {
@@ -447,27 +551,31 @@ export interface SettingsDialogData {
     }
     
     .color-preview {
-      display: flex;
-      gap: 4px;
+      display: flex !important;
+      gap: 8px !important;
+      align-items: center !important;
     }
     
     .color-dot {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      transition: transform 0.2s ease;
+      display: inline-block !important;
+      width: 18px !important;
+      height: 18px !important;
+      border-radius: 50% !important;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+      transition: transform 0.2s ease !important;
+      flex-shrink: 0 !important;
+      border: none !important;
     }
     
     .color-option:hover .color-dot {
-      transform: scale(1.1);
+      transform: scale(1.05);
     }
     
-    .color-label {
-      font-size: 12px;
+    .color-name {
+      font-size: 14px;
       font-weight: 500;
       color: #1d1d1f;
-      text-align: center;
+      margin-left: 12px;
     }
     
     /* Sidebar Options */
@@ -568,20 +676,24 @@ export interface SettingsDialogData {
     }
     
     /* Scrollbar Styling */
-    .dialog-content::-webkit-scrollbar {
+    .dialog-content::-webkit-scrollbar,
+    .color-scheme-selector::-webkit-scrollbar {
       width: 6px;
     }
     
-    .dialog-content::-webkit-scrollbar-track {
+    .dialog-content::-webkit-scrollbar-track,
+    .color-scheme-selector::-webkit-scrollbar-track {
       background: transparent;
     }
     
-    .dialog-content::-webkit-scrollbar-thumb {
+    .dialog-content::-webkit-scrollbar-thumb,
+    .color-scheme-selector::-webkit-scrollbar-thumb {
       background: #c4c4c6;
       border-radius: 3px;
     }
     
-    .dialog-content::-webkit-scrollbar-thumb:hover {
+    .dialog-content::-webkit-scrollbar-thumb:hover,
+    .color-scheme-selector::-webkit-scrollbar-thumb:hover {
       background: #86868b;
     }
     
@@ -843,6 +955,121 @@ export interface SettingsDialogData {
     .severity-dot.info {
       background: #007aff;
     }
+    
+    /* Enhanced Apple Styling */
+    .settings-card {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .settings-card:hover {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      transform: translateY(-2px);
+    }
+    
+    .icon-wrapper {
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .icon-wrapper::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+      transform: rotate(45deg);
+      transition: all 0.6s;
+      opacity: 0;
+    }
+    
+    .settings-card:hover .icon-wrapper::after {
+      animation: shimmer 0.6s ease-in-out;
+    }
+    
+    @keyframes shimmer {
+      0% {
+        transform: translateX(-100%) translateY(-100%) rotate(45deg);
+        opacity: 0;
+      }
+      50% {
+        opacity: 1;
+      }
+      100% {
+        transform: translateX(100%) translateY(100%) rotate(45deg);
+        opacity: 0;
+      }
+    }
+    
+    /* Smooth transitions for all interactive elements */
+    .color-option, .sidebar-option .option-content, .segment, .apple-switch .slider,
+    .apple-slider::-webkit-slider-thumb, .checkbox-box, .btn {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    /* Focus states */
+    .segment:focus-visible,
+    .btn:focus-visible {
+      outline: 2px solid #007aff;
+      outline-offset: 2px;
+    }
+    
+    .apple-slider:focus-visible {
+      background: linear-gradient(90deg, #007aff 0%, #007aff var(--value, 0%), #e5e5e7 var(--value, 0%), #e5e5e7 100%);
+    }
+    
+    /* Color Picker Controls */
+    .color-picker-control {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+    }
+    
+    .apple-color-picker {
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      overflow: hidden;
+      background: none;
+      outline: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s ease;
+    }
+    
+    .apple-color-picker:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .apple-color-picker:focus {
+      box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+    }
+    
+    .color-preview {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: 2px solid rgba(0, 0, 0, 0.1);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      flex-shrink: 0;
+    }
+    
+    .color-picker-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #1d1d1f;
+      flex: 1;
+    }
+    
+    .divider-line {
+      height: 1px;
+      background: #e5e5e7;
+      margin: 20px 0;
+    }
   `]
 })
 export class EchartsSettingsDialogComponent {
@@ -856,6 +1083,8 @@ export class EchartsSettingsDialogComponent {
     this.data.minMaxVisible = this.data.minMaxVisible ?? false;
     this.data.minMaxStyle = this.data.minMaxStyle ?? 'dashed';
     this.data.minMaxColor = this.data.minMaxColor ?? 'rgba(128, 128, 128, 0.5)';
+    this.data.minColor = this.data.minColor ?? '#ff4757';
+    this.data.maxColor = this.data.maxColor ?? '#5352ed';
     this.data.minMaxLineWidth = this.data.minMaxLineWidth ?? 2;
     
     this.data.alarmStatusVisible = this.data.alarmStatusVisible ?? false;
@@ -863,6 +1092,13 @@ export class EchartsSettingsDialogComponent {
     this.data.alarmShowCritical = this.data.alarmShowCritical ?? true;
     this.data.alarmShowWarning = this.data.alarmShowWarning ?? true;
     this.data.alarmShowInfo = this.data.alarmShowInfo ?? false;
+    
+    // Initialize alarm lines settings
+    this.data.alarmLinesVisible = this.data.alarmLinesVisible ?? false;
+    this.data.alarmLineStyle = this.data.alarmLineStyle ?? 'dashed';
+    this.data.alarmLineWidth = this.data.alarmLineWidth ?? 2;
+    this.data.alarmMinColor = this.data.alarmMinColor ?? '#ff9500';
+    this.data.alarmMaxColor = this.data.alarmMaxColor ?? '#ff3b30';
     
     // Convert opacity to percentage for slider
     this.opacityPercent = Math.round((this.data.alarmOpacity ?? 0.12) * 100);

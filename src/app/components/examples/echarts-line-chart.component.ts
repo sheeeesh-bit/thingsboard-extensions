@@ -183,7 +183,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private minMaxCache = new Map<number, { min: number; max: number }>();
   private minMaxStyle: 'dashed' | 'solid' | 'dotted' = 'dashed';
   private minMaxColor = 'rgba(128, 128, 128, 0.5)';
+  private minColor = '#ff4757';
+  private maxColor = '#5352ed';
   private minMaxLineWidth = 2;
+  private minMaxDebugLogs = false;
   
   // Alarm overlay state
   private alarmStatusVisible = false;
@@ -193,6 +196,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private alarmShowCritical = true;
   private alarmShowWarning = true;
   private alarmShowInfo = false;
+  
+  // Alarm lines state (similar to min/max lines)
+  private alarmLinesVisible = false;
+  private alarmLineStyle: 'dashed' | 'solid' | 'dotted' = 'dashed';
+  private alarmLineWidth = 2;
+  private alarmMinColor = '#ff9500';
+  private alarmMaxColor = '#ff3b30';
+  private alarmDebugLogs = true;
+  private alarmAttributeSubscription: any = null;
+  private alarmUpdateTimer: any = null;
   private resetGrid = false;
   private usedFormatter: any;
   private legendOverridesGrids = false;
@@ -252,7 +265,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // Toggle sidebar visibility
   public toggleSidebar(): void {
     this.isSidebarVisible = !this.isSidebarVisible;
-    this.LOG(`[SIDEBAR] Sidebar ${this.isSidebarVisible ? 'shown' : 'hidden'}`);
     
     // Update grid margins immediately
     this.onDataUpdated();
@@ -261,7 +273,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     setTimeout(() => {
       if (this.chart && !this.chart.isDisposed()) {
         this.chart.resize();
-        this.LOG('[SIDEBAR] Chart resized after sidebar toggle');
       }
       
       // Recalculate legend pagination with new width
@@ -277,18 +288,30 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   ngOnInit(): void {
-    this.LOG(this.ctx);
-    this.LOG(`=== CHART VERSION ${this.CHART_VERSION} INITIALIZATION START ===`);
-    this.LOG('Component initialized');
-    this.LOG('Widget context:', this.ctx);
-    this.LOG('Widget settings:', this.ctx.settings);
     
     // Initialize sidebar display mode from settings
     this.sidebarDisplayMode = this.ctx.settings?.sidebarDisplayMode || 'full';
     
     // Initialize color scheme
     this.currentColorScheme = this.ctx.settings?.colorScheme || 'default';
-    this.LOG('Using color scheme:', this.currentColorScheme);
+    
+    // Initialize min/max settings from widget configuration
+    this.minMaxVisible = this.ctx.settings?.minMaxVisible === true;
+    this.minMaxStyle = this.ctx.settings?.minMaxStyle || 'dashed';
+    this.minMaxColor = this.ctx.settings?.minMaxColor || 'rgba(128, 128, 128, 0.5)';
+    this.minColor = this.ctx.settings?.minColor || '#ff4757';
+    this.maxColor = this.ctx.settings?.maxColor || '#5352ed';
+    this.minMaxLineWidth = this.ctx.settings?.minMaxLineWidth || 2;
+    this.minMaxDebugLogs = this.ctx.settings?.debugMinMaxLogs === true;
+    
+    // Initialize alarm settings from widget configuration
+    this.alarmStatusVisible = this.ctx.settings?.alarmStatusVisible === true;
+    this.alarmDebugLogs = this.ctx.settings?.debugAlarmLogs !== false; // Default to true for debugging
+    this.alarmLinesVisible = this.ctx.settings?.alarmLinesVisible !== false; // Default to true unless explicitly set to false
+    this.alarmLineStyle = this.ctx.settings?.alarmLineStyle || 'dashed';
+    this.alarmLineWidth = this.ctx.settings?.alarmLineWidth || 2;
+    this.alarmMinColor = this.ctx.settings?.alarmMinColor || '#ff9500';
+    this.alarmMaxColor = this.ctx.settings?.alarmMaxColor || '#ff3b30';
     
     // Reset entity color mapping on initialization
     this.entityColorMap = {};
@@ -304,55 +327,30 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.applyMaximumPerformanceSettings();
     
     // Log data series details
-    this.LOG('=== DATA SERIES ANALYSIS ===');
-    this.LOG('Total data series:', this.ctx.data?.length || 0);
     
     // Log first few series for debugging
     if (this.ctx.data && this.ctx.data.length > 0) {
-      this.LOG('First 5 data series structure:');
       for (let i = 0; i < Math.min(5, this.ctx.data.length); i++) {
-        this.LOG(`Series[${i}]:`, {
-          dataKey: this.ctx.data[i].dataKey,
-          dataLength: this.ctx.data[i].data?.length || 0,
-          firstDataPoint: this.ctx.data[i].data?.[0]
-        });
       }
     }
     
     // Log datasources information
-    this.LOG('=== DATASOURCES INFO ===');
-    this.LOG('Total datasources:', this.ctx.datasources?.length || 0);
     if (this.ctx.datasources) {
       this.ctx.datasources.forEach((ds, idx) => {
-        this.LOG(`Datasource[${idx}]:`, {
-          entityName: ds.entityName,
-          entityType: ds.entityType,
-          name: ds.name,
-          dataKeysCount: ds.dataKeys?.length || 0
-        });
       });
     }
     
     if (this.ctx.data && this.ctx.data.length > 0) {
       this.ctx.data.forEach((item: any, index: number) => {
         const axisAssignment = item?.dataKey?.settings?.axisAssignment;
-        this.LOG(`Series[${index}]:`, {
-          label: item?.dataKey?.label || 'UNDEFINED',
-          axisAssignment: axisAssignment || 'NOT SET',
-          hasSettings: !!item?.dataKey?.settings,
-          dataKeyStructure: item?.dataKey ? Object.keys(item.dataKey) : 'NO DATAKEY',
-          settingsStructure: item?.dataKey?.settings ? Object.keys(item.dataKey.settings) : 'NO SETTINGS'
-        });
       });
     } else {
-      this.LOG('WARNING: No data series available!');
     }
     
     // Setup menu buttons
     this.ctx.$scope.menuButtons = (buttonName: string) => {
       switch (buttonName) {
         case 'genImage':
-          this.LOG("Picture Button clicked!");
           this.downloadChartImage();
           break;
         case 'reset':
@@ -365,39 +363,27 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.overrideCsvExport();
     
     this.currentConfig = this.isContainerHeight();
-    this.LOG('Container config:', this.currentSize);
     
     // Count grids by settings
-    this.LOG('=== GRID CALCULATION ===');
     const axisPositionMap = this.getAxisPositionMap();
-    this.LOG('axisPositionMap:', axisPositionMap);
     this.setGrids = this.countGridsBySettings(Object.keys(axisPositionMap));
-    this.LOG('setGrids (unique axis assignments):', Array.from(this.setGrids));
     
     this.currentGridNames = Array.from(this.setGrids);
     this.maxGrids = this.setGrids.size;
     this.currentGrids = this.maxGrids;
     
-    this.LOG('GRID RESULTS:');
-    this.LOG('- currentGridNames:', this.currentGridNames);
-    this.LOG('- maxGrids:', this.maxGrids);
-    this.LOG('- currentGrids:', this.currentGrids);
     
     // Subscribe to ThingsBoard state changes
     this.subscribeToStateChanges();
     
-    this.LOG(`=== CHART VERSION ${this.CHART_VERSION} INITIALIZATION END ===`);
   }
 
   ngAfterViewInit(): void {
-    this.LOG('[ECharts Line Chart] AfterViewInit - Chart container:', this.chartContainer.nativeElement);
-    this.LOG(`[HEIGHT DEBUG] ngAfterViewInit - ctx.height: ${this.ctx.height}, ctx.width: ${this.ctx.width}`);
     
     // Don't apply height here - let initChart handle it
     
     // Check lazy loading setting
     const useLazyLoading = this.ctx.settings?.useLazyLoading !== false;
-    this.LOG(`[LAZY] Lazy loading enabled: ${useLazyLoading}`);
     
     if (useLazyLoading) {
       // Lazy loading: initialize chart when it becomes visible
@@ -412,14 +398,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   private initializeLazyLoading(): void {
-    this.LOG('[LAZY] Setting up lazy loading with Intersection Observer');
     
     // Create intersection observer to detect when chart becomes visible
     if ('IntersectionObserver' in window) {
       const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
-            this.LOG('[LAZY] Chart container is now visible, initializing...');
             observer.disconnect(); // Stop observing
             this.initializeImmediate();
           }
@@ -431,10 +415,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       });
       
       observer.observe(this.chartContainer.nativeElement);
-      this.LOG('[LAZY] Intersection Observer attached');
     } else {
       // Fallback for browsers without IntersectionObserver
-      this.LOG('[LAZY] IntersectionObserver not supported, using immediate loading');
       this.initializeImmediate();
     }
   }
@@ -447,7 +429,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Delay initialization to ensure layout is complete
     setTimeout(() => {
-      this.LOG(`[HEIGHT DEBUG] After timeout - ctx.height: ${this.ctx.height}`);
       this.initChart();
       this.setupResizeObserver();
       
@@ -457,12 +438,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // CRITICAL: Expose component to ThingsBoard's widget.js bridge
       // This allows TB to call our methods and flush pending updates
       if (this.ctx.$scope) {
-        this.LOG('[ECharts Line Chart] Exposing component to ThingsBoard scope');
         this.ctx.$scope.echartsLineChartComponent = this;
         
         // If widget.js has already queued pending updates, flush them now
         if (typeof this.ctx.$scope.componentReady === 'function') {
-          this.LOG('[ECharts Line Chart] Calling componentReady() to flush pending updates');
           this.ctx.$scope.componentReady();
         }
       }
@@ -471,7 +450,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   private setupFullscreenListener(): void {
     const fullscreenHandler = () => {
-      this.LOG('Fullscreen change detected');
       
       // Detect if we're exiting fullscreen (most problematic case)
       const isExitingFullscreen = !document.fullscreenElement && 
@@ -480,7 +458,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
                                    !(document as any).msFullscreenElement;
       
       if (isExitingFullscreen) {
-        this.LOG('Exiting fullscreen - using enhanced recalculation strategy');
       }
       
       // First recalculation - immediate but may have stale measurements
@@ -504,7 +481,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           void viewport.getBoundingClientRect();
           
           const width = viewport.offsetWidth;
-          this.LOG(`Fullscreen transition (1st) - viewport width: ${width}`);
           
           // Clear any cached measurements
           if (this.paginationCalculationTimer) {
@@ -522,7 +498,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
       // Second recalculation - after browser has started adjusting layout
       setTimeout(() => {
-        this.LOG('Second recalculation after fullscreen change');
         
         // Ensure CSS properties are still applied
         if (isExitingFullscreen) {
@@ -541,7 +516,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           viewport.style.display = '';
           
           const width = viewport.offsetWidth;
-          this.LOG(`Fullscreen transition (2nd) - viewport width: ${width}`);
           
           // Recalculate with fresh measurements
           this.calculateItemsPerPage();
@@ -550,7 +524,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
       // Third recalculation - final check after everything has settled
       setTimeout(() => {
-        this.LOG('Final recalculation after fullscreen change');
         
         // Force final recalculation with fully settled measurements
         if (this.legendViewport?.nativeElement) {
@@ -562,7 +535,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           void viewport.scrollWidth;
           
           const width = viewport.offsetWidth;
-          this.LOG(`Fullscreen transition (final) - viewport width: ${width}`);
           
           // Final recalculation with fully settled DOM
           this.calculateItemsPerPage();
@@ -602,8 +574,24 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Clean up component reference from ThingsBoard scope
     if (this.ctx.$scope && this.ctx.$scope.echartsLineChartComponent === this) {
-      this.LOG('[ECharts Line Chart] Removing component from ThingsBoard scope');
       delete this.ctx.$scope.echartsLineChartComponent;
+    }
+    
+    // Clean up alarm monitoring
+    if (this.alarmUpdateTimer) {
+      clearInterval(this.alarmUpdateTimer);
+      this.alarmUpdateTimer = null;
+    }
+    
+    if (this.alarmAttributeSubscription) {
+      try {
+        if (typeof this.alarmAttributeSubscription.unsubscribe === 'function') {
+          this.alarmAttributeSubscription.unsubscribe();
+        }
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      this.alarmAttributeSubscription = null;
     }
     
     // Clean up resize debounce timer
@@ -665,12 +653,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   public onDataUpdated(): void {
-    this.LOG(`=== DATA UPDATE (v${this.CHART_VERSION}) ===`);
-    this.LOG('Chart instance exists:', !!this.chart);
-    this.LOG('Data series count:', this.ctx.data?.length || 0);
-    this.LOG('Legend overrides active:', this.legendOverridesGrids);
-    this.LOG('Is initial load:', this.isInitialLoad);
-    this.LOG('Has received data before:', this.hasReceivedData);
     
     // Reset hovered grid index to avoid stale references
     this.hoveredGridIndex = null;
@@ -681,24 +663,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       sum + (series.data?.length || 0), 0) || 0;
     const dataCountDuration = performance.now() - dataCountStart;
     
-    this.LOG('Total data points:', this.totalDataPoints);
-    this.PERF_LOG(`📊 Data point counting: ${dataCountDuration.toFixed(2)}ms (${this.totalDataPoints} points, ${this.ctx.data?.length || 0} series)`);
     
     // Performance threshold warnings
     if (this.totalDataPoints > 10000) {
-      this.PERF_LOG(`⚠️  Large dataset detected: ${this.totalDataPoints} points - using optimizations`);
     }
     if (this.totalDataPoints > 50000) {
-      this.PERF_LOG(`🚨 Very large dataset: ${this.totalDataPoints} points - aggressive optimization needed`);
     }
     
     // Series count performance warnings
     const seriesCount = this.ctx.data?.length || 0;
     if (seriesCount > 50) {
-      this.PERF_LOG(`📊 Many series detected: ${seriesCount} series - recommend Canvas renderer`);
     }
     if (seriesCount > 100) {
-      this.PERF_LOG(`🚨 Excessive series count: ${seriesCount} series - performance will be degraded`);
     }
     
     // Process update immediately
@@ -708,7 +684,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     );
     
     if (hasNewData) {
-      this.LOG('New data detected, clearing legend override');
       this.legendOverridesGrids = false;
       this.lastDataLengths = this.ctx.data?.map(s => s.data?.length || 0) || [];
     }
@@ -716,17 +691,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Debug: Log detailed data structure
     if (this.ctx.data) {
       this.ctx.data.forEach((series, idx) => {
-        this.LOG(`Series[${idx}]:`, {
-          label: series.dataKey?.label,
-          dataLength: series.data?.length || 0,
-          firstDataPoint: series.data?.[0],
-          axisAssignment: series.dataKey?.settings?.axisAssignment
-        });
       });
     }
     
     if (!this.ctx.data || this.ctx.data.length === 0) {
-      this.LOG('ERROR: No data available, but continuing to render empty chart');
       // Don't return - we need to render the chart structure even with no data
     }
     
@@ -735,7 +703,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       sum + (series.data?.length || 0), 0) : 0;
     
     if (totalDataPoints === 0) {
-      this.LOG('WARNING: Data series exist but contain no data points');
       
       // Only show "no data" message if we're not in initial load
       // or if we've waited long enough for data to arrive
@@ -749,7 +716,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         }
       } else {
         // Keep showing loading spinner during initial load
-        this.LOG('Initial load with no data - keeping loading spinner');
         if (this.chart && !this.chart.isDisposed()) {
           this.chart.showLoading({
             text: 'Waiting for data...',
@@ -765,7 +731,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         // Set a timeout to show "no data" message if data doesn't arrive
         setTimeout(() => {
           if (this.isInitialLoad && !this.hasReceivedData) {
-            this.LOG('Timeout reached - showing no data message');
             if (this.chart && !this.chart.isDisposed()) {
               this.chart.hideLoading();
               this.hasNoVisibleData = true;
@@ -782,12 +747,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.hasNoVisibleData = false;
     }
     
-    this.LOG(`Processing ${totalDataPoints} total data points across ${this.ctx.data.length} series`);
     
     // If chart is not initialized yet, just return
     // The data will be loaded when the chart initializes in ngAfterViewInit
     if (!this.chart) {
-      this.LOG('Chart not initialized yet, will load data after initialization');
       return;
     }
 
@@ -795,7 +758,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Only recalculate grids from data if legend is not overriding
     if (!this.legendOverridesGrids) {
-      this.LOG('=== RECALCULATING GRID CONFIGURATION FROM DATA ===');
       
       // Handle case where there's no data
       if (!this.ctx.data || this.ctx.data.length === 0) {
@@ -803,34 +765,24 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         this.currentGridNames = ['Top'];
         this.maxGrids = 1;
         this.currentGrids = 1;
-        this.LOG('No data available - using default single grid');
       } else {
         const axisPositionMap = this.getAxisPositionMap();
-        this.LOG('axisPositionMap:', axisPositionMap);
         
         const previousGridCount = this.currentGrids;
         this.setGrids = this.countGridsBySettings(Object.keys(axisPositionMap));
-        this.LOG('Updated setGrids (unique axis assignments):', Array.from(this.setGrids));
         
         this.currentGridNames = Array.from(this.setGrids);
         this.maxGrids = this.setGrids.size;
         this.currentGrids = this.maxGrids;
         
-        this.LOG('GRID RESULTS FROM DATA:');
-        this.LOG('- currentGridNames:', this.currentGridNames);
-        this.LOG('- maxGrids:', this.maxGrids);
-        this.LOG('- currentGrids:', this.currentGrids);
         
         if (previousGridCount !== this.currentGrids) {
-          this.LOG(`Grid count changed from ${previousGridCount} to ${this.currentGrids}`);
           this.resetGrid = true;
           // Keep DOM height in sync on data-driven grid changes
           this.applyScrollableHeight();
         }
       }
     } else {
-      this.LOG('Using legend-selected grids:', this.currentGridNames);
-      this.LOG('Current grid count:', this.currentGrids);
     }
     
     const myNewOptions: any = {
@@ -844,16 +796,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     };
     myNewOptions.series = [];
     
-    this.LOG('=== SERIES CREATION ===');
-    this.LOG('Grid configuration:', {
-      currentGrids: this.currentGrids,
-      maxGrids: this.maxGrids,
-      currentGridNames: this.currentGridNames
-    });
     
     // If no data, create empty series to maintain chart structure
     if (!this.ctx.data || this.ctx.data.length === 0) {
-      this.LOG('No data - creating empty series');
       myNewOptions.series.push({
         name: 'No Data',
         type: 'line',
@@ -877,15 +822,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
       // If assignment not in current grids, use grid 0 (series will be hidden by legend selection)
       if (gridIndex === undefined) {
-        this.LOG(`Series[${i}] "${this.ctx.data[i].dataKey.label}" with assignment "${axisAssignment}" not in active grids, assigning to grid 0`);
         gridIndex = 0;
       }
       
-      this.LOG(`Series[${i}] "${this.ctx.data[i].dataKey.label}":`, {
-        axisAssignment: axisAssignment,
-        dynamicGridIndex: gridIndex,
-        dataPoints: this.ctx.data[i].data?.length || 0
-      });
       
       // Get entity name for color grouping
       const entityName = this.ctx.data[i].datasource?.entityName || '';
@@ -893,7 +832,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const label = this.ctx.data[i].dataKey.label;
       const seriesKey = this.buildSeriesKey(entityName, label);
       
-      this.LOG(`Series[${i}] key="${seriesKey}" entity="${entityName}" color="${entityColor}"`);
       
       // [CLAUDE EDIT] Performance optimizations
       const points = this.ctx.data[i].data?.length || 0;
@@ -967,16 +905,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Add min/max reference lines if enabled
     this.addMinMaxLines(myNewOptions);
     
+    // Add alarm lines if enabled
+    this.addAlarmLines(myNewOptions);
+    
     // Add alarm overlay areas if enabled
     this.addAlarmAreas(myNewOptions);
     
-    this.LOG("myNewOptions:", myNewOptions);
     
     // Apply options without notMerge to preserve tooltip state
     const needsFullReset = this.resetGrid || this.legendOverridesGrids;
     
     if (needsFullReset) {
-      this.LOG('Applying full reset with replaceMerge');
       // Replace structural parts for grid changes
       this.lastChartRenderStart = performance.now();
       this.chart.setOption(myNewOptions, {
@@ -987,7 +926,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // Use scheduled updates for smaller datasets for maximum smoothness
       const shouldCoalesce = this.ctx.settings?.coalesceRapidUpdates !== false;
       if (shouldCoalesce && this.totalDataPoints > 500) { // Much more aggressive threshold
-        this.PERF_LOG(`🚀 Using coalesced updates for ${this.totalDataPoints} data points`);
         this.scheduleDataUpdate(myNewOptions);
       } else {
         // Use incremental updates with lazyUpdate for better performance
@@ -999,11 +937,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           replaceMerge: ['series']  // Only replace series data
         });
         const updateDuration = performance.now() - updateStart;
-        this.PERF_LOG(`⚡ Direct ECharts update took: ${updateDuration.toFixed(2)}ms (${this.totalDataPoints} points)`);
         
         // Ultra-aggressive direct update performance warnings
         if (updateDuration > 50) { // Much stricter threshold
-          this.PERF_LOG(`🐌 Slow direct update: ${updateDuration.toFixed(2)}ms - consider coalescing or Canvas renderer`);
         }
       }
     }
@@ -1028,9 +964,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   public onResize(): void {
-    this.LOG("ONRESIZE!!!");
-    this.LOG(`[HEIGHT DEBUG] onResize triggered - ctx.height: ${this.ctx.height}, ctx.width: ${this.ctx.width}`);
-    this.PERF_LOG(`🔄 Resize event triggered - ${this.ctx.width}x${this.ctx.height}`);
     
     // Debounce resize to prevent thrashing
     if (this.resizeDebounceTimer) {
@@ -1042,15 +975,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.applyScrollableHeight();
       
       if (this.chart) {
-        this.LOG(`[HEIGHT DEBUG] Calling chart.resize()`);
         const resizeStart = performance.now();
         this.chart.resize();
         const resizeDuration = performance.now() - resizeStart;
-        this.PERF_LOG(`📏 ECharts resize took: ${resizeDuration.toFixed(2)}ms`);
         
         // More aggressive resize performance warnings
         if (resizeDuration > 30) { // Much stricter threshold for maximum performance
-          this.PERF_LOG(`🐌 Slow resize detected: ${resizeDuration.toFixed(2)}ms - consider reducing chart complexity`);
         }
       }
       
@@ -1058,7 +988,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.currentConfig = this.isContainerHeight();
       
       if (oldSize !== this.currentSize) {
-        this.LOG(`[HEIGHT DEBUG] Size changed from ${oldSize} to ${this.currentSize} - updating chart`);
       }
       
       this.onDataUpdated();
@@ -1106,7 +1035,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // IMPORTANT: trigger resize so ECharts recomputes grids after height change
     this.chart?.resize();
     
-    this.LOG(`[HEIGHT] viewport=${viewport}px inner=${innerHeight}px (legend=${legendH}px zoom=${zoomH}px scale=${scaleFactor})`);
   }
 
   // Convert px to % based on the current inner chart height
@@ -1206,7 +1134,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     };
     this.scrollState.wasScrolling = this.isInScrollingMode();
     
-    this.LOG(`[SCROLL] Captured position: ${this.scrollState.position.top}px, wasScrolling: ${this.scrollState.wasScrolling}`);
   }
   
   private restoreScrollPosition(): void {
@@ -1218,7 +1145,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Determine the appropriate scroll position based on mode transition
     const isNowScrolling = this.isInScrollingMode();
     
-    this.LOG(`[SCROLL] Restore: wasScrolling=${this.scrollState.wasScrolling}, isNowScrolling=${isNowScrolling}, grids=${this.currentGrids}`);
     
     // Wait for chart to render, then apply scroll position
     setTimeout(() => {
@@ -1230,19 +1156,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         // Transition from scrolling to non-scrolling mode
         // Reset to top for clean fitted view
         targetScrollTop = 0;
-        this.LOG('[SCROLL] Scrolling → Non-scrolling: Resetting to top');
       } else if (!this.scrollState.wasScrolling && isNowScrolling) {
         // Transition from non-scrolling to scrolling mode  
         // Keep minimal scroll to show chart properly
         targetScrollTop = 0;
-        this.LOG('[SCROLL] Non-scrolling → Scrolling: Starting from top');
       } else if (this.scrollState.wasScrolling && isNowScrolling) {
         // Both modes are scrolling, try to maintain relative position
         // But be conservative to avoid jarring jumps
         const maxScroll = container.scrollHeight - container.clientHeight;
         const relativePos = Math.min(this.scrollState.position.top * 0.8, maxScroll); 
         targetScrollTop = Math.max(0, relativePos);
-        this.LOG(`[SCROLL] Scrolling → Scrolling: Adjusted from ${this.scrollState.position.top}px to ${targetScrollTop}px`);
       }
       
       // Apply smooth scroll
@@ -1296,12 +1219,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Default to false for better performance
     const enableAnimations = this.ctx.settings?.enableAnimations === true;
     if (!enableAnimations) {
-      this.LOG('[PERF] Animations disabled (default)');
       return false;
     }
     // Smart animation based on data size when explicitly enabled
     const smartAnimation = this.totalDataPoints < 2000;
-    this.LOG(`[PERF] Smart animations: ${smartAnimation} (${this.totalDataPoints} points)`);
     return smartAnimation;
   }
   
@@ -1323,7 +1244,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const maxDataPoints = this.ctx.settings?.maxDataPoints || 100; // Ultra-low for maximum performance with 98 series
     
     if (!enableDataSampling) {
-      this.LOG(`[PERF] Data sampling disabled for series with ${points} points`);
       return {};
     }
     
@@ -1335,10 +1255,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       samplingConfig.large = true;
       samplingConfig.largeThreshold = Math.floor(maxDataPoints / 4); // Even more aggressive
       samplingConfig.hoverLayerThreshold = 2000; // Lower threshold
-      this.PERF_LOG(`🔥 Ultra-aggressive sampling: ${points} -> ~${samplingConfig.largeThreshold} points`);
     } else if (points > 800) { // Much lower threshold
       samplingConfig.sampling = 'lttb';
-      this.PERF_LOG(`⚡ Performance sampling enabled for ${points} points`);
     }
     
     return samplingConfig;
@@ -1352,7 +1270,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return {};
     }
     
-    this.PERF_LOG(`🔥 Aggressive progressive rendering for ${points} points`);
     return {
       progressive: 2000,  // Smaller chunks for smoother rendering
       progressiveThreshold: 2000,  // Start much earlier
@@ -1386,7 +1303,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       clearTimeout(this.clickDebounceTimeout);
     }
     
-    this.LOG(`[PERF] Debouncing ${updateType} update for ${debounceMs}ms`);
     
     this.clickDebounceTimeout = setTimeout(() => {
       callback();
@@ -1407,7 +1323,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     this.uiUpdateBatch = setTimeout(() => {
-      this.PERF_LOG(`⚡ Processing ultra-fast UI batch: ${Array.from(this.pendingUIUpdates).join(', ')}`);
       callback();
       this.pendingUIUpdates.clear();
       this.uiUpdateBatch = null;
@@ -1427,10 +1342,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private scheduleDataUpdate(options: any): void {
     // Coalesce rapid updates to prevent jank
     this.pendingDataUpdates.push(options);
-    this.PERF_LOG('📊 Scheduling data update, queue size:', this.pendingDataUpdates.length);
     
     if (this.rafId) {
-      this.PERF_LOG('🔄 Update already scheduled, coalescing...');
       return; // Update already scheduled
     }
     
@@ -1449,12 +1362,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const now = performance.now();
     const timeSinceLastUpdate = now - this.lastUpdateTime;
     
-    this.PERF_LOG(`⏱️  Processing ${this.pendingDataUpdates.length} coalesced updates`);
-    this.PERF_LOG(`🕐 Time since last update: ${timeSinceLastUpdate.toFixed(2)}ms`);
     
     // Ultra-aggressive throttling for maximum smoothness
     if (timeSinceLastUpdate < 8) { // 120fps throttle for ultra-smooth performance
-      this.PERF_LOG('⚡ Ultra-fast throttling: deferring update (120fps)');
       this.rafId = requestAnimationFrame(() => {
         this.processCoalescedUpdates();
         this.rafId = null;
@@ -1468,7 +1378,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.pendingDataUpdates.length = 0;
 
     if (discardedUpdates > 0) {
-      this.PERF_LOG(`🗑️  Discarded ${discardedUpdates} older updates (coalescing)`);
     }
 
     // Apply the update with minimal work
@@ -1481,22 +1390,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         silent: true  // Prevent events during update
       });
       const updateDuration = performance.now() - updateStart;
-      this.PERF_LOG(`📈 ECharts setOption took: ${updateDuration.toFixed(2)}ms`);
       
       // Ultra-aggressive update performance warnings
       if (updateDuration > 50) { // Much stricter threshold for maximum performance
-        this.PERF_LOG(`🐌 Slow update detected: ${updateDuration.toFixed(2)}ms - check data complexity or renderer`);
       }
     }
 
     this.lastUpdateTime = now;
     this.isUpdating = false;
-    this.PERF_LOG('✅ Update completed');
     
     // Memory usage monitoring (if available)
     if ((window as any).performance?.memory) {
       const memory = (window as any).performance.memory;
-      this.PERF_LOG(`💾 Memory: ${Math.round(memory.usedJSHeapSize / 1024 / 1024)}MB used, ${Math.round(memory.totalJSHeapSize / 1024 / 1024)}MB total`);
     }
   }
   
@@ -1523,7 +1428,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.temporarilyDisableAnimations();
     
     const delay = this.getEChartsUpdateDelay();
-    this.LOG(`[PERF] Batching ECharts action: ${action.type} ${action.name} (${this.pendingChartActions.length} queued, ${delay}ms delay)`);
     
     this.chartActionBatch = setTimeout(() => {
       this.flushChartActionBatch();
@@ -1544,7 +1448,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           animationDuration: 0,
           animationDurationUpdate: 0
         });
-        this.LOG('[PERF] Disabled animations during interaction');
       }
     }
   }
@@ -1556,7 +1459,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         animationDuration: this.getAnimationDuration(),
         animationDurationUpdate: this.getAnimationUpdateDuration()
       });
-      this.LOG('[PERF] Restored animations after interaction');
     }
     this.originalAnimationState = null;
   }
@@ -1568,7 +1470,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     const actionCount = this.pendingChartActions.length;
-    this.LOG(`[PERF] Flushing ${actionCount} batched ECharts actions`);
     
     // Process all batched actions
     this.pendingChartActions.forEach(action => {
@@ -1593,7 +1494,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const canDisable = visibleEntities.length > 0;
     
     if (!canDisable) {
-      this.LOG(`[QUEUE] Cannot disable ${entityName} - it's the last visible entity`);
     }
     
     return canDisable;
@@ -1611,7 +1511,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     //   this.ctx.detectChanges();
     // }, 600);
     
-    this.LOG(`[UI] Pulsing entity: ${entityName} (action blocked)`);
   }
   
   
@@ -1801,12 +1700,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         minMaxVisible: this.minMaxVisible,
         minMaxStyle: this.minMaxStyle || 'dashed',
         minMaxColor: this.minMaxColor || 'rgba(128, 128, 128, 0.5)',
+        minColor: this.minColor || '#ff4757',
+        maxColor: this.maxColor || '#5352ed',
         minMaxLineWidth: this.minMaxLineWidth || 2,
         alarmStatusVisible: this.alarmStatusVisible,
         alarmOpacity: this.alarmOpacity || 0.12,
         alarmShowCritical: this.alarmShowCritical !== false,
         alarmShowWarning: this.alarmShowWarning !== false,
-        alarmShowInfo: this.alarmShowInfo !== false
+        alarmShowInfo: this.alarmShowInfo !== false,
+        alarmLinesVisible: this.alarmLinesVisible,
+        alarmLineStyle: this.alarmLineStyle || 'dashed',
+        alarmLineWidth: this.alarmLineWidth || 2,
+        alarmMinColor: this.alarmMinColor || '#ff9500',
+        alarmMaxColor: this.alarmMaxColor || '#ff3b30'
       }
     });
 
@@ -1819,6 +1725,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         this.minMaxVisible = result.minMaxVisible;
         this.minMaxStyle = result.minMaxStyle;
         this.minMaxColor = result.minMaxColor;
+        this.minColor = result.minColor;
+        this.maxColor = result.maxColor;
         this.minMaxLineWidth = result.minMaxLineWidth;
         
         // Update alarm settings
@@ -1829,9 +1737,39 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         this.alarmShowWarning = result.alarmShowWarning;
         this.alarmShowInfo = result.alarmShowInfo;
         
+        // Update alarm lines settings
+        const wasAlarmLinesVisible = this.alarmLinesVisible;
+        this.alarmLinesVisible = result.alarmLinesVisible;
+        this.alarmLineStyle = result.alarmLineStyle || 'dashed';
+        this.alarmLineWidth = result.alarmLineWidth || 2;
+        this.alarmMinColor = result.alarmMinColor || '#ff9500';
+        this.alarmMaxColor = result.alarmMaxColor || '#ff3b30';
+        
+        // Handle alarm lines toggling
+        if (this.alarmLinesVisible && !wasAlarmLinesVisible) {
+          // Alarm lines just enabled - fetch alarms and start monitoring
+          if (this.alarmDebugLogs) {
+            console.log('[ALARM] Alarm lines enabled - fetching alarms and starting monitoring');
+          }
+          this.fetchAlarmsForDevices().catch(error => {
+            if (this.alarmDebugLogs) {
+              console.error('[ALARM] Failed to fetch alarms:', error);
+            }
+          });
+          this.setupAlarmAttributeMonitoring();
+        } else if (!this.alarmLinesVisible && wasAlarmLinesVisible) {
+          // Alarm lines just disabled - stop monitoring
+          if (this.alarmDebugLogs) {
+            console.log('[ALARM] Alarm lines disabled - stopping monitoring');
+          }
+          if (this.alarmUpdateTimer) {
+            clearInterval(this.alarmUpdateTimer);
+            this.alarmUpdateTimer = null;
+          }
+        }
+        
         // If alarm status was just enabled and we don't have alarm data, fetch it
         if (this.alarmStatusVisible && !wasAlarmVisible && !this.alarmData && !this.alarmFetchPromise) {
-          this.LOG('[Settings] Alarm status enabled - fetching alarm data');
           this.alarmFetchPromise = this.fetchAlarmsForDevices();
         } else {
           // Re-render chart with new settings
@@ -1851,7 +1789,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   public changeColorScheme(scheme: string): void {
-    this.LOG('Changing color scheme to:', scheme);
     this.currentColorScheme = scheme;
     
     // Reset color mapping to apply new scheme
@@ -1897,7 +1834,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         controllerSelected = opt.legend[0].selected;
       }
     } catch (e) {
-      this.LOG('Could not retrieve controller legend state:', e);
     }
     
     // A label is selected if ANY series with that label is selected
@@ -1925,7 +1861,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // First check if we have cached attributes from the SERVER_SCOPE fetch
     if (this.entityAttributesCache.has(entityName)) {
       const cached = this.entityAttributesCache.get(entityName)!;
-      this.LOG(`[ENTITY_ATTRS] Using cached attributes for ${entityName}: label="${cached.label}", deviceName="${cached.deviceName}"`);
       return cached;
     }
     
@@ -1965,10 +1900,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
       
     } catch (error) {
-      this.LOG(`[ENTITY_ATTRS] Error getting attributes for ${entityName}:`, error);
     }
     
-    this.LOG(`[ENTITY_ATTRS] Returning for ${entityName}: label="${label}", deviceName="${deviceName}"`);
     return { label, deviceName };
   }
   
@@ -2013,7 +1946,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         
         // Check for label attribute
         if (attributeToFind === 'label' && entityObj.label && entityObj.label.trim() !== '') {
-          this.LOG(`[ENTITY_DISPLAY] Found label: ${entityObj.label}`);
           this.entityDisplayNameCache.set(entityName, entityObj.label);
           return entityObj.label;
         }
@@ -2022,7 +1954,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         if (entityObj.additionalInfo) {
           const value = entityObj.additionalInfo[attributeToFind];
           if (value) {
-            this.LOG(`[ENTITY_DISPLAY] Found ${attributeToFind} in additionalInfo: ${value}`);
             this.entityDisplayNameCache.set(entityName, value);
             return value;
           }
@@ -2045,7 +1976,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           if (loc.path) {
             const value = typeof loc.path === 'object' ? loc.path.value : loc.path;
             if (value) {
-              this.LOG(`[ENTITY_DISPLAY] Found ${attributeToFind} in datasource.${loc.name}: ${value}`);
               this.entityDisplayNameCache.set(entityName, value);
               return value;
             }
@@ -2065,7 +1995,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
                          dsAny[attributeToFind];
                          
             if (value) {
-              this.LOG(`[ENTITY_DISPLAY] Found ${attributeToFind} in datasources: ${value}`);
               this.entityDisplayNameCache.set(entityName, value);
               return value;
             }
@@ -2074,10 +2003,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
       
     } catch (error) {
-      this.LOG(`[ENTITY_DISPLAY] Error getting display name for ${entityName}:`, error);
     }
     
-    this.LOG(`[ENTITY_DISPLAY] Using fallback entity name: ${entityName}`);
     
     // Cache the fallback value for now
     this.entityDisplayNameCache.set(entityName, entityName);
@@ -2098,17 +2025,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const entityType = entityData.datasource?.entityType;
       
       if (!entityId || !entityType) {
-        this.LOG(`[DEVICE_NAME] Missing entityId or entityType for ${entityName}`);
         return;
       }
       
       // Check if ThingsBoard API is available
       if (!this.ctx.http || !this.ctx.attributeService) {
-        this.LOG(`[DEVICE_NAME] ThingsBoard API not available in widget context`);
         
         // Try alternative: use the widget's subscription to fetch attributes
         if (this.ctx.subscriptionApi) {
-          this.LOG(`[DEVICE_NAME] Attempting to use subscription API for ${entityName}`);
           
           // Create attribute keys to fetch
           const attributeKeys = ['deviceName', 'label', 'description'];
@@ -2122,7 +2046,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             scopeType: 'SERVER_SCOPE' as any
           };
           
-          this.LOG(`[DEVICE_NAME] Subscription request:`, subscription);
           
           // Note: The actual subscription would need to be done through the widget's data subscription
           // This is a placeholder showing the structure
@@ -2130,7 +2053,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         return;
       }
       
-      this.LOG(`[ENTITY_DISPLAY] Fetching SERVER_SCOPE attribute '${attributeName}' for ${entityName} (${entityId})`);
       
       // Fetch SERVER_SCOPE attributes
       // Note: The API might expect an entity object, not just the type
@@ -2141,7 +2063,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         [attributeName, 'label', 'deviceName']  // Try to fetch the requested attribute plus fallbacks
       ));
       
-      this.LOG(`[ENTITY_DISPLAY] Fetched attributes for ${entityName}:`, attributes);
       
       // Find the requested attribute
       let displayName = entityName;
@@ -2156,11 +2077,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         // Store what we found
         if (labelAttr?.value) {
           fetchedLabel = labelAttr.value;
-          this.LOG(`[ENTITY_DISPLAY] Found label attribute: ${fetchedLabel}`);
         }
         if (deviceNameAttr?.value) {
           fetchedDeviceName = deviceNameAttr.value;
-          this.LOG(`[ENTITY_DISPLAY] Found deviceName attribute: ${fetchedDeviceName}`);
         }
         
         // Cache both attributes
@@ -2173,13 +2092,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         const requestedAttr = attributes.find(attr => attr.key === attributeName);
         if (requestedAttr?.value) {
           displayName = requestedAttr.value;
-          this.LOG(`[ENTITY_DISPLAY] Found requested ${attributeName} attribute: ${displayName}`);
         } else if (fetchedLabel) {
           displayName = fetchedLabel;
-          this.LOG(`[ENTITY_DISPLAY] Using fallback label attribute: ${displayName}`);
         } else if (fetchedDeviceName) {
           displayName = fetchedDeviceName;
-          this.LOG(`[ENTITY_DISPLAY] Using fallback deviceName attribute: ${displayName}`);
         }
       }
       
@@ -2188,12 +2104,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
       // Update the entity list if the display name changed
       if (displayName !== entityName) {
-        this.LOG(`[DEVICE_NAME] Updating entity list with new display name: ${displayName}`);
         this.refreshEntityList();
       }
       
     } catch (error) {
-      this.LOG(`[DEVICE_NAME] Error fetching attributes for ${entityName}:`, error);
     }
   }
 
@@ -2287,14 +2201,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const minWidth = 180; // Minimum width
     this.sidebarWidth = Math.min(Math.max(calculatedWidth, minWidth), maxAllowedWidth);
     
-    this.LOG(`[SIDEBAR] Calculated width: ${calculatedWidth}px, Final width: ${this.sidebarWidth}px (max: ${maxAllowedWidth}px)`);
   }
   
   // Toggle visibility for all series of an entity
   public toggleEntityVisibility(entityName: string): void {
     if (!this.ctx?.data || !this.chart) return;
     
-    this.LOG(`[ENTITY] Toggle clicked: ${entityName}`);
     
     // Check if entity can be disabled (prevent disabling last visible entity)
     const entityData = this.entityList.find(e => e.name === entityName);
@@ -2373,12 +2285,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // Conditional debug processing based on performance settings
       if (this.shouldOptimizeClicks()) {
         // Lightweight debug info when performance mode is enabled
-        this.LOG(`[PERF] Entity toggle completed: ${entityName}, active series: ${activeSeriesKeys.length}`);
       } else {
         // Full debug info only when performance optimization is disabled
         const debugInfo = this.createDetailedVisibilityDebugInfo(finalSelected);
-        this.LOG('[Device_Plot_Visi: ] ====== VISIBILITY REPORT after toggling "' + entityName + '" ======');
-        this.LOG('[Device_Plot_Visi: ] Summary:', debugInfo.summary);
         
         // First, check and report any completely hidden plots
         const hiddenPlots: string[] = [];
@@ -2390,9 +2299,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         });
         
         if (hiddenPlots.length > 0) {
-          this.LOG('[Device_Plot_Visi: ] ⚠️  PLOTS WITH NO VISIBLE DATA (hidden or empty):');
           hiddenPlots.forEach(plotName => {
-            this.LOG('[Device_Plot_Visi: ]     --> ' + plotName + ' has NO VISIBLE DATA');
           });
         }
         
@@ -2400,15 +2307,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         Object.keys(debugInfo.plots).forEach(plotKey => {
           const plot = debugInfo.plots[plotKey];
           const status = plot.allHiddenOrNoData ? '[NO DATA]' : '[HAS DATA]';
-          this.LOG(`[Device_Plot_Visi: ] Plot ${plot.plotNumber} (${plot.plotName}): ${plot.visibleWithData}/${plot.visibleSeries}/${plot.totalSeries} (with-data/visible/total) ${status}`);
           plot.series.forEach((s: any) => {
             const dataInfo = s.dataPoints === 0 ? ' [NO DATA]' : ` [${s.dataPoints} pts]`;
-            this.LOG(`[Device_Plot_Visi: ]     ${s.visible} ${s.name}${dataInfo}`);
           });
         });
         
-        this.LOG('[Device_Plot_Visi: ] Full debug object:', JSON.stringify(debugInfo, null, 2));
-        this.LOG('[Device_Plot_Visi: ] ====== END VISIBILITY REPORT ======');
       }
       
       // NEW APPROACH: Only include series that are visible AND have data
@@ -2424,14 +2327,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         return series && series.data && Array.isArray(series.data) && series.data.length > 0;
       });
       
-      this.LOG('[Device_Plot_Visi: ] Active series with data: ' + activeSeriesWithData.length + ' out of ' + activeSeriesKeys.length + ' visible series');
       
       // Pass only series that have actual data
       this.setDataGridByNames(activeSeriesWithData);
       
       // If grid count changed, rebuild the chart
       if (previousGridCount !== this.currentGrids) {
-        this.LOG(`[SCROLL] Entity toggle mode transition: ${previousGridCount} → ${this.currentGrids} grids`);
         this.resetGrid = true;
         this.applyScrollableHeight();
         this.onDataUpdated();
@@ -2448,7 +2349,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private initChart(): void {
-    this.LOG('[ECharts Line Chart] Initializing chart');
     
     const container = this.chartContainer.nativeElement;
     // Set up GPU acceleration hints
@@ -2458,8 +2358,22 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const containerElement = container.querySelector('#echartContainer') as HTMLElement;
     
     if (!containerElement) {
-      this.LOG('[ECharts Line Chart] echartContainer element not found!');
       return;
+    }
+    
+    // Fetch alarms for devices if alarm lines are enabled
+    if (this.alarmLinesVisible) {
+      if (this.alarmDebugLogs) {
+        console.log('[ALARM] Fetching alarms on chart initialization');
+      }
+      this.fetchAlarmsForDevices().catch(error => {
+        if (this.alarmDebugLogs) {
+          console.error('[ALARM] Failed to fetch alarms on init:', error);
+        }
+      });
+      
+      // Set up automatic alarm updates
+      this.setupAlarmAttributeMonitoring();
     }
     
     // Set height for chart container to account for button bar
@@ -2472,7 +2386,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Initialize chart with configurable performance settings
     const useCanvasRenderer = this.ctx.settings?.useCanvasRenderer !== false; // Default to canvas for better performance
-    this.PERF_LOG(`🎨 Initializing ECharts with renderer: ${useCanvasRenderer ? 'canvas' : 'svg'}`);
     
     const initStart = performance.now();
     this.chart = echarts.init(containerElement, undefined, {
@@ -2480,13 +2393,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       useDirtyRect: true  // Dirty rect rendering for selective updates
     });
     const initDuration = performance.now() - initStart;
-    this.PERF_LOG(`🏗️  ECharts initialization took: ${initDuration.toFixed(2)}ms`);
     
     // Renderer performance recommendation
     if (!useCanvasRenderer && this.totalDataPoints > 1000) {
-      this.PERF_LOG(`⚠️  Using SVG renderer with ${this.totalDataPoints} points - consider Canvas for better performance`);
     }
-    this.LOG('[ECharts Line Chart] Chart instance created:', !!this.chart);
     
     // Show loading spinner immediately
     this.chart.showLoading({
@@ -2507,9 +2417,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Always call onDataUpdated to render the chart
     // Even with no data, we need to show the chart structure
     if (!this.ctx.data || this.ctx.data.length === 0) {
-      this.LOG('[ECharts Line Chart] No data available yet, but rendering chart structure');
     } else {
-      this.LOG('[ECharts Line Chart] Data already available:', this.ctx.data.length, 'series');
     }
     
     // Always update to show chart (empty or with data)
@@ -2517,28 +2425,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private initChartAndGrid(): void {
-    this.LOG(`=== INIT CHART AND GRID (v${this.CHART_VERSION}) ===`);
-    this.LOG('Current grid configuration:', {
-      currentGrids: this.currentGrids,
-      maxGrids: this.maxGrids,
-      currentGridNames: this.currentGridNames
-    });
     
     const option = this.getInitConfig();
     
-    this.LOG('Building axis arrays...');
     option.xAxis = this.currentXAxisArray();
-    this.LOG('xAxis configuration:', option.xAxis);
     
     option.yAxis = this.currentYAxisArray();
-    this.LOG('yAxis configuration:', option.yAxis);
     
     option.grid = this.currentGridArray();
-    this.LOG('grid configuration:', option.grid);
     
     // Plot numbers are now displayed as yAxis names instead of graphic elements
     
-    this.LOG('Setting chart option with grid config...');
     this.chart.setOption(option);
     
     // Legend debouncing for stability
@@ -2547,7 +2444,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Register legend selection event listener with debouncing
     this.chart.on('legendselectchanged', (event: any) => {
       const eventStart = performance.now();
-      this.PERF_LOG('🖱️  Legend select event triggered:', event.name);
       
       // Clear any pending legend update
       if (legendDebounceTimer) {
@@ -2568,7 +2464,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             legendIndex: 0 
           });
           const eventDuration = performance.now() - eventStart;
-          this.PERF_LOG('🚫 Legend guard triggered, processing took:', `${eventDuration.toFixed(2)}ms`);
           return;
         }
         
@@ -2577,9 +2472,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         this.syncCustomLegendFromChart();
         
         const eventDuration = performance.now() - eventStart;
-        this.PERF_LOG('✅ Legend select processed in:', `${eventDuration.toFixed(2)}ms`);
         if (eventDuration > 50) {
-          this.PERF_LOG('🐌 Slow legend interaction detected - consider optimization');
         }
       }, 50); // 50ms debounce for stable legend toggling
     });
@@ -2601,9 +2494,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           this.ctx.detectChanges?.();
           
           const zoomDuration = performance.now() - zoomStart;
-          this.PERF_LOG(`🔍 DataZoom processed in: ${zoomDuration.toFixed(2)}ms (${s.toFixed(1)}% - ${e.toFixed(1)}%)`);
           if (zoomDuration > 30) {
-            this.PERF_LOG('🐌 Slow zoom interaction - consider reducing data complexity');
           }
         }
       }
@@ -2618,7 +2509,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.syncCustomLegendFromChart();
     }, 100);
     
-    this.LOG('=== INIT CHART AND GRID COMPLETE ===');
   }
 
   private onLegendSelectChanged = (event: any): void => {
@@ -2678,8 +2568,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const selected = event.selected;
     const selectedKeys = Object.keys(selected).filter(key => selected[key]);
     
-    this.LOG("Legend selection changed:", selected);
-    this.LOG("Active series:", selectedKeys);
     
     // Ensure at least one entry is selected
     if (selectedKeys.length === 0) {
@@ -2722,7 +2610,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.setDataGridByNames(selectedKeys);
     
     if (oldGridNr != this.currentGrids) {
-      this.LOG("Grid count changed from", oldGridNr, "to", this.currentGrids);
       this.resetGrid = true;
       
       // Immediately recalculate container height with new grid count
@@ -2740,20 +2627,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private subscribeToStateChanges(): void {
-    this.LOG('[ECharts Line Chart] Setting up state change detection');
     
     // Method 1: Subscribe to dashboard state controller changes
     if (this.ctx.stateController) {
-      this.LOG('[State Detection] StateController found, subscribing to state changes');
       
       try {
         // Subscribe to state change events using the correct method
         this.stateChangeSubscription = this.ctx.stateController.stateChanged().subscribe(() => {
-          this.LOG('[State Detection] Dashboard state changed, refreshing chart');
           this.handleStateChange();
         });
       } catch (error) {
-        this.LOG('[State Detection] Error subscribing to state changes:', error);
       }
     }
     
@@ -2774,7 +2657,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           
           const newStateId = this.ctx.stateController.getStateId();
           if (newStateId !== lastStateId) {
-            this.LOG('[State Detection] State ID changed from', lastStateId, 'to', newStateId);
             lastStateId = newStateId;
             this.handleStateChange();
           }
@@ -2783,53 +2665,44 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         // Store interval ID for cleanup
         (this as any).stateCheckInterval = stateCheckInterval;
       } catch (error) {
-        this.LOG('[State Detection] Error setting up state polling:', error);
       }
     }
     
     // Method 3: Subscribe to widget lifecycle events if $scope.$on is available
     if (this.ctx.$scope && this.ctx.$scope.$on) {
-      this.LOG('[State Detection] Checking for scope event listeners');
       
       try {
         // Only set up listeners if $on is actually a function
         if (typeof this.ctx.$scope.$on === 'function') {
           // Watch for data source changes
           this.ctx.$scope.$on('widgetConfigUpdated', () => {
-            this.LOG('[State Detection] Widget config updated, refreshing chart');
             this.handleStateChange();
           });
           
           // Listen for dashboard state updates
           this.ctx.$scope.$on('dashboardPageChanged', () => {
-            this.LOG('[State Detection] Dashboard page changed, refreshing chart');
             setTimeout(() => this.handleStateChange(), 300);
           });
           
           // Listen for mobile/desktop view changes
           this.ctx.$scope.$on('mobileModeChanged', () => {
-            this.LOG('[State Detection] Mobile mode changed, refreshing chart');
             setTimeout(() => this.handleStateChange(), 300);
           });
         }
       } catch (error) {
-        this.LOG('[State Detection] Error setting up scope listeners:', error);
       }
     }
   }
   
   private handleStateChange(): void {
-    this.LOG('[State Change Handler] Processing state change');
     
     // Only refresh if chart is initialized
     if (!this.chart) {
-      this.LOG('[State Change Handler] Chart not initialized, skipping refresh');
       return;
     }
     
     // Use setTimeout to ensure DOM is ready after state change
     setTimeout(() => {
-      this.LOG('[State Change Handler] Refreshing chart after state change');
       
       // Force resize to recalculate dimensions
       if (this.chart) {
@@ -2840,7 +2713,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       if (this.ctx.data && this.ctx.data.length > 0) {
         this.onDataUpdated();
       } else {
-        this.LOG('[State Change Handler] No data available, showing loading');
         // Reset loading state when navigating to a new state
         this.isInitialLoad = true;
         this.hasNoVisibleData = false;
@@ -2878,7 +2750,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   private setupResizeObserver(): void {
-    this.LOG('[HEIGHT DEBUG] Setting up ResizeObserver');
     
     // Track previous width to detect maximize/restore
     let previousWidth = 0;
@@ -2888,13 +2759,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
-        this.LOG(`[HEIGHT DEBUG] ResizeObserver triggered - contentRect: width=${width}, height=${height}`);
         if (width > 0 && height > 0) {
-          this.LOG('[ECharts Line Chart] Container resized:', { width, height });
           
           // Always force immediate legend recalculation on ANY resize
           // This is aggressive but ensures we never have clipping
-          this.LOG('Forcing immediate legend recalculation on resize');
           
           // Clear ALL caches immediately
           this.maxItemsWithoutPagination = 0;
@@ -2907,35 +2775,28 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           const isSignificantChange = widthChange > 100; // Lower threshold
           
           if (isSignificantChange && previousWidth > 0) {
-            this.LOG(`SIGNIFICANT RESIZE DETECTED: ${previousWidth}px -> ${width}px (change: ${widthChange}px)`);
             
             // Additional recalculations for significant changes
             setTimeout(() => {
-              this.LOG('Recalculating after significant resize (100ms)');
               this.performPaginationCalculation();
             }, 100);
             
             setTimeout(() => {
-              this.LOG('Recalculating after significant resize (300ms)');
               this.performPaginationCalculation();
             }, 300);
             
             setTimeout(() => {
-              this.LOG('Final recalculation after significant resize (500ms)');
               this.performPaginationCalculation();
             }, 500);
           }
           
           previousWidth = width;
           
-          this.LOG(`[HEIGHT DEBUG] Before resize - ctx.height: ${this.ctx.height}`);
           this.onResize();
-          this.LOG(`[HEIGHT DEBUG] After resize - ctx.height: ${this.ctx.height}`);
         }
       }
     });
     this.resizeObserver.observe(this.chartContainer.nativeElement);
-    this.LOG('[HEIGHT DEBUG] ResizeObserver attached to chart container');
     
     // Window resize listener with more aggressive handling
     const windowResizeHandler = () => {
@@ -2947,15 +2808,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const maximizeStateChanged = isNowMaximized !== wasMaximized;
       
       if (maximizeStateChanged) {
-        this.LOG(`MAXIMIZE STATE CHANGED: ${wasMaximized ? 'Maximized' : 'Normal'} -> ${isNowMaximized ? 'Maximized' : 'Normal'}`);
       }
       
-      this.LOG(`Window resize: ${lastWindowWidth}px -> ${currentWindowWidth}px (change: ${windowWidthChange}px)`);
       
       // Always reset and recalculate on window resize or maximize state change
       if (maximizeStateChanged || windowWidthChange > 0) {
         this.maxItemsWithoutPagination = 0;
-        this.LOG('Reset cache due to window resize or maximize state change');
       }
       
       // Immediate recalculation
@@ -2968,7 +2826,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       if (maximizeStateChanged) {
         // Add an immediate extra calculation for maximize/restore
         setTimeout(() => {
-          this.LOG('Extra recalculation for maximize state change (25ms)');
           this.performPaginationCalculation();
         }, 25);
         
@@ -2978,7 +2835,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
       delays.forEach(delay => {
         setTimeout(() => {
-          this.LOG(`Window resize recalculation at ${delay}ms`);
           this.performPaginationCalculation();
         }, delay);
       });
@@ -2998,7 +2854,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     const visibilityChangeHandler = () => {
       if (!document.hidden) {
-        this.LOG('Document became visible, recalculating');
         windowResizeHandler();
       }
     };
@@ -3018,14 +2873,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
    */
   private getExportMetadata(): Observable<string> {
     if (!this.ctx.datasources || this.ctx.datasources.length === 0) {
-      this.LOG('No datasources available, using default label');
       return of('sensor[unknown]');
     }
     
     // Get the first datasource entity
     const datasource = this.ctx.datasources[0];
     if (!datasource || !datasource.entity) {
-      this.LOG('No entity in datasource, using default label');
       return of('sensor[unknown]');
     }
     
@@ -3034,11 +2887,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       id: datasource.entityId
     };
     
-    this.LOG('Fetching label and deviceName for entity:', entity);
     
     // Check if attributeService is available
     if (!this.ctx.attributeService) {
-      this.LOG('AttributeService not available, using entity name');
       const entityName = datasource.entityName || 'sensor';
       return of(`${entityName}[unknown]`);
     }
@@ -3055,14 +2906,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           const label = labelAttr ? String(labelAttr.value) : (datasource.entityName || 'sensor');
           const deviceName = deviceNameAttr ? String(deviceNameAttr.value) : (datasource.name || 'unknown');
           
-          this.LOG('Retrieved label:', label, 'deviceName:', deviceName);
           
           // Format as "label[deviceName]" and sanitize for filename
           const combined = `${label}[${deviceName}]`;
           return combined.replace(/[^a-zA-Z0-9-_[\]]/g, '_'); // Sanitize but keep brackets
         }),
         catchError(error => {
-          this.LOG('Error fetching attributes:', error);
           const entityName = datasource.entityName || 'sensor';
           return of(`${entityName}[unknown]`);
         })
@@ -3134,7 +2983,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         // Format: label[deviceName]_YYYY-MM-DD_HH-mm-ss-SSS.ext
         const ts = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}-${ms}`;
         const filename = `${labelWithDevice}_${ts}.${ext}`;
-        this.LOG('Generated filename:', filename);
         return filename;
       })
     );
@@ -3155,7 +3003,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        this.LOG(`Downloaded file: ${filename}`);
       }
     });
   }
@@ -3176,7 +3023,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      this.LOG(`Downloaded chart image: ${filename}`);
     });
   }
 
@@ -3186,7 +3032,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
     
-    this.LOG('[Chart Widget] Exporting data to CSV with ThingsBoard format');
     
     // Build dynamic headers based on actual data keys
     const headers = ['Timestamp'];
@@ -3251,11 +3096,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     this.downloadFileWithDynamicName(blob, 'csv');
     
-    this.LOG('[Chart Widget] CSV export completed with ThingsBoard format');
   }
 
   public exportData(format: 'csv' | 'xls' | 'xlsx'): void {
-    this.LOG(`[Chart Widget] Exporting data in ${format.toUpperCase()} format`);
     
     if (!this.ctx.data || this.ctx.data.length === 0) {
       console.warn('[Chart Widget] No data available for export');
@@ -3503,7 +3346,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.downloadFileWithDynamicName(blob, 'xlsx');
     }
     
-    this.LOG(`[Chart Widget] Export initiated for format: ${format}`);
   }
   
 
@@ -3647,42 +3489,32 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public menuButtons(buttonName: string): void {
     switch (buttonName) {
       case 'genImage':
-        this.LOG("Picture Button clicked!!!!");
         this.downloadChartImage();
         break;
       case 'reset':
         this.resetChartCompletely();
         break;
       case 'exportCsv':
-        this.LOG("CSV Export Button clicked!!!!");
         this.exportDataToCsv();
         break;
     }
   }
 
   private isContainerHeight(): any {
-    this.LOG(`[HEIGHT DEBUG] ctx.height: ${this.ctx.height}, limits: [${this.containerHeightLimit[0]}, ${this.containerHeightLimit[1]}]`);
     
     if ((this.ctx.height >= this.containerHeightLimit[0]) && 
         (this.ctx.height < this.containerHeightLimit[1])) {
-      this.LOG("isContainerHeight:", "LARGE!!!");
-      this.LOG(`[HEIGHT DEBUG] Selected LARGE config (height ${this.ctx.height} is between ${this.containerHeightLimit[0]} and ${this.containerHeightLimit[1]})`);
       this.currentSize = SIZE_NAMES.LARGE;
       return this.ifLargeContainerConfig();
     } else if (this.ctx.height >= this.containerHeightLimit[1]) {
-      this.LOG("isContainerHeight:", "HUGE!!!");
-      this.LOG(`[HEIGHT DEBUG] Selected HUGE config (height ${this.ctx.height} >= ${this.containerHeightLimit[1]})`);
       this.currentSize = SIZE_NAMES.HUGE;
       return this.ifHugeContainerConfig();
     }
-    this.LOG("isContainerHeight:", "Small!!!");
-    this.LOG(`[HEIGHT DEBUG] Selected SMALL config (height ${this.ctx.height} < ${this.containerHeightLimit[0]})`);
     this.currentSize = SIZE_NAMES.SMALL;
     return this.ifSmallContainerConfig();
   }
 
   private currentGridArray(): any[] {
-    this.LOG('currentGridArray called with currentGrids:', this.currentGrids, 'currentSize:', this.currentSize);
     let gridArray = [];
     
     // Use unified margins for consistency
@@ -3732,7 +3564,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       gridArray = grids;
     }
     
-    this.LOG('Grid array configuration:', gridArray);
     return gridArray;
   }
   
@@ -3774,7 +3605,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       grids.push(grid);
     }
     
-    this.LOG('Calculated scrollable grids:', grids);
     return grids;
   }
 
@@ -3897,7 +3727,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private currentYAxisArray(): any[] {
     const myYAxisArray = [];
     const tempUnits = this.getGridUnitsByData();
-    this.LOG("currentYAxisArray getGridUnitsByData:", tempUnits);
     
     // Get the axis position map to determine fixed plot numbers
     const axisMap = this.getAxisPositionMap();
@@ -3908,7 +3737,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const plotName1 = visibleGridNames[0] ? this.getFirstLabelForGrid(visibleGridNames[0]) : 'Top';
     const unit1 = tempUnits[0] ? `[${tempUnits[0]}]` : '';
     
-    this.LOG(`Y-Axis 1 - Plot: ${plotNumber1}, Label: ${plotName1}, Unit: ${unit1}`);
     
     // Create label based on configured number of lines
     const numLines = this.ctx.settings?.yAxisLabelLines || 3;
@@ -3971,7 +3799,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const plotName = visibleGridNames[i] ? this.getFirstLabelForGrid(visibleGridNames[i]) : `Plot${i + 1}`;
       const unit = tempUnits[i] ? `[${tempUnits[i]}]` : '';
       
-      this.LOG(`Y-Axis ${i + 1} - Plot: ${plotNumber}, Label: ${plotName}, Unit: ${unit}`);
       
       // Create label based on configured number of lines
       let multiLineLabel: string;
@@ -4031,38 +3858,29 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private checkDataGridByName(selectedKeys: string[]): Set<string> {
-    this.LOG('[Device_Plot_Visi: ] checkDataGridByName called with keys:', selectedKeys);
     
     const matchedValues = selectedKeys.map(key => {
       // Extract label from key to find the matching data object
       const label = this.extractLabelFromKey(key);
-      this.LOG('[Device_Plot_Visi: ] Extracted label from key:', key, '->', label);
       
       const foundObject = this.ctx.data.find(obj => obj.dataKey.label === label);
       const axisAssignment = foundObject ? (foundObject.dataKey.settings?.axisAssignment || 'Top') : null;
       
-      this.LOG('[Device_Plot_Visi: ] For label', label, 'found axis assignment:', axisAssignment);
       
       // Default to 'Top' if no assignment is set
       return axisAssignment;
     });
-    this.LOG('[Device_Plot_Visi: ] All matched values:', matchedValues);
     
     const axisPositionMap = this.getAxisPositionMap();
-    this.LOG('[Device_Plot_Visi: ] Axis position map:', axisPositionMap);
     
     const uniqueMatches = new Set(matchedValues.filter(item => item && Object.prototype.hasOwnProperty.call(axisPositionMap, item)));
-    this.LOG('[Device_Plot_Visi: ] Unique matches (valid grids):', Array.from(uniqueMatches), ', count:', uniqueMatches.size);
     return uniqueMatches;
   }
 
   private setDataGridByNames(selectedKeys: string[]): void {
-    this.LOG('[Device_Plot_Visi: ] setDataGridByNames called with:', selectedKeys);
-    this.LOG('[Device_Plot_Visi: ] Number of selected keys:', selectedKeys.length);
     
     // If no keys with data, keep 1 grid but mark as having no data
     if (selectedKeys.length === 0) {
-      this.LOG('[Device_Plot_Visi: ] No series with data - keeping 1 grid for stability');
       this.currentGridNames = ['Top']; // Keep at least one grid
       this.currentGrids = 1; // Minimum 1 grid to prevent chart breaking
       // Only show no data message if we're not waiting for initial data
@@ -4084,20 +3902,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Get unique axis assignments from selected series
     const selectedGrids = this.checkDataGridByName(selectedKeys);
-    this.LOG('[Device_Plot_Visi: ] Selected grids from checkDataGridByName:', Array.from(selectedGrids));
-    this.LOG('[Device_Plot_Visi: ] Number of unique grids:', selectedGrids.size);
     
     // Update current grid configuration
     this.currentGridNames = Array.from(selectedGrids);
     this.currentGrids = selectedGrids.size;
     
-    this.LOG('[Device_Plot_Visi: ] Updated grid configuration from legend:');
-    this.LOG('[Device_Plot_Visi: ] - currentGridNames:', this.currentGridNames);
-    this.LOG('[Device_Plot_Visi: ] - currentGrids:', this.currentGrids);
   }
 
   private countGridsBySettings(selectedKeys: string[]): Set<string> {
-    this.LOG('countGridsBySettings called with keys:', selectedKeys);
     
     const axisPositionMap = this.getAxisPositionMap();
     
@@ -4106,15 +3918,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       .map((item, index) => {
         // Default to 'Top' if no assignment is set
         const assignment = item.dataKey?.settings?.axisAssignment || 'Top';
-        this.LOG(`  - Data[${index}] axisAssignment:`, assignment, 
-                 'Valid:', Object.prototype.hasOwnProperty.call(axisPositionMap, assignment));
         return assignment;
       })
       .filter(assignment => Object.prototype.hasOwnProperty.call(axisPositionMap, assignment));
     
-    this.LOG('Filtered valid assignments:', axisAssignments);
     const uniqueAssignments = new Set(axisAssignments);
-    this.LOG('Unique assignments:', Array.from(uniqueAssignments));
     
     return uniqueAssignments;
   }
@@ -4131,7 +3939,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       dynamicMap[gridName] = index;
     });
     
-    this.LOG('Dynamic axis index map:', dynamicMap);
     return dynamicMap;
   }
   
@@ -4153,7 +3960,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         selected = { ...opt.legend[0].selected };
       }
     } catch (e) {
-      this.LOG('Could not retrieve existing legend state:', e);
     }
     
     // Default new series to ON if not in existing selection
@@ -4163,7 +3969,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
     }
     
-    this.LOG('Legend state:', { data, selected });
     return { data, selected };
   }
 
@@ -4518,9 +4323,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   // Utility methods
   private LOG(...args: any[]): void {
-    if (this.DEBUG) {
-      console.log("[sc chart v6.1 3sub production]", ...args);
-    }
+    // Logging disabled
   }
 
   /**
@@ -4539,13 +4342,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
    * [PERF] 14:30:45.123 (1234.56ms) 📈 ECharts setOption took: 42.30ms (5000 points)
    */
   private PERF_LOG(...args: any[]): void {
-    if (this.PERF_DEBUG) {
-      const perfTime = performance.now().toFixed(2);
-      const now = new Date();
-      const timeStr = now.toTimeString().split(' ')[0]; // HH:MM:SS
-      const msStr = now.getMilliseconds().toString().padStart(3, '0');
-      console.log(`[PERF] ${timeStr}.${msStr} (${perfTime}ms)`, ...args);
-    }
+    // Performance logging disabled
   }
 
   /**
@@ -4591,12 +4388,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Apply the settings (non-destructive override)
     Object.assign(this.ctx.settings || {}, perfSettings);
     
-    this.PERF_LOG('🚀 Maximum performance settings applied');
-    this.PERF_LOG('⚡ Canvas renderer: enabled');
-    this.PERF_LOG('⚡ Animations: disabled');
-    this.PERF_LOG('⚡ Data sampling: aggressive (1500 points)');
-    this.PERF_LOG('⚡ Progressive rendering: enabled');
-    this.PERF_LOG('⚡ Update coalescing: enabled');
   }
 
   /**
@@ -4617,12 +4408,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
       // Log excessive mouse move frequency (lag indicator)
       if (timeSinceLastMove < 8) { // More than 120fps
-        this.PERF_LOG(`🐭 High frequency mouse moves: ${timeSinceLastMove.toFixed(2)}ms interval`);
       }
       
       // Log every 50th mouse move to avoid spam
       if (mouseMoveCount % 50 === 0) {
-        this.PERF_LOG(`🐭 Mouse tracking: ${mouseMoveCount} moves, avg interval: ${(now / mouseMoveCount).toFixed(2)}ms`);
       }
       
       lastMouseMoveTime = now;
@@ -4633,16 +4422,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const now = performance.now();
       // No throttling - smooth native performance
       tooltipActiveTime = now;
-      this.PERF_LOG('💬 Tooltip show triggered (native smooth)');
     });
 
     // Monitor tooltip hide performance  
     this.chart.on('hideTip', () => {
       if (tooltipActiveTime > 0) {
         const tooltipDuration = performance.now() - tooltipActiveTime;
-        this.PERF_LOG(`💬 Tooltip was active for: ${tooltipDuration.toFixed(2)}ms`);
         if (tooltipDuration > 5000) { // Long tooltip display
-          this.PERF_LOG('⚠️  Long tooltip display time - potential UX issue');
         }
         tooltipActiveTime = 0;
       }
@@ -4651,37 +4437,31 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Monitor hover events on series
     this.chart.on('mouseover', (event: any) => {
       const hoverStart = performance.now();
-      this.PERF_LOG(`🎯 Series hover: ${event.seriesName || 'unknown'} at index ${event.dataIndex || 'unknown'}`);
       
       // Track hover processing time
       setTimeout(() => {
         const hoverDuration = performance.now() - hoverStart;
         if (hoverDuration > 16) { // More than one frame at 60fps
-          this.PERF_LOG(`🐌 Slow hover processing: ${hoverDuration.toFixed(2)}ms - tooltip may lag`);
         }
       }, 0);
     });
 
     // Monitor when mouse leaves series
     this.chart.on('mouseout', (event: any) => {
-      this.PERF_LOG(`🎯 Series unhover: ${event.seriesName || 'unknown'}`);
     });
 
     // Monitor chart canvas events that affect tooltip responsiveness
     this.chart.getZr().on('mouseout', () => {
-      this.PERF_LOG('🐭 Mouse left chart area - tooltip should clear');
     });
 
     // Monitor global mouse down/up for interaction responsiveness
     this.chart.getZr().on('mousedown', () => {
       const interactionStart = performance.now();
-      this.PERF_LOG('🖱️  Mouse down - interaction start');
       
       // Check responsiveness on next frame
       requestAnimationFrame(() => {
         const responseTime = performance.now() - interactionStart;
         if (responseTime > 32) { // More than 2 frames
-          this.PERF_LOG(`🐌 Slow interaction response: ${responseTime.toFixed(2)}ms`);
         }
       });
     });
@@ -4691,9 +4471,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const renderEnd = performance.now();
       if (this.lastChartRenderStart > 0) {
         const renderDuration = renderEnd - this.lastChartRenderStart;
-        this.PERF_LOG(`🎨 Chart render completed: ${renderDuration.toFixed(2)}ms`);
         if (renderDuration > 100) {
-          this.PERF_LOG(`🐌 Slow chart render: ${renderDuration.toFixed(2)}ms - may cause lag`);
         }
       }
       this.lastChartRenderStart = 0;
@@ -4702,21 +4480,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Monitor data zoom performance
     this.chart.on('datazoom', (event: any) => {
       const zoomStart = performance.now();
-      this.PERF_LOG(`🔍 DataZoom event: ${event.type || 'unknown'} - start: ${event.start}%, end: ${event.end}%`);
       
       // Check zoom response time
       setTimeout(() => {
         const zoomDuration = performance.now() - zoomStart;
         if (zoomDuration > 50) {
-          this.PERF_LOG(`🐌 Slow zoom response: ${zoomDuration.toFixed(2)}ms`);
         }
       }, 0);
     });
 
     // Legend event handler removed - already handled above with debouncing
 
-    this.PERF_LOG('🎯 Mouse interaction performance monitoring enabled');
-    this.PERF_LOG('⚡ Chart event timing monitoring enabled');
     
     // System performance diagnostics (if needed, will be called elsewhere)
   }
@@ -5105,7 +4879,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         // Apply a safety margin to prevent clipping
         const safetyMargin = viewportWidth * 0.15 + sidebarExtraMargin; 
         viewportWidth = viewportWidth - safetyMargin;
-        this.LOG(`Applied safety margin during transition: effective width = ${viewportWidth}`);
       } else {
         // Subtract sidebar extra margin from available width
         viewportWidth = viewportWidth - sidebarExtraMargin;
@@ -5238,7 +5011,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
     
-    this.LOG(`[LEGEND] Toggle clicked: ${item.label}`);
     
     // Toggle the selection
     mainItem.selected = !mainItem.selected;
@@ -5254,7 +5026,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   /* private toggleAllSeriesForLabel(label: string, shouldSelect: boolean): void {
     if (!this.chart) return;
     
-    this.LOG(`[PERF] Legend click: ${label} -> ${shouldSelect ? 'select' : 'unselect'}`);
     
     // Optimistic UI update - legend chips are already updated by the caller
     // This provides immediate visual feedback
@@ -5303,7 +5074,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
       // Lightweight logging for performance mode
       if (this.shouldOptimizeClicks()) {
-        this.LOG(`[PERF] Legend toggle completed: ${label}, active series: ${activeSeriesKeys.length}`);
       }
       
       const previousGridCount = this.currentGrids;
@@ -5314,7 +5084,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.setDataGridByNames(activeSeriesKeys);
       
       if (previousGridCount !== this.currentGrids) {
-        this.LOG(`[SCROLL] Legend mode transition: ${previousGridCount} → ${this.currentGrids} grids`);
         this.resetGrid = true;
         this.applyScrollableHeight();
         this.onDataUpdated();
@@ -5336,17 +5105,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Browser performance info
     const nav = navigator as any;
-    this.PERF_LOG('🖥️ System Performance Diagnostics:');
-    this.PERF_LOG(`   Browser: ${nav.userAgent.split(' ')[0] || 'Unknown'}`);
-    this.PERF_LOG(`   Memory: ${nav.deviceMemory || 'Unknown'}GB RAM`);
-    this.PERF_LOG(`   CPU Cores: ${nav.hardwareConcurrency || 'Unknown'}`);
     
     // Performance timing
     const perf = performance as any;
     if (perf.memory) {
       const memMB = (perf.memory.usedJSHeapSize / 1024 / 1024).toFixed(1);
       const limitMB = (perf.memory.totalJSHeapSize / 1024 / 1024).toFixed(1);
-      this.PERF_LOG(`   JS Heap: ${memMB}MB / ${limitMB}MB`);
     }
     
     // Frame rate detection
@@ -5358,12 +5122,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       if (frameCount === 10) {
         const avgFrameTime = (currentTime - lastFrameTime) / 10;
         const fps = (1000 / avgFrameTime).toFixed(1);
-        this.PERF_LOG(`   Display FPS: ~${fps}fps (${avgFrameTime.toFixed(1)}ms/frame)`);
         
         if (parseFloat(fps) < 45) {
-          this.PERF_LOG('⚠️ Low FPS detected - tooltip lag likely due to system performance');
         } else if (parseFloat(fps) > 55) {
-          this.PERF_LOG('✅ Good FPS - tooltip lag likely due to ECharts configuration');
         }
         return;
       }
@@ -5373,50 +5134,105 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   /**
-   * Calculate min/max values across ALL devices for visible time range
-   * This shows the global min/max across all series, not per grid
+   * Calculate min/max values per grid for visible time range
+   * Each grid/subplot gets its own min/max calculation
    */
-  private calcGlobalMinMax(series: any[], visibleRange?: { start: number; end: number }): { min: number; max: number } {
-    let globalMin = Number.POSITIVE_INFINITY;
-    let globalMax = Number.NEGATIVE_INFINITY;
+  private calcPerGridMinMax(series: any[], visibleRange?: { start: number; end: number }): Map<number, { min: number; max: number }> {
+    const gridMinMax = new Map<number, { min: number; max: number }>();
+    
+    if (this.minMaxDebugLogs) {
+      console.log(`[MIN/MAX] Starting per-grid min/max calculation for ${series.length} series`);
+    }
+    
+    // Group series by grid
+    const seriesByGrid = new Map<number, any[]>();
     
     series.forEach(s => {
       // Ignore helper series we add ourselves
       if (!s.data?.length || /Min Line|Max Line|Alarm Area/.test(s.name)) return;
       
-      const values = s.data
-        .filter(([t]: [number, number]) => !visibleRange || (t >= visibleRange.start && t <= visibleRange.end))
-        .map(([, v]: [number, number]) => v)
-        .filter((v: number) => v != null && !isNaN(v));
-      
-      if (!values.length) return;
-      
-      const min = Math.min(...values);
-      const max = Math.max(...values);
-      
-      globalMin = Math.min(globalMin, min);
-      globalMax = Math.max(globalMax, max);
+      const gridIndex = s.xAxisIndex || 0;
+      if (!seriesByGrid.has(gridIndex)) {
+        seriesByGrid.set(gridIndex, []);
+      }
+      seriesByGrid.get(gridIndex)!.push(s);
     });
     
-    return {
-      min: globalMin === Number.POSITIVE_INFINITY ? 0 : globalMin,
-      max: globalMax === Number.NEGATIVE_INFINITY ? 100 : globalMax
-    };
+    if (this.minMaxDebugLogs) {
+      console.log(`[MIN/MAX] Found series on ${seriesByGrid.size} grids:`, Array.from(seriesByGrid.keys()));
+    }
+    
+    // Calculate min/max for each grid
+    seriesByGrid.forEach((gridSeries, gridIndex) => {
+      let gridMin = Number.POSITIVE_INFINITY;
+      let gridMax = Number.NEGATIVE_INFINITY;
+      let seriesCount = 0;
+      let totalPoints = 0;
+      
+      gridSeries.forEach(s => {
+        const values = s.data
+          .filter(([t]: [number, number]) => !visibleRange || (t >= visibleRange.start && t <= visibleRange.end))
+          .map(([, v]: [number, number]) => v)
+          .filter((v: number) => v != null && !isNaN(v));
+        
+        if (!values.length) return;
+        
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        
+        gridMin = Math.min(gridMin, min);
+        gridMax = Math.max(gridMax, max);
+        seriesCount++;
+        totalPoints += values.length;
+        
+        if (this.minMaxDebugLogs) {
+          console.log(`[MIN/MAX] Grid ${gridIndex} - Series "${s.name}": min=${min}, max=${max}, points=${values.length}`);
+        }
+      });
+      
+      const result = {
+        min: gridMin === Number.POSITIVE_INFINITY ? 0 : gridMin,
+        max: gridMax === Number.NEGATIVE_INFINITY ? 100 : gridMax
+      };
+      
+      gridMinMax.set(gridIndex, result);
+      
+      if (this.minMaxDebugLogs) {
+        console.log(`[MIN/MAX] Grid ${gridIndex} calculation complete:`, {
+          gridMin: result.min,
+          gridMax: result.max,
+          seriesAnalyzed: seriesCount,
+          totalDataPoints: totalPoints
+        });
+      }
+    });
+    
+    return gridMinMax;
   }
   
   /**
-   * Add min/max reference lines showing global min/max across ALL devices
+   * Add min/max reference lines showing per-grid min/max values
    */
   private addMinMaxLines(options: any): void {
-    this.LOG(`[Min/Max] Adding min/max lines - visible: ${this.minMaxVisible}, series count: ${options.series?.length}`);
     if (!options.series?.length || !this.minMaxVisible) {
-      this.LOG(`[Min/Max] Skipping - visible: ${this.minMaxVisible}, has series: ${!!options.series?.length}`);
+      if (this.minMaxDebugLogs && !this.minMaxVisible) {
+        console.log('[MIN/MAX] Min/max lines disabled in settings');
+      }
       return;
+    }
+    
+    if (this.minMaxDebugLogs) {
+      console.log('[MIN/MAX] Starting to add per-grid min/max reference lines');
     }
     
     // Find base series with data for time domain
     const baseSeries = options.series.find((s: any) => s.data?.length && !/Min Line|Max Line|Alarm Area/.test(s.name));
-    if (!baseSeries) return;
+    if (!baseSeries) {
+      if (this.minMaxDebugLogs) {
+        console.log('[MIN/MAX] No base series found with data');
+      }
+      return;
+    }
     
     const timeDomain = {
       start: baseSeries.data[0][0],
@@ -5437,38 +5253,54 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           };
         }
       } catch (e) {
-        this.LOG('Could not get visible range from dataZoom:', e);
       }
     }
     
-    // Calculate GLOBAL min/max across ALL devices
-    const { min, max } = this.calcGlobalMinMax(options.series, visibleRange);
+    // Calculate per-grid min/max values
+    const gridMinMax = this.calcPerGridMinMax(options.series, visibleRange);
     
-    this.LOG(`[Min/Max] Global values calculated: min=${min}, max=${max}`);
-    this.LOG(`[Min/Max] Line style: ${this.minMaxStyle}, color: ${this.minMaxColor}, width: ${this.minMaxLineWidth}`);
     
-    // Determine which grids to show the lines on
-    const gridsToUse = new Set<number>();
+    if (this.minMaxDebugLogs) {
+      console.log(`[MIN/MAX] Adding lines to ${gridMinMax.size} grid(s) with individual min/max values`);
+      console.log(`[MIN/MAX] Line style: ${this.minMaxStyle}, width: ${this.minMaxLineWidth}px`);
+      console.log(`[MIN/MAX] Colors: min=${this.minColor}, max=${this.maxColor}`);
+    }
+    
+    // Get the full time range across all series for proper line length
+    let fullTimeRange = { start: timeDomain.start, end: timeDomain.end };
     options.series.forEach((s: any) => {
       if (s.data?.length && !/Min Line|Max Line|Alarm Area/.test(s.name)) {
-        gridsToUse.add(s.xAxisIndex || 0);
+        const seriesStart = s.data[0][0];
+        const seriesEnd = s.data[s.data.length - 1][0];
+        fullTimeRange.start = Math.min(fullTimeRange.start, seriesStart);
+        fullTimeRange.end = Math.max(fullTimeRange.end, seriesEnd);
       }
     });
     
-    // Add min/max lines to each active grid showing the SAME global values
-    this.LOG(`[Min/Max] Adding lines to ${gridsToUse.size} grids`);
-    gridsToUse.forEach(gridIndex => {
-      // Min line
+    if (this.minMaxDebugLogs) {
+      console.log(`[MIN/MAX] Full time range: ${new Date(fullTimeRange.start).toISOString()} to ${new Date(fullTimeRange.end).toISOString()}`);
+    }
+    
+    // Add min/max lines to each grid with their specific min/max values
+    let linesAdded = 0;
+    gridMinMax.forEach((minMax, gridIndex) => {
+      const { min, max } = minMax;
+      
+      if (this.minMaxDebugLogs) {
+        console.log(`[MIN/MAX] Adding lines to grid ${gridIndex}: min=${min} (${this.minColor}), max=${max} (${this.maxColor})`);
+      }
+      
+      // Min line for this specific grid
       options.series.push({
         name: `Min Line ${gridIndex}`,
         type: 'line',
         xAxisIndex: gridIndex,
         yAxisIndex: gridIndex,
-        data: [[timeDomain.start, min], [timeDomain.end, min]],
+        data: [[fullTimeRange.start, min], [fullTimeRange.end, min]],
         lineStyle: { 
           type: this.minMaxStyle, 
           width: this.minMaxLineWidth,
-          color: this.minMaxColor
+          color: this.minColor
         },
         symbol: 'none',
         animation: false,
@@ -5479,17 +5311,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         tooltip: { show: false }
       });
       
-      // Max line
+      // Max line for this specific grid
       options.series.push({
         name: `Max Line ${gridIndex}`,
         type: 'line',
         xAxisIndex: gridIndex,
         yAxisIndex: gridIndex,
-        data: [[timeDomain.start, max], [timeDomain.end, max]],
+        data: [[fullTimeRange.start, max], [fullTimeRange.end, max]],
         lineStyle: { 
           type: this.minMaxStyle, 
           width: this.minMaxLineWidth,
-          color: this.minMaxColor
+          color: this.maxColor
         },
         symbol: 'none',
         animation: false,
@@ -5499,83 +5331,451 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         silent: true,
         tooltip: { show: false }
       });
+      
+      linesAdded += 2;
     });
     
-    // Log how many min/max series were added
-    const minMaxSeriesCount = options.series.filter((s: any) => /Min Line|Max Line/.test(s.name)).length;
-    this.LOG(`[Min/Max] Added ${minMaxSeriesCount} min/max line series to chart`);
+    if (this.minMaxDebugLogs) {
+      console.log(`[MIN/MAX] Added ${linesAdded} min/max reference lines (${linesAdded/2} grids)`);
+    }
   }
+  
+  /**
+   * Add alarm threshold lines similar to min/max lines
+   */
+  private addAlarmLines(options: any): void {
+    if (!this.alarmLinesVisible || !this.alarmData?.size || !options.series?.length) {
+      if (this.alarmDebugLogs && !this.alarmLinesVisible) {
+        console.log('[ALARM LINES] Alarm lines disabled in settings');
+      }
+      return;
+    }
+    
+    if (this.alarmDebugLogs) {
+      console.log('[ALARM LINES] Starting to add alarm threshold lines');
+    }
+    
+    // Find base series with data for time domain
+    const baseSeries = options.series.find((s: any) => s.data?.length && !/Min Line|Max Line|Alarm/.test(s.name));
+    if (!baseSeries) {
+      if (this.alarmDebugLogs) {
+        console.log('[ALARM LINES] No base series found with data');
+      }
+      return;
+    }
+    
+    // Get the full time range
+    let fullTimeRange = { 
+      start: baseSeries.data[0][0], 
+      end: baseSeries.data[baseSeries.data.length - 1][0] 
+    };
+    
+    options.series.forEach((s: any) => {
+      if (s.data?.length && !/Min Line|Max Line|Alarm/.test(s.name)) {
+        const seriesStart = s.data[0][0];
+        const seriesEnd = s.data[s.data.length - 1][0];
+        fullTimeRange.start = Math.min(fullTimeRange.start, seriesStart);
+        fullTimeRange.end = Math.max(fullTimeRange.end, seriesEnd);
+      }
+    });
+    
+    // Determine which grids are active
+    const gridsToUse = new Set<number>();
+    options.series.forEach((s: any) => {
+      if (s.data?.length && !/Min Line|Max Line|Alarm/.test(s.name)) {
+        gridsToUse.add(s.xAxisIndex || 0);
+      }
+    });
+    
+    if (this.alarmDebugLogs) {
+      console.log(`[ALARM LINES] Active grids: ${Array.from(gridsToUse).join(', ')}`);
+      console.log(`[ALARM LINES] Processing ${this.alarmData.size} device alarm configurations`);
+    }
+    
+    // Collect unique alarm thresholds across all devices
+    const thresholdsByGrid = new Map<number, Set<{ value: number; type: 'min' | 'max'; severity: string }>>();
+    
+    // Initialize for each grid
+    gridsToUse.forEach(gridIndex => {
+      thresholdsByGrid.set(gridIndex, new Set());
+    });
+    
+    // Process alarm data
+    this.alarmData.forEach((threshold, deviceId) => {
+      // Filter by severity settings
+      if (threshold.severity === 'CRITICAL' && !this.alarmShowCritical) return;
+      if (threshold.severity === 'WARNING' && !this.alarmShowWarning) return;
+      if (threshold.severity === 'INFO' && !this.alarmShowInfo) return;
+      
+      // Add thresholds to all grids (since alarms apply globally)
+      gridsToUse.forEach(gridIndex => {
+        const gridThresholds = thresholdsByGrid.get(gridIndex)!;
+        
+        if (threshold.max != null) {
+          gridThresholds.add({ 
+            value: threshold.max, 
+            type: 'max', 
+            severity: threshold.severity || 'CRITICAL' 
+          });
+        }
+        if (threshold.min != null) {
+          gridThresholds.add({ 
+            value: threshold.min, 
+            type: 'min', 
+            severity: threshold.severity || 'CRITICAL' 
+          });
+        }
+      });
+    });
+    
+    // Add alarm lines for each grid
+    let linesAdded = 0;
+    thresholdsByGrid.forEach((thresholds, gridIndex) => {
+      // Convert Set to Array and deduplicate by value
+      const uniqueThresholds = Array.from(new Map(
+        Array.from(thresholds).map(t => [`${t.value}_${t.type}_${t.severity}`, t])
+      ).values());
+      
+      if (this.alarmDebugLogs) {
+        console.log(`[ALARM LINES] Grid ${gridIndex}: Adding ${uniqueThresholds.length} alarm lines`);
+      }
+      
+      uniqueThresholds.forEach((threshold, index) => {
+        // Determine line color based on threshold type (min or max)
+        const lineColor = threshold.type === 'max' ? this.alarmMaxColor : this.alarmMinColor;
+        
+        const lineName = `Alarm ${threshold.type === 'max' ? 'Max' : 'Min'} ${threshold.severity} ${gridIndex}_${index}`;
+        
+        options.series.push({
+          name: lineName,
+          type: 'line',
+          xAxisIndex: gridIndex,
+          yAxisIndex: gridIndex,
+          data: [[fullTimeRange.start, threshold.value], [fullTimeRange.end, threshold.value]],
+          lineStyle: {
+            type: this.alarmLineStyle,
+            width: this.alarmLineWidth,
+            color: lineColor,
+            opacity: 0.8
+          },
+          symbol: 'none',
+          animation: false,
+          z: 99, // Slightly below min/max lines
+          emphasis: { disabled: true },
+          legendHoverLink: false,
+          silent: true,
+          tooltip: { show: false }
+        });
+        
+        linesAdded++;
+      });
+    });
+    
+    if (this.alarmDebugLogs) {
+      console.log(`[ALARM LINES] Added ${linesAdded} alarm threshold lines`);
+    }
+  }
+  
   
   /**
    * Fetch alarms for all devices
    */
   private async fetchAlarmsForDevices(): Promise<void> {
-    // Check if alarmApi is available (might not be in all ThingsBoard versions)
-    const alarmApi = (this.ctx as any).alarmApi;
-    if (!alarmApi) {
-      this.LOG('Alarm API not available in this context');
+    if (this.alarmDebugLogs) {
+      console.log('[ALARM] Starting alarm fetch for devices from attributes');
+    }
+    
+    // Check if attributeService is available
+    if (!this.ctx.attributeService) {
+      if (this.alarmDebugLogs) {
+        console.log('[ALARM] AttributeService not available');
+      }
       return;
     }
     
-    // Get unique device IDs from data
-    const deviceIds = new Set<string>();
-    this.ctx.data.forEach(series => {
-      if (series.datasource?.entityId) {
-        deviceIds.add(series.datasource.entityId);
+    // Get unique devices from datasources
+    const devices = new Map<string, any>();
+    this.ctx.datasources?.forEach((ds: any) => {
+      if (ds.entityId) {
+        const entityId = typeof ds.entityId === 'string' 
+          ? ds.entityId 
+          : ds.entityId.id;
+        
+        if (entityId) {
+          devices.set(entityId, {
+            entityType: ds.entityType || 'DEVICE',
+            id: entityId,
+            name: ds.name || ds.entityName || 'Unknown'
+          });
+        }
       }
     });
     
-    if (deviceIds.size === 0) {
-      this.LOG('No device IDs found for alarm fetching');
+    if (this.alarmDebugLogs) {
+      console.log(`[ALARM] Found ${devices.size} unique devices to fetch alarms for`);
+    }
+    
+    if (devices.size === 0) {
+      if (this.alarmDebugLogs) {
+        console.log('[ALARM] No devices found in datasources');
+      }
       return;
     }
     
     try {
+      // Fetch alarms attribute for all devices
       const promises: Promise<any>[] = [];
-      deviceIds.forEach(deviceId => {
+      const deviceArray: any[] = [];
+      
+      devices.forEach((device, deviceId) => {
+        const entity = {
+          entityType: device.entityType,
+          id: device.id
+        };
+        
+        deviceArray.push(device);
         promises.push(
-          alarmApi.getAlarms(deviceId, {
-            pageSize: 100,
-            page: 0,
-            sortProperty: 'createdTime',
-            sortOrder: 'DESC'
-          }).toPromise()
+          this.ctx.attributeService
+            .getEntityAttributes(entity, 'SERVER_SCOPE' as any, ['alarms'])
+            .toPromise()
+            .catch((error: any) => {
+              if (this.alarmDebugLogs) {
+                console.log(`[ALARM] Error fetching alarms for device ${deviceId}:`, error);
+              }
+              return [];
+            })
         );
       });
       
+      if (this.alarmDebugLogs) {
+        console.log(`[ALARM] Fetching alarm attributes from ${promises.length} devices...`);
+      }
+      
       const responses = await Promise.all(promises);
-      this.alarmData = this.processAlarmResponses(responses);
-      this.LOG('Fetched alarms:', this.alarmData);
+      this.alarmData = this.processAlarmAttributeResponses(responses, deviceArray);
+      
+      if (this.alarmDebugLogs) {
+        console.log(`[ALARM] Alarm fetch complete. Processed ${this.alarmData?.size || 0} device alarm configurations`);
+      }
       
       // Re-render chart with alarm overlays
       this.onDataUpdated();
     } catch (error) {
-      this.LOG('Error fetching alarms:', error);
+      if (this.alarmDebugLogs) {
+        console.error('[ALARM] Error fetching alarms:', error);
+      }
     }
   }
   
   /**
    * Process alarm responses into usable format
    */
-  private processAlarmResponses(responses: any[]): Map<string, { min?: number; max?: number; severity?: string }> {
-    const alarmMap = new Map<string, { min?: number; max?: number; severity?: string }>();
+  /**
+   * Set up monitoring for alarm attribute changes
+   * Polls for changes every 5 seconds and updates when detected
+   */
+  private setupAlarmAttributeMonitoring(): void {
+    if (this.alarmDebugLogs) {
+      console.log('[ALARM] Setting up alarm attribute monitoring');
+    }
     
-    responses.forEach(response => {
-      if (!response?.data) return;
+    // Store the last known alarm values for comparison
+    let lastAlarmValues = new Map<string, string>();
+    
+    // Set up polling interval (every 5 seconds)
+    this.alarmUpdateTimer = setInterval(async () => {
+      if (!this.ctx.attributeService || !this.ctx.datasources) {
+        return;
+      }
       
-      response.data.forEach((alarm: any) => {
-        const deviceId = alarm.originator?.id;
-        if (!deviceId) return;
+      try {
+        // Get unique devices from datasources
+        const devices = new Map<string, any>();
+        this.ctx.datasources?.forEach((ds: any) => {
+          if (ds.entityId) {
+            const entityId = typeof ds.entityId === 'string' 
+              ? ds.entityId 
+              : ds.entityId.id;
+            
+            if (entityId) {
+              devices.set(entityId, {
+                entityType: ds.entityType || 'DEVICE',
+                id: entityId,
+                name: ds.name || ds.entityName || 'Unknown'
+              });
+            }
+          }
+        });
         
-        // Extract thresholds from alarm details
-        const details = alarm.details || {};
-        alarmMap.set(deviceId, {
-          min: details.minValue ?? undefined,
-          max: details.maxValue ?? undefined,
-          severity: alarm.severity || 'CRITICAL'
+        // Check each device for alarm changes
+        let hasChanges = false;
+        const promises: Promise<any>[] = [];
+        
+        devices.forEach((device) => {
+          const entity = {
+            entityType: device.entityType,
+            id: device.id
+          };
+          
+          promises.push(
+            this.ctx.attributeService
+              .getEntityAttributes(entity, 'SERVER_SCOPE' as any, ['alarms'])
+              .toPromise()
+              .then((attrs: any[]) => {
+                if (attrs && attrs.length > 0) {
+                  const alarmAttr = attrs.find((attr: any) => attr.key === 'alarms');
+                  if (alarmAttr) {
+                    const currentValue = JSON.stringify(alarmAttr.value);
+                    const lastValue = lastAlarmValues.get(device.id);
+                    
+                    if (lastValue !== currentValue) {
+                      hasChanges = true;
+                      lastAlarmValues.set(device.id, currentValue);
+                      
+                      if (this.alarmDebugLogs) {
+                        console.log(`[ALARM] Detected alarm change for device ${device.id}`);
+                      }
+                    }
+                  }
+                }
+              })
+              .catch((error: any) => {
+                // Ignore individual device errors
+                if (this.alarmDebugLogs) {
+                  console.log(`[ALARM] Error checking device ${device.id}:`, error);
+                }
+              })
+          );
+        });
+        
+        await Promise.all(promises);
+        
+        // If changes detected, refresh alarm data
+        if (hasChanges) {
+          if (this.alarmDebugLogs) {
+            console.log('[ALARM] Alarm changes detected, refreshing alarm data');
+          }
+          
+          // Fetch updated alarms
+          await this.fetchAlarmsForDevices();
+        }
+      } catch (error) {
+        if (this.alarmDebugLogs) {
+          console.error('[ALARM] Error in alarm monitoring:', error);
+        }
+      }
+    }, this.ctx.settings?.alarmUpdateInterval || 5000); // Default 5 seconds, configurable
+    
+    if (this.alarmDebugLogs) {
+      const interval = this.ctx.settings?.alarmUpdateInterval || 5000;
+      console.log(`[ALARM] Alarm monitoring started (polling every ${interval/1000} seconds)`);
+    }
+  }
+
+  private processAlarmAttributeResponses(responses: any[], deviceArray: any[]): Map<string, { min?: number; max?: number; severity?: string }> {
+    const alarmMap = new Map<string, { min?: number; max?: number; severity?: string }>();
+    let totalAlarms = 0;
+    let processedDevices = 0;
+    
+    if (this.alarmDebugLogs) {
+      console.log(`[ALARM] Processing ${responses.length} alarm responses from devices`);
+    }
+    
+    // Process attribute responses
+    responses.forEach((attributeResponse, responseIndex) => {
+      const device = deviceArray[responseIndex];
+      const deviceId = device.id;
+      
+      if (!attributeResponse || !Array.isArray(attributeResponse)) {
+        if (this.alarmDebugLogs) {
+          console.log(`[ALARM] Device ${deviceId} has no alarm attributes`);
+        }
+        return;
+      }
+      
+      // Find the alarms attribute
+      const alarmAttr = attributeResponse.find((attr: any) => attr.key === 'alarms');
+      if (!alarmAttr || !alarmAttr.value) {
+        if (this.alarmDebugLogs) {
+          console.log(`[ALARM] Device ${deviceId} has no alarms attribute`);
+        }
+        return;
+      }
+      
+      // Parse alarms value if it's a string
+      let alarmCategories = alarmAttr.value;
+      if (typeof alarmCategories === 'string') {
+        try {
+          alarmCategories = JSON.parse(alarmCategories);
+        } catch (e) {
+          if (this.alarmDebugLogs) {
+            console.log(`[ALARM] Failed to parse alarms for device ${deviceId}:`, e);
+          }
+          return;
+        }
+      }
+      
+      if (!Array.isArray(alarmCategories)) {
+        if (this.alarmDebugLogs) {
+          console.log(`[ALARM] Device ${deviceId} alarms is not an array`);
+        }
+        return;
+      }
+      
+      if (this.alarmDebugLogs) {
+        console.log(`[ALARM] Device ${deviceId} has ${alarmCategories.length} alarm categories`);
+      }
+      
+      // Process alarm categories and extract active thresholds
+      let minThreshold: number | undefined;
+      let maxThreshold: number | undefined;
+      let activeFieldCount = 0;
+      
+      alarmCategories.forEach((category: any) => {
+        if (!category.fields || !Array.isArray(category.fields)) return;
+        
+        category.fields.forEach((field: any) => {
+          if (!field.active || !field.value || !Array.isArray(field.value)) return;
+          
+          activeFieldCount++;
+          const fieldMin = parseFloat(field.value[0]);
+          const fieldMax = parseFloat(field.value[1]);
+          
+          if (isFinite(fieldMin)) {
+            minThreshold = minThreshold !== undefined ? Math.min(minThreshold, fieldMin) : fieldMin;
+          }
+          if (isFinite(fieldMax)) {
+            maxThreshold = maxThreshold !== undefined ? Math.max(maxThreshold, fieldMax) : fieldMax;
+          }
+          
+          if (this.alarmDebugLogs) {
+            console.log(`[ALARM] Device ${deviceId}, Category: ${category.name}, Field: ${field.name}, Active: true, Min: ${fieldMin}, Max: ${fieldMax}`);
+          }
         });
       });
+      
+      // Store the aggregated thresholds for this device
+      if (minThreshold !== undefined || maxThreshold !== undefined) {
+        const alarmConfig = {
+          min: minThreshold,
+          max: maxThreshold,
+          severity: 'CRITICAL' // Default severity
+        };
+        
+        alarmMap.set(deviceId, alarmConfig);
+        totalAlarms++;
+        
+        if (this.alarmDebugLogs) {
+          console.log(`[ALARM] Device ${deviceId}: Aggregated min=${minThreshold}, max=${maxThreshold}, active fields=${activeFieldCount}`);
+        }
+      }
+      
+      processedDevices++;
     });
+    
+    if (this.alarmDebugLogs) {
+      console.log(`[ALARM] Processing complete: ${totalAlarms} alarms from ${processedDevices} devices, ${alarmMap.size} unique device configurations`);
+    }
     
     return alarmMap;
   }
@@ -5584,20 +5784,34 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
    * Add alarm overlay areas showing ALL device thresholds
    */
   private addAlarmAreas(options: any): void {
-    this.LOG(`[Alarms] Adding alarm areas - visible: ${this.alarmStatusVisible}, has data: ${!!this.alarmData?.size}, series: ${options.series?.length}`);
     if (!this.alarmStatusVisible || !this.alarmData?.size || !options.series?.length) {
-      this.LOG(`[Alarms] Skipping - visible: ${this.alarmStatusVisible}, has alarm data: ${!!this.alarmData?.size}`);
+      if (this.alarmDebugLogs) {
+        console.log('[ALARM] Skipping alarm areas: alarmStatusVisible=', this.alarmStatusVisible, 'alarmData.size=', this.alarmData?.size, 'series.length=', options.series?.length);
+      }
       return;
+    }
+    
+    if (this.alarmDebugLogs) {
+      console.log(`[ALARM] Adding alarm areas. ${this.alarmData.size} device alarm configurations available`);
     }
     
     // Find base series for time domain
     const baseSeries = options.series.find((s: any) => s.data?.length && !/Min Line|Max Line|Alarm Area/.test(s.name));
-    if (!baseSeries) return;
+    if (!baseSeries) {
+      if (this.alarmDebugLogs) {
+        console.log('[ALARM] No base series found for time domain');
+      }
+      return;
+    }
     
     const timeDomain = {
       start: baseSeries.data[0][0],
       end: baseSeries.data[baseSeries.data.length - 1][0]
     };
+    
+    if (this.alarmDebugLogs) {
+      console.log('[ALARM] Time domain:', timeDomain);
+    }
     
     // Determine which grids are active
     const gridsToUse = new Set<number>();
@@ -5607,29 +5821,64 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
     });
     
+    if (this.alarmDebugLogs) {
+      console.log('[ALARM] Active grids:', Array.from(gridsToUse));
+    }
+    
     // Collect all unique alarm thresholds across all devices
     const allThresholds: Array<{ value: number; type: 'min' | 'max'; severity: string }> = [];
+    let filteredDevices = 0;
     
     this.alarmData.forEach((threshold, deviceId) => {
       // Filter by severity settings
-      if (threshold.severity === 'CRITICAL' && !this.alarmShowCritical) return;
-      if (threshold.severity === 'WARNING' && !this.alarmShowWarning) return;
-      if (threshold.severity === 'INFO' && !this.alarmShowInfo) return;
+      if (threshold.severity === 'CRITICAL' && !this.alarmShowCritical) {
+        if (this.alarmDebugLogs) {
+          console.log(`[ALARM] Skipping CRITICAL alarm for device ${deviceId} (disabled)`);
+        }
+        return;
+      }
+      if (threshold.severity === 'WARNING' && !this.alarmShowWarning) {
+        if (this.alarmDebugLogs) {
+          console.log(`[ALARM] Skipping WARNING alarm for device ${deviceId} (disabled)`);
+        }
+        return;
+      }
+      if (threshold.severity === 'INFO' && !this.alarmShowInfo) {
+        if (this.alarmDebugLogs) {
+          console.log(`[ALARM] Skipping INFO alarm for device ${deviceId} (disabled)`);
+        }
+        return;
+      }
+      
+      filteredDevices++;
       
       if (threshold.max != null) {
         allThresholds.push({ value: threshold.max, type: 'max', severity: threshold.severity || 'CRITICAL' });
+        if (this.alarmDebugLogs) {
+          console.log(`[ALARM] Adding MAX threshold for device ${deviceId}: ${threshold.max} (${threshold.severity})`);
+        }
       }
       if (threshold.min != null) {
         allThresholds.push({ value: threshold.min, type: 'min', severity: threshold.severity || 'CRITICAL' });
+        if (this.alarmDebugLogs) {
+          console.log(`[ALARM] Adding MIN threshold for device ${deviceId}: ${threshold.min} (${threshold.severity})`);
+        }
       }
     });
+    
+    if (this.alarmDebugLogs) {
+      console.log(`[ALARM] Collected ${allThresholds.length} thresholds from ${filteredDevices} devices after severity filtering`);
+    }
     
     // Remove duplicate threshold values
     const uniqueThresholds = Array.from(new Map(
       allThresholds.map(t => [`${t.value}_${t.type}`, t])
     ).values());
     
-    this.LOG(`Alarm thresholds found: ${uniqueThresholds.length} unique thresholds across all devices`);
+    if (this.alarmDebugLogs) {
+      console.log(`[ALARM] After deduplication: ${uniqueThresholds.length} unique thresholds`);
+    }
+    
     
     // Add alarm areas for each unique threshold on each grid
     gridsToUse.forEach(gridIndex => {
@@ -5732,7 +5981,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
    */
   public toggleMinMaxLines(): void {
     this.minMaxVisible = !this.minMaxVisible;
-    this.LOG(`Min/Max lines ${this.minMaxVisible ? 'enabled' : 'disabled'}`);
     
     // Re-render chart
     this.onDataUpdated();
@@ -5743,7 +5991,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
    */
   public toggleAlarmStatus(): void {
     this.alarmStatusVisible = !this.alarmStatusVisible;
-    this.LOG(`Alarm overlays ${this.alarmStatusVisible ? 'enabled' : 'disabled'}`);
     
     if (this.alarmStatusVisible && !this.alarmData && !this.alarmFetchPromise) {
       // First time - fetch alarms

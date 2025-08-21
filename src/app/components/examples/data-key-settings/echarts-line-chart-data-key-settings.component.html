@@ -1,44 +1,107 @@
-<form [formGroup]="dataKeySettingsForm" *ngIf="dataKeySettingsForm" style="width: 100%;">
-  <div class="mat-content mat-padding" fxLayout="column" style="width: 100%;">
+<form [formGroup]="dataKeySettingsForm" *ngIf="dataKeySettingsForm" class="apple-datakey-form">
+  <div class="datakey-container">
     
-    <!-- Chart Type -->
-    <mat-form-field class="mat-block" appearance="outline">
-      <mat-label>Type</mat-label>
-      <mat-select formControlName="chartType">
-        <mat-option value="Line">Line</mat-option>
-        <mat-option value="Bar">Bar</mat-option>
-      </mat-select>
-    </mat-form-field>
+    <!-- Data Key Configuration Section -->
+    <div class="datakey-section">
+      <div class="section-header">
+        <div class="section-icon datakey-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M3 3V21H21V3H3Z" stroke="currentColor" stroke-width="2" fill="none"/>
+            <path d="M9 9H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M9 15H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="section-info">
+          <h3 class="section-title">Data Key Configuration</h3>
+          <p class="section-subtitle">Configure chart type, subplot assignment, and display settings</p>
+        </div>
+      </div>
+      
+      <div class="datakey-content">
+        <!-- Chart Type Selection -->
+        <div class="setting-group">
+          <label class="setting-label">Chart Type</label>
+          <div class="chart-type-selector">
+            <button type="button" 
+                    class="chart-type-option"
+                    [class.selected]="dataKeySettingsForm.get('chartType')?.value === 'Line'"
+                    (click)="selectChartType('Line')">
+              <div class="chart-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 17L9 11L13 15L21 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M21 7H17M21 7V11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <span class="chart-name">Line Chart</span>
+            </button>
+            <button type="button" 
+                    class="chart-type-option"
+                    [class.selected]="dataKeySettingsForm.get('chartType')?.value === 'Bar'"
+                    (click)="selectChartType('Bar')">
+              <div class="chart-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 20V10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M18 20V4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M6 20V16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span class="chart-name">Bar Chart</span>
+            </button>
+          </div>
+        </div>
 
-    <!-- Subplot Assignment -->
-    <mat-form-field class="mat-block" appearance="outline">
-      <mat-label>Subplot Assignment</mat-label>
-      <mat-select formControlName="axisAssignment">
-        <mat-option value="Top">Subplot 1 (Top)</mat-option>
-        <mat-option value="Middle">Subplot 2 (Middle)</mat-option>
-        <mat-option value="Bottom">Subplot 3 (Bottom)</mat-option>
-        <mat-option value="Plot4">Subplot 4</mat-option>
-        <mat-option value="Plot5">Subplot 5</mat-option>
-        <mat-option value="Plot6">Subplot 6</mat-option>
-        <mat-option value="Plot7">Subplot 7</mat-option>
-      </mat-select>
-    </mat-form-field>
+        <!-- Subplot Assignment -->
+        <div class="setting-group">
+          <label class="setting-label">Subplot Assignment</label>
+          <div class="custom-select">
+            <select formControlName="axisAssignment" class="apple-select">
+              <option value="Top">Subplot 1 (Top)</option>
+              <option value="Middle">Subplot 2 (Middle)</option>
+              <option value="Bottom">Subplot 3 (Bottom)</option>
+              <option value="Plot4">Subplot 4</option>
+              <option value="Plot5">Subplot 5</option>
+              <option value="Plot6">Subplot 6</option>
+              <option value="Plot7">Subplot 7</option>
+            </select>
+            <div class="select-arrow">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+        </div>
 
-    <!-- Bottom Plot Assignment -->
-    <mat-form-field class="mat-block" appearance="outline">
-      <mat-label>Show bottom Plot devicetype</mat-label>
-      <mat-select formControlName="bottomPlotAssigment">
-        <mat-option value="Always">Always</mat-option>
-        <mat-option value="S-100">S-100</mat-option>
-      </mat-select>
-    </mat-form-field>
+        <!-- Device Type Assignment -->
+        <div class="setting-group">
+          <label class="setting-label">Show Bottom Plot Device Type</label>
+          <div class="custom-select">
+            <select formControlName="bottomPlotAssigment" class="apple-select">
+              <option value="Always">Always Show</option>
+              <option value="S-100">S-100 Device Type Only</option>
+            </select>
+            <div class="select-arrow">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+        </div>
 
-    <!-- Number of Digits -->
-    <mat-form-field class="mat-block" appearance="outline">
-      <mat-label>Number of Digits</mat-label>
-      <input matInput type="number" formControlName="numberOfDigits" placeholder="1">
-    </mat-form-field>
-
+        <!-- Number of Digits -->
+        <div class="setting-group">
+          <label class="setting-label">Decimal Places</label>
+          <div class="input-group">
+            <input type="number" 
+                   formControlName="numberOfDigits" 
+                   class="apple-input"
+                   min="0" 
+                   max="10"
+                   placeholder="1">
+            <div class="input-hint">Number of decimal places to display</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
   </div>
 </form>

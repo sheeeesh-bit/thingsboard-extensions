@@ -3,6 +3,8 @@ import { FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { AppState } from '@core/public-api';
 import { Store } from '@ngrx/store';
 import { WidgetSettings, WidgetSettingsComponent } from '@shared/public-api';
+import { MatDialog } from '@angular/material/dialog';
+import { DebugLoggingDialogComponent, DebugLoggingDialogData } from '../debug-dialog/debug-logging-dialog.component';
 
 export interface EchartsLineChartSettings extends WidgetSettings {
   // General Settings
@@ -19,18 +21,6 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   customEntityAttribute?: string;  // Custom attribute name if 'custom' is selected
   sidebarDisplayMode?: 'full' | 'compact' | 'colors';  // How to display the sidebar
   
-  // Y-Axis Settings
-  yAxisLeftTitle?: string;
-  yAxisLeftUnit?: string;
-  yAxisLeftAutoScale?: boolean;
-  yAxisLeftMinScale?: number;
-  yAxisLeftMaxScale?: number;
-  yAxisRightTitle?: string;
-  yAxisRightUnit?: string;
-  yAxisRightAutoScale?: boolean;
-  yAxisRightMinScale?: number;
-  yAxisRightMaxScale?: number;
-  yAxisRightColorChoser?: string;
   
   // Data Point Settings
   showDataPoints?: boolean;
@@ -77,6 +67,21 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   showCustomLegend?: boolean;
   showZoomControls?: boolean;
   
+  // Min/Max Reference Lines
+  minMaxVisible?: boolean;
+  minMaxStyle?: 'dashed' | 'solid' | 'dotted';
+  minMaxColor?: string;
+  minColor?: string;
+  maxColor?: string;
+  minMaxLineWidth?: number;
+  
+  // Alarm Overlays
+  alarmStatusVisible?: boolean;
+  alarmOpacity?: number;
+  alarmShowCritical?: boolean;
+  alarmShowWarning?: boolean;
+  alarmShowInfo?: boolean;
+  
   // Debug & Performance
   debugOutput?: boolean;
   useLazyLoading?: boolean;
@@ -91,6 +96,12 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   batchEChartsUpdates?: boolean;
   echartsUpdateDelay?: number;
   disableChartAnimationsDuringInteraction?: boolean;
+  
+  // Debug Logging Settings
+  debugNormalLogs?: boolean;
+  debugPerformanceLogs?: boolean;
+  debugMinMaxLogs?: boolean;
+  debugAlarmLogs?: boolean;
 }
 
 @Component({
@@ -101,10 +112,22 @@ export interface EchartsLineChartSettings extends WidgetSettings {
 export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
 
   public echartsLineChartSettingsForm: FormGroup;
+  public Math = Math; // Make Math available in template
+  
+  // Track which sections are expanded
+  public expandedSections: { [key: string]: boolean } = {
+    design: true,      // Default expanded
+    grid: false,
+    tooltip: false,
+    export: false,
+    ui: false,
+    performance: false
+  };
 
   constructor(
     protected store: Store<AppState>,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private dialog: MatDialog
   ) {
     super(store);
   }
@@ -119,17 +142,6 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       entityDisplayAttribute: 'label',  // Default to label attribute
       customEntityAttribute: '',
       sidebarDisplayMode: 'full',  // Default to full table view
-      yAxisLeftTitle: '',
-      yAxisLeftUnit: 'ml',
-      yAxisLeftAutoScale: true,
-      yAxisLeftMinScale: 0,
-      yAxisLeftMaxScale: 100,
-      yAxisRightTitle: '',
-      yAxisRightUnit: '',
-      yAxisRightAutoScale: true,
-      yAxisRightMinScale: 0,
-      yAxisRightMaxScale: 100,
-      yAxisRightColorChoser: '#F44336',
       showDataPoints: false,
       symbolSize_data: 5,
       exportDecimals: 6,
@@ -152,6 +164,19 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       showEntitySidebar: true,
       showCustomLegend: true,
       showZoomControls: true,
+      // Min/Max Reference Lines
+      minMaxVisible: false,
+      minMaxStyle: 'dashed',
+      minMaxColor: 'rgba(128, 128, 128, 0.5)',
+      minColor: '#ff4757',
+      maxColor: '#5352ed',
+      minMaxLineWidth: 2,
+      // Alarm Overlays
+      alarmStatusVisible: false,
+      alarmOpacity: 0.12,
+      alarmShowCritical: true,
+      alarmShowWarning: true,
+      alarmShowInfo: false,
       debugOutput: false,
       useLazyLoading: true,
       enableAnimations: true,
@@ -164,7 +189,11 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       clickDebounceMs: 100,
       batchEChartsUpdates: true,
       echartsUpdateDelay: 50,
-      disableChartAnimationsDuringInteraction: true
+      disableChartAnimationsDuringInteraction: true,
+      debugNormalLogs: false,
+      debugPerformanceLogs: false,
+      debugMinMaxLogs: false,
+      debugAlarmLogs: false
     };
   }
 
@@ -185,17 +214,6 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       
       // Graph Settings
       smooth: [settings.smooth],
-      yAxisLeftTitle: [settings.yAxisLeftTitle || ''],
-      yAxisLeftUnit: [settings.yAxisLeftUnit || 'ml'],
-      yAxisLeftAutoScale: [settings.yAxisLeftAutoScale !== false],
-      yAxisLeftMinScale: [settings.yAxisLeftMinScale || 0],
-      yAxisLeftMaxScale: [settings.yAxisLeftMaxScale || 100],
-      yAxisRightTitle: [settings.yAxisRightTitle || ''],
-      yAxisRightUnit: [settings.yAxisRightUnit || ''],
-      yAxisRightAutoScale: [settings.yAxisRightAutoScale !== false],
-      yAxisRightMinScale: [settings.yAxisRightMinScale || 0],
-      yAxisRightMaxScale: [settings.yAxisRightMaxScale || 100],
-      yAxisRightColorChoser: [settings.yAxisRightColorChoser || '#F44336'],
       showDataPoints: [settings.showDataPoints],
       symbolSize_data: [settings.symbolSize_data || 5],
       exportDecimals: [settings.exportDecimals || 6],
@@ -224,6 +242,21 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       showCustomLegend: [settings.showCustomLegend !== false],
       showZoomControls: [settings.showZoomControls !== false],
       
+      // Min/Max Reference Lines
+      minMaxVisible: [settings.minMaxVisible || false],
+      minMaxStyle: [settings.minMaxStyle || 'dashed'],
+      minMaxColor: [settings.minMaxColor || 'rgba(128, 128, 128, 0.5)'],
+      minColor: [settings.minColor || '#ff4757'],
+      maxColor: [settings.maxColor || '#5352ed'],
+      minMaxLineWidth: [settings.minMaxLineWidth || 2],
+      
+      // Alarm Overlays
+      alarmStatusVisible: [settings.alarmStatusVisible || false],
+      alarmOpacity: [settings.alarmOpacity || 0.12],
+      alarmShowCritical: [settings.alarmShowCritical !== false],
+      alarmShowWarning: [settings.alarmShowWarning !== false],
+      alarmShowInfo: [settings.alarmShowInfo || false],
+      
       // Debug & Performance
       debugOutput: [settings.debugOutput],
       useLazyLoading: [settings.useLazyLoading !== false],
@@ -237,7 +270,13 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       clickDebounceMs: [settings.clickDebounceMs || 100],
       batchEChartsUpdates: [settings.batchEChartsUpdates !== false],
       echartsUpdateDelay: [settings.echartsUpdateDelay || 50],
-      disableChartAnimationsDuringInteraction: [settings.disableChartAnimationsDuringInteraction !== false]
+      disableChartAnimationsDuringInteraction: [settings.disableChartAnimationsDuringInteraction !== false],
+      
+      // Debug Logging Settings
+      debugNormalLogs: [settings.debugNormalLogs || false],
+      debugPerformanceLogs: [settings.debugPerformanceLogs || false],
+      debugMinMaxLogs: [settings.debugMinMaxLogs || false],
+      debugAlarmLogs: [settings.debugAlarmLogs || false]
     });
   }
 
@@ -271,5 +310,35 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
 
   removeAnnotation(index: number): void {
     this.annotationsFormArray.removeAt(index);
+  }
+  
+  toggleSection(section: string): void {
+    this.expandedSections[section] = !this.expandedSections[section];
+  }
+
+  openDebugLoggingDialog(): void {
+    const dialogData: DebugLoggingDialogData = {
+      normalLogs: this.echartsLineChartSettingsForm.get('debugNormalLogs')?.value || false,
+      performanceLogs: this.echartsLineChartSettingsForm.get('debugPerformanceLogs')?.value || false,
+      minMaxLogs: this.echartsLineChartSettingsForm.get('debugMinMaxLogs')?.value || false,
+      alarmLogs: this.echartsLineChartSettingsForm.get('debugAlarmLogs')?.value || false
+    };
+
+    const dialogRef = this.dialog.open(DebugLoggingDialogComponent, {
+      width: '500px',
+      data: dialogData,
+      panelClass: 'debug-dialog-panel'
+    });
+
+    dialogRef.afterClosed().subscribe((result: DebugLoggingDialogData) => {
+      if (result) {
+        this.echartsLineChartSettingsForm.patchValue({
+          debugNormalLogs: result.normalLogs,
+          debugPerformanceLogs: result.performanceLogs,
+          debugMinMaxLogs: result.minMaxLogs,
+          debugAlarmLogs: result.alarmLogs
+        });
+      }
+    });
   }
 }

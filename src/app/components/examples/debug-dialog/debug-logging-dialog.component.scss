@@ -1,0 +1,236 @@
+.debug-dialog {
+  width: 100%;
+  max-width: 500px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px 24px 20px;
+  border-bottom: 1px solid #e5e5e7;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+}
+
+.header-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+  flex-shrink: 0;
+}
+
+.header-content {
+  flex: 1;
+}
+
+.dialog-title {
+  margin: 0 0 6px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1d1d1f;
+  letter-spacing: -0.01em;
+}
+
+.dialog-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: #86868b;
+  line-height: 1.4;
+}
+
+.dialog-content {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.debug-option {
+  background: #f5f5f7;
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: #ebebed;
+  }
+}
+
+.option-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.option-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  
+  &.normal {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  &.performance {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+  }
+  
+  &.minmax {
+    background: linear-gradient(135deg, #007aff, #5856d6);
+    color: white;
+  }
+  
+  &.alarm {
+    background: linear-gradient(135deg, #ff3b30, #ff6482);
+    color: white;
+  }
+}
+
+.option-info {
+  flex: 1;
+}
+
+.option-title {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.option-description {
+  margin: 0;
+  font-size: 13px;
+  color: #86868b;
+  line-height: 1.4;
+}
+
+// Apple-style toggle switch
+.apple-switch {
+  position: relative;
+  display: inline-block;
+  width: 51px;
+  height: 31px;
+  flex-shrink: 0;
+  
+  input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #c7c7cc;
+    transition: .3s;
+    border-radius: 31px;
+    
+    &:before {
+      position: absolute;
+      content: "";
+      height: 27px;
+      width: 27px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+  }
+  
+  input:checked + .slider {
+    background-color: #34c759;
+  }
+  
+  input:checked + .slider:before {
+    transform: translateX(20px);
+  }
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px 24px;
+  border-top: 1px solid #e5e5e7;
+  background: #fafafa;
+}
+
+.dialog-button {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  
+  &.secondary {
+    background: #f5f5f7;
+    color: #1d1d1f;
+    
+    &:hover {
+      background: #ebebed;
+    }
+  }
+  
+  &.primary {
+    background: #007aff;
+    color: white;
+    
+    &:hover {
+      background: #0056cc;
+    }
+    
+    &:active {
+      background: #004299;
+    }
+  }
+  
+  &:focus-visible {
+    outline: 2px solid #007aff;
+    outline-offset: 2px;
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 600px) {
+  .dialog-header {
+    padding: 20px 20px 16px;
+  }
+  
+  .dialog-content {
+    padding: 16px 20px;
+  }
+  
+  .dialog-actions {
+    padding: 16px 20px 20px;
+  }
+  
+  .option-header {
+    gap: 12px;
+  }
+  
+  .option-icon {
+    width: 28px;
+    height: 28px;
+  }
+}
