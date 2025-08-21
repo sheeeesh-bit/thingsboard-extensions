@@ -197,24 +197,24 @@ export interface SettingsDialogData {
                 <button class="segment" 
                         [class.active]="data.minMaxStyle === 'dashed'"
                         (click)="data.minMaxStyle = 'dashed'">
-                  <svg width="24" height="2" viewBox="0 0 24 2">
-                    <path d="M0 1H5 M8 1H13 M16 1H21 M24 1H29" stroke="currentColor" stroke-width="2"/>
+                  <svg width="20" height="2" viewBox="0 0 20 2">
+                    <path d="M0 1H4 M6 1H10 M12 1H16 M18 1H20" stroke="currentColor" stroke-width="2"/>
                   </svg>
                   <span>Dashed</span>
                 </button>
                 <button class="segment"
                         [class.active]="data.minMaxStyle === 'solid'"
                         (click)="data.minMaxStyle = 'solid'">
-                  <svg width="24" height="2" viewBox="0 0 24 2">
-                    <path d="M0 1H24" stroke="currentColor" stroke-width="2"/>
+                  <svg width="20" height="2" viewBox="0 0 20 2">
+                    <path d="M0 1H20" stroke="currentColor" stroke-width="2"/>
                   </svg>
                   <span>Solid</span>
                 </button>
                 <button class="segment"
                         [class.active]="data.minMaxStyle === 'dotted'"
                         (click)="data.minMaxStyle = 'dotted'">
-                  <svg width="24" height="2" viewBox="0 0 24 2">
-                    <path d="M0 1H1 M3 1H4 M6 1H7 M9 1H10 M12 1H13 M15 1H16 M18 1H19 M21 1H22" stroke="currentColor" stroke-width="2"/>
+                  <svg width="20" height="2" viewBox="0 0 20 2">
+                    <path d="M0 1H1 M3 1H4 M6 1H7 M9 1H10 M12 1H13 M15 1H16 M18 1H19" stroke="currentColor" stroke-width="2"/>
                   </svg>
                   <span>Dotted</span>
                 </button>
@@ -342,24 +342,24 @@ export interface SettingsDialogData {
                 <button class="segment" 
                         [class.active]="data.alarmLineStyle === 'dashed'"
                         (click)="data.alarmLineStyle = 'dashed'">
-                  <svg width="24" height="2" viewBox="0 0 24 2">
-                    <path d="M0 1H5 M8 1H13 M16 1H21 M24 1H29" stroke="currentColor" stroke-width="2"/>
+                  <svg width="20" height="2" viewBox="0 0 20 2">
+                    <path d="M0 1H4 M6 1H10 M12 1H16 M18 1H20" stroke="currentColor" stroke-width="2"/>
                   </svg>
                   <span>Dashed</span>
                 </button>
                 <button class="segment"
                         [class.active]="data.alarmLineStyle === 'solid'"
                         (click)="data.alarmLineStyle = 'solid'">
-                  <svg width="24" height="2" viewBox="0 0 24 2">
-                    <path d="M0 1H24" stroke="currentColor" stroke-width="2"/>
+                  <svg width="20" height="2" viewBox="0 0 20 2">
+                    <path d="M0 1H20" stroke="currentColor" stroke-width="2"/>
                   </svg>
                   <span>Solid</span>
                 </button>
                 <button class="segment"
                         [class.active]="data.alarmLineStyle === 'dotted'"
                         (click)="data.alarmLineStyle = 'dotted'">
-                  <svg width="24" height="2" viewBox="0 0 24 2">
-                    <path d="M0 1H1 M3 1H4 M6 1H7 M9 1H10 M12 1H13 M15 1H16 M18 1H19 M21 1H22" stroke="currentColor" stroke-width="2"/>
+                  <svg width="20" height="2" viewBox="0 0 20 2">
+                    <path d="M0 1H1 M3 1H4 M6 1H7 M9 1H10 M12 1H13 M15 1H16 M18 1H19" stroke="currentColor" stroke-width="2"/>
                   </svg>
                   <span>Dotted</span>
                 </button>
@@ -463,6 +463,7 @@ export interface SettingsDialogData {
       padding: 24px;
       max-height: 60vh;
       overflow-y: auto;
+      overflow-x: hidden;
       background: #f5f5f7;
     }
     
@@ -796,15 +797,33 @@ export interface SettingsDialogData {
       border-radius: 9px;
       padding: 2px;
       gap: 2px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: #c4c4c6 transparent;
+    }
+    
+    .segmented-control::-webkit-scrollbar {
+      height: 4px;
+    }
+    
+    .segmented-control::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .segmented-control::-webkit-scrollbar-thumb {
+      background: #c4c4c6;
+      border-radius: 2px;
     }
     
     .segment {
-      flex: 1;
-      padding: 8px 12px;
+      flex: 0 0 auto;
+      min-width: 80px;
+      padding: 6px 10px;
       border: none;
       background: transparent;
       border-radius: 7px;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
       color: #1d1d1f;
       cursor: pointer;
@@ -812,7 +831,8 @@ export interface SettingsDialogData {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
+      white-space: nowrap;
     }
     
     .segment:hover {
