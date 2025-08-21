@@ -406,6 +406,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   private initializeImmediate(): void {
+    // Set initial legend padding to prevent cutoff on first render
+    // This ensures the CSS custom properties are set before the legend renders
+    const initialLeftMargin = this.currentSize === 'small' ? 15 : 13;
+    const sidebarAdjustment = (this.isSidebarVisible && this.ctx.settings?.showEntitySidebar !== false) ? 5 : 0;
+    const leftMargin = `${initialLeftMargin + sidebarAdjustment}%`;
+    const rightMargin = '1%';
+    this.syncLegendToGridMargins(leftMargin, rightMargin);
+    
     // Delay initialization to ensure layout is complete
     setTimeout(() => {
       this.LOG(`[HEIGHT DEBUG] After timeout - ctx.height: ${this.ctx.height}`);
