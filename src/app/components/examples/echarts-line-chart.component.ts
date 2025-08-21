@@ -3385,8 +3385,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('currentGridArray called with currentGrids:', this.currentGrids, 'currentSize:', this.currentSize);
     let gridArray = [];
     
-    // Determine margins based on size - increased left margin for multi-line labels
-    const leftMargin = this.currentSize === 'small' ? '15%' : '13%';
+    // Determine margins based on size and sidebar visibility
+    // Add extra margin when sidebar is visible to prevent Y-axis labels from clipping
+    const baseLeftMargin = this.currentSize === 'small' ? 15 : 13;
+    const sidebarAdjustment = (this.isSidebarVisible && this.ctx.settings?.showEntitySidebar !== false) ? 3 : 0;
+    const leftMargin = `${baseLeftMargin + sidebarAdjustment}%`;
     const rightMargin = '1%';
     
     // Sync legend overlay to use same margins as grids
@@ -3439,7 +3442,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   private calculateScrollableGrids(numGrids: number): any[] {
     const grids = [];
-    const leftMargin = this.currentSize === 'small' ? '12%' : '10%';
+    // Add extra margin when sidebar is visible to prevent Y-axis labels from clipping
+    const baseLeftMargin = this.currentSize === 'small' ? 12 : 10;
+    const sidebarAdjustment = (this.isSidebarVisible && this.ctx.settings?.showEntitySidebar !== false) ? 3 : 0;
+    const leftMargin = `${baseLeftMargin + sidebarAdjustment}%`;
     const rightMargin = '1%';
     
     // [CLAUDE] Use dynamic top reserve based on actual legend height
