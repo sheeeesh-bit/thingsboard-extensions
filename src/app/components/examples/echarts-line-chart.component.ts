@@ -155,7 +155,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // ThingsBoard example properties
   private DEBUG = true;
-  private PERF_DEBUG = false; // Independent performance logging
+  private PERF_DEBUG = true; // Enable performance diagnostics for tooltip lag analysis
+  private lastChartRenderStart = 0; // Track render timing
+  // Removed throttling variables - using native ECharts smooth performance
   private CHART_VERSION = "1.2";
   private currentConfig: any;
   private containerHeightLimit = [1000, 1200];
@@ -210,7 +212,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public sidebarWidth = 240; // Default width, will be calculated dynamically
   
   // UI feedback states
-  private lastPulsedEntity: string | null = null;
+  // private lastPulsedEntity: string | null = null; // Unused - removed for performance
   
   // Cache for entity display names
   private entityDisplayNameCache = new Map<string, string>();
@@ -941,7 +943,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       type: 'scroll',
       data: this.getLegendState().data,
       selected: this.getLegendState().selected,
-      selectedMode: true
+      selectedMode: true,
+      animation: false,  // Disable legend animation for faster response
+      animationDurationUpdate: 0  // No animation delay on updates
     }];
     
     this.LOG("myNewOptions:", myNewOptions);
@@ -952,6 +956,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     if (needsFullReset) {
       this.LOG('Applying full reset with replaceMerge');
       // Replace structural parts for grid changes
+      this.lastChartRenderStart = performance.now();
       this.chart.setOption(myNewOptions, {
         replaceMerge: ['grid', 'xAxis', 'yAxis', 'series', 'dataZoom']
       });
@@ -965,6 +970,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       } else {
         // Use incremental updates with lazyUpdate for better performance
         const updateStart = performance.now();
+        this.lastChartRenderStart = performance.now();
         this.chart.setOption(myNewOptions, { 
           notMerge: false, 
           lazyUpdate: true,
@@ -1292,7 +1298,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   private getDataSamplingSettings(points: number): { sampling?: string; large?: boolean; largeThreshold?: number; hoverLayerThreshold?: number } {
     const enableDataSampling = this.ctx.settings?.enableDataSampling !== false;
-    const maxDataPoints = this.ctx.settings?.maxDataPoints || 1500; // Much more aggressive
+    const maxDataPoints = this.ctx.settings?.maxDataPoints || 100; // Ultra-low for maximum performance with 98 series
     
     if (!enableDataSampling) {
       this.LOG(`[PERF] Data sampling disabled for series with ${points} points`);
@@ -1573,15 +1579,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // Provide visual feedback when an action is blocked (pulse effect)
   private pulseEntityVisually(entityName: string): void {
-    // Set the pulse state
-    this.lastPulsedEntity = entityName;
-    this.ctx.detectChanges();
+    // Visual pulse functionality removed for performance optimization
+    // this.lastPulsedEntity = entityName;
+    // this.ctx.detectChanges();
     
     // Clear the pulse after animation duration
-    setTimeout(() => {
-      this.lastPulsedEntity = null;
-      this.ctx.detectChanges();
-    }, 600);
+    // setTimeout(() => {
+    //   this.lastPulsedEntity = null;
+    //   this.ctx.detectChanges();
+    // }, 600);
     
     this.LOG(`[UI] Pulsing entity: ${entityName} (action blocked)`);
   }
@@ -2390,6 +2396,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('[ECharts Line Chart] Initializing chart');
     
     const container = this.chartContainer.nativeElement;
+    // Set up GPU acceleration hints
+    container.style.willChange = 'transform';
+    container.style.transform = 'translateZ(0)';
+    
     const containerElement = container.querySelector('#echartContainer') as HTMLElement;
     
     if (!containerElement) {
@@ -2476,29 +2486,54 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('Setting chart option with grid config...');
     this.chart.setOption(option);
     
-    // Register legend selection event listener with guard
+    // Legend debouncing for stability
+    let legendDebounceTimer: any = null;
+    
+    // Register legend selection event listener with debouncing
     this.chart.on('legendselectchanged', (event: any) => {
-      // Guard: prevent hiding all series
-      const selected = event?.selected || {};
-      const visibleCount = Object.values(selected).filter(v => v !== false).length;
+      const eventStart = performance.now();
+      this.PERF_LOG('🖱️  Legend select event triggered:', event.name);
       
-      if (visibleCount === 0) {
-        // Re-enable the last clicked item
-        this.chart.dispatchAction({ 
-          type: 'legendSelect', 
-          name: event.name, 
-          legendIndex: 0 
-        });
-        return;
+      // Clear any pending legend update
+      if (legendDebounceTimer) {
+        clearTimeout(legendDebounceTimer);
       }
       
-      this.onLegendSelectChanged(event);
-      // Sync custom legend toolbar when legend changes
-      this.syncCustomLegendFromChart();
+      // Debounce legend updates to prevent flashing
+      legendDebounceTimer = setTimeout(() => {
+        // Guard: prevent hiding all series
+        const selected = event?.selected || {};
+        const visibleCount = Object.values(selected).filter(v => v !== false).length;
+        
+        if (visibleCount === 0) {
+          // Re-enable the last clicked item
+          this.chart.dispatchAction({ 
+            type: 'legendSelect', 
+            name: event.name, 
+            legendIndex: 0 
+          });
+          const eventDuration = performance.now() - eventStart;
+          this.PERF_LOG('🚫 Legend guard triggered, processing took:', `${eventDuration.toFixed(2)}ms`);
+          return;
+        }
+        
+        this.onLegendSelectChanged(event);
+        // Sync custom legend toolbar when legend changes
+        this.syncCustomLegendFromChart();
+        
+        const eventDuration = performance.now() - eventStart;
+        this.PERF_LOG('✅ Legend select processed in:', `${eventDuration.toFixed(2)}ms`);
+        if (eventDuration > 50) {
+          this.PERF_LOG('🐌 Slow legend interaction detected - consider optimization');
+        }
+      }, 50); // 50ms debounce for stable legend toggling
     });
     
-    // Keep zoom sliders in sync when user uses mousewheel/drag
+    // Keep zoom sliders in sync when user uses mousewheel/drag - native smooth zoom
     this.chart.on('dataZoom', () => {
+      const now = performance.now();
+      const zoomStart = now;
+      
       const dz = (this.chart.getOption().dataZoom || [])[0];
       if (dz) {
         const s = Math.round((dz.start as number) * 1000) / 1000;
@@ -2509,9 +2544,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           // Update external bar positions (handles/window)
           this.updateZoomOverlay();
           this.ctx.detectChanges?.();
+          
+          const zoomDuration = performance.now() - zoomStart;
+          this.PERF_LOG(`🔍 DataZoom processed in: ${zoomDuration.toFixed(2)}ms (${s.toFixed(1)}% - ${e.toFixed(1)}%)`);
+          if (zoomDuration > 30) {
+            this.PERF_LOG('🐌 Slow zoom interaction - consider reducing data complexity');
+          }
         }
       }
     });
+    
+    // Add critical mouse/hover performance monitoring for tooltip lag detection
+    this.setupMouseInteractionLogging();
     
     // Initial refresh of entity list and sync custom legend
     setTimeout(() => {
@@ -2522,7 +2566,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.LOG('=== INIT CHART AND GRID COMPLETE ===');
   }
 
-  private onLegendSelectChanged(event: any): void {
+  private onLegendSelectChanged = (event: any): void => {
     // Reset hovered grid index to avoid stale references
     this.hoveredGridIndex = null;
     
@@ -4241,10 +4285,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       tooltip: {
         trigger: 'axis',
         triggerOn: 'mousemove|click',
-        confine: true,
-        animation: false,  // Disable tooltip animation for performance
-        transitionDuration: 0,  // No transition delay for better responsiveness
-        renderMode: 'html',  // Use HTML for better performance with large datasets
+        confine: false,
+        animation: false,
+        transitionDuration: 0,
+        renderMode: 'html',  // HTML mode for proper formatting
+        appendToBody: false,
+        enterable: false,
+        showDelay: 0,
+        hideDelay: 100,
+        alwaysShowContent: false,
         // [CLAUDE] Apple-style tooltip design
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
         borderColor: 'rgba(0, 0, 0, 0.1)',
@@ -4261,23 +4310,21 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         axisPointer: {
           type: 'cross',
           snap: true,
+          animation: false,  // Disable axisPointer animation for immediate response
+          throttle: 16,  // 60fps throttling for ultra-smooth mouse tracking
           link: [{
             xAxisIndex: 'all'
           }]
         },
-        // Track which grid the mouse is over
+        // Ultra-fast position function - no complex grid calculations
         position: (point: number[]) => {
-          // Detect which grid contains the mouse position
-          if (this.chart) {
-            for (let i = 0; i < this.currentGrids; i++) {
-              if (this.chart.containPixel({ gridIndex: i }, point)) {
-                this.hoveredGridIndex = i;
-                break;
-              }
-            }
+          // Fast grid estimation without expensive containPixel calls
+          if (point && this.currentGrids > 1) {
+            const normalizedY = point[1] / (this.chart?.getHeight() || 600);
+            this.hoveredGridIndex = Math.floor(normalizedY * this.currentGrids);
           }
-          // Return null to use default positioning
-          return null;
+          // Fixed offset positioning for speed
+          return [point[0] + 15, point[1] - 25];
         },
         formatter: (params: any[]) => {
           if (!params?.length) return '';
@@ -4495,6 +4542,128 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.PERF_LOG('⚡ Data sampling: aggressive (1500 points)');
     this.PERF_LOG('⚡ Progressive rendering: enabled');
     this.PERF_LOG('⚡ Update coalescing: enabled');
+  }
+
+  /**
+   * Setup comprehensive mouse interaction and tooltip performance monitoring
+   */
+  private setupMouseInteractionLogging(): void {
+    if (!this.chart) return;
+
+    let lastMouseMoveTime = 0;
+    let mouseMoveCount = 0;
+    let tooltipActiveTime = 0;
+    
+    // Monitor mouse movement performance (main cause of tooltip lag)
+    this.chart.getZr().on('mousemove', () => {
+      const now = performance.now();
+      const timeSinceLastMove = now - lastMouseMoveTime;
+      mouseMoveCount++;
+      
+      // Log excessive mouse move frequency (lag indicator)
+      if (timeSinceLastMove < 8) { // More than 120fps
+        this.PERF_LOG(`🐭 High frequency mouse moves: ${timeSinceLastMove.toFixed(2)}ms interval`);
+      }
+      
+      // Log every 50th mouse move to avoid spam
+      if (mouseMoveCount % 50 === 0) {
+        this.PERF_LOG(`🐭 Mouse tracking: ${mouseMoveCount} moves, avg interval: ${(now / mouseMoveCount).toFixed(2)}ms`);
+      }
+      
+      lastMouseMoveTime = now;
+    });
+
+    // Monitor tooltip show performance - no throttling for smooth native feel
+    this.chart.on('showTip', () => {
+      const now = performance.now();
+      // No throttling - smooth native performance
+      tooltipActiveTime = now;
+      this.PERF_LOG('💬 Tooltip show triggered (native smooth)');
+    });
+
+    // Monitor tooltip hide performance  
+    this.chart.on('hideTip', () => {
+      if (tooltipActiveTime > 0) {
+        const tooltipDuration = performance.now() - tooltipActiveTime;
+        this.PERF_LOG(`💬 Tooltip was active for: ${tooltipDuration.toFixed(2)}ms`);
+        if (tooltipDuration > 5000) { // Long tooltip display
+          this.PERF_LOG('⚠️  Long tooltip display time - potential UX issue');
+        }
+        tooltipActiveTime = 0;
+      }
+    });
+
+    // Monitor hover events on series
+    this.chart.on('mouseover', (event: any) => {
+      const hoverStart = performance.now();
+      this.PERF_LOG(`🎯 Series hover: ${event.seriesName || 'unknown'} at index ${event.dataIndex || 'unknown'}`);
+      
+      // Track hover processing time
+      setTimeout(() => {
+        const hoverDuration = performance.now() - hoverStart;
+        if (hoverDuration > 16) { // More than one frame at 60fps
+          this.PERF_LOG(`🐌 Slow hover processing: ${hoverDuration.toFixed(2)}ms - tooltip may lag`);
+        }
+      }, 0);
+    });
+
+    // Monitor when mouse leaves series
+    this.chart.on('mouseout', (event: any) => {
+      this.PERF_LOG(`🎯 Series unhover: ${event.seriesName || 'unknown'}`);
+    });
+
+    // Monitor chart canvas events that affect tooltip responsiveness
+    this.chart.getZr().on('mouseout', () => {
+      this.PERF_LOG('🐭 Mouse left chart area - tooltip should clear');
+    });
+
+    // Monitor global mouse down/up for interaction responsiveness
+    this.chart.getZr().on('mousedown', () => {
+      const interactionStart = performance.now();
+      this.PERF_LOG('🖱️  Mouse down - interaction start');
+      
+      // Check responsiveness on next frame
+      requestAnimationFrame(() => {
+        const responseTime = performance.now() - interactionStart;
+        if (responseTime > 32) { // More than 2 frames
+          this.PERF_LOG(`🐌 Slow interaction response: ${responseTime.toFixed(2)}ms`);
+        }
+      });
+    });
+
+    // Monitor chart render performance
+    this.chart.on('rendered', () => {
+      const renderEnd = performance.now();
+      if (this.lastChartRenderStart > 0) {
+        const renderDuration = renderEnd - this.lastChartRenderStart;
+        this.PERF_LOG(`🎨 Chart render completed: ${renderDuration.toFixed(2)}ms`);
+        if (renderDuration > 100) {
+          this.PERF_LOG(`🐌 Slow chart render: ${renderDuration.toFixed(2)}ms - may cause lag`);
+        }
+      }
+      this.lastChartRenderStart = 0;
+    });
+
+    // Monitor data zoom performance
+    this.chart.on('datazoom', (event: any) => {
+      const zoomStart = performance.now();
+      this.PERF_LOG(`🔍 DataZoom event: ${event.type || 'unknown'} - start: ${event.start}%, end: ${event.end}%`);
+      
+      // Check zoom response time
+      setTimeout(() => {
+        const zoomDuration = performance.now() - zoomStart;
+        if (zoomDuration > 50) {
+          this.PERF_LOG(`🐌 Slow zoom response: ${zoomDuration.toFixed(2)}ms`);
+        }
+      }, 0);
+    });
+
+    // Legend event handler removed - already handled above with debouncing
+
+    this.PERF_LOG('🎯 Mouse interaction performance monitoring enabled');
+    this.PERF_LOG('⚡ Chart event timing monitoring enabled');
+    
+    // System performance diagnostics (if needed, will be called elsewhere)
   }
 
 
@@ -5102,6 +5271,50 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
     }, 50);
   }
-  
+
+  /**
+   * System performance diagnostics to identify tooltip lag causes
+   * @deprecated Currently not used - can be enabled if needed for debugging
+   */
+  private logSystemPerformance(): void {
+    if (!this.PERF_DEBUG) return;
+    
+    // Browser performance info
+    const nav = navigator as any;
+    this.PERF_LOG('🖥️ System Performance Diagnostics:');
+    this.PERF_LOG(`   Browser: ${nav.userAgent.split(' ')[0] || 'Unknown'}`);
+    this.PERF_LOG(`   Memory: ${nav.deviceMemory || 'Unknown'}GB RAM`);
+    this.PERF_LOG(`   CPU Cores: ${nav.hardwareConcurrency || 'Unknown'}`);
+    
+    // Performance timing
+    const perf = performance as any;
+    if (perf.memory) {
+      const memMB = (perf.memory.usedJSHeapSize / 1024 / 1024).toFixed(1);
+      const limitMB = (perf.memory.totalJSHeapSize / 1024 / 1024).toFixed(1);
+      this.PERF_LOG(`   JS Heap: ${memMB}MB / ${limitMB}MB`);
+    }
+    
+    // Frame rate detection
+    let lastFrameTime = performance.now();
+    let frameCount = 0;
+    const checkFrameRate = () => {
+      const currentTime = performance.now();
+      frameCount++;
+      if (frameCount === 10) {
+        const avgFrameTime = (currentTime - lastFrameTime) / 10;
+        const fps = (1000 / avgFrameTime).toFixed(1);
+        this.PERF_LOG(`   Display FPS: ~${fps}fps (${avgFrameTime.toFixed(1)}ms/frame)`);
+        
+        if (parseFloat(fps) < 45) {
+          this.PERF_LOG('⚠️ Low FPS detected - tooltip lag likely due to system performance');
+        } else if (parseFloat(fps) > 55) {
+          this.PERF_LOG('✅ Good FPS - tooltip lag likely due to ECharts configuration');
+        }
+        return;
+      }
+      requestAnimationFrame(checkFrameRate);
+    };
+    requestAnimationFrame(checkFrameRate);
+  }
 
 }
