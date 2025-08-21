@@ -251,6 +251,13 @@ div[fxFlex] {
     .entity-table-compact {
       display: none;
     }
+    
+    // Ensure consistent spacing when collapsed
+    .colors-container {
+      gap: 10px; // Match the open mode spacing
+      padding: 12px 12px;
+      align-items: center;
+    }
   }
   
   // Collapsed with initials mode
@@ -260,6 +267,13 @@ div[fxFlex] {
     .entity-table,
     .entity-table-compact {
       display: none;
+    }
+    
+    // Ensure consistent spacing when collapsed
+    .initials-container {
+      gap: 10px; // Match the open mode spacing
+      padding: 12px 16px;
+      align-items: center;
     }
   }
   
@@ -281,10 +295,10 @@ div[fxFlex] {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
-    flex: 1;
+    flex: 1; // Take remaining space in flex container
     overflow-y: auto;
     overflow-x: hidden;
-    max-height: calc(100% - 48px); // Account for header height
+    min-height: 0; // Important for flex scrolling
     
     .entity-row-compact {
       cursor: pointer;
@@ -328,12 +342,12 @@ div[fxFlex] {
   .colors-container {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px; // Consistent spacing
     padding: 12px;
-    flex: 1;
+    flex: 1; // Take remaining space in flex container
     overflow-y: auto;
     overflow-x: hidden;
-    max-height: calc(100% - 48px); // Account for header height
+    min-height: 0; // Important for flex scrolling
     
     .color-box {
       width: 36px;
@@ -359,12 +373,12 @@ div[fxFlex] {
   .initials-container {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px; // Consistent spacing
     padding: 12px;
-    flex: 1;
+    flex: 1; // Take remaining space in flex container
     overflow-y: auto;
     overflow-x: hidden;
-    max-height: calc(100% - 48px); // Account for header height
+    min-height: 0; // Important for flex scrolling
     
     .initial-box {
       width: 56px;
@@ -484,22 +498,17 @@ div[fxFlex] {
   border-collapse: collapse;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
   font-size: 13px;
-  display: block; // Changed to block for scrolling
+  flex: 1; // Take remaining space in flex container
   overflow-y: auto;
   overflow-x: hidden;
-  max-height: calc(100vh - 150px); // Use viewport height minus estimated header/button space
+  min-height: 0; // Important for flex scrolling
   
   tbody {
-    display: block;
-    width: 100%;
     
     tr.entity-row {
       cursor: pointer;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       position: relative;
-      display: table;
-      width: 100%;
-      table-layout: fixed;
       
       &::after {
         content: '';
