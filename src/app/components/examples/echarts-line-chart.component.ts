@@ -196,6 +196,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private chartActionBatch: any = null;
   private originalAnimationState: boolean | null = null;
   
+  // Critical INP performance optimization state
+  private rafId: number | null = null;
+  private pendingDataUpdates: any[] = [];
+  private lastUpdateTime = 0;
+  private isUpdating = false;
+  
   // Sidebar state
   public isSidebarVisible = true;
   public sidebarDisplayMode: 'full' | 'compact' | 'colors' = 'full';
@@ -582,6 +588,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       clearTimeout(this.resizeDebounceTimer);
     }
     
+    // Clean up RAF for INP optimization
+    if (this.rafId) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+    
     // Clean up pagination calculation timer
     if (this.paginationCalculationTimer) {
       clearTimeout(this.paginationCalculationTimer);
@@ -920,12 +932,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       });
       this.resetGrid = false;
     } else {
-      // Use incremental updates with lazyUpdate for better performance
-      this.chart.setOption(myNewOptions, { 
-        notMerge: false, 
-        lazyUpdate: true,
-        replaceMerge: ['series']  // Only replace series data
-      });
+      // Use scheduled updates for large datasets to prevent INP issues
+      const shouldCoalesce = this.ctx.settings?.coalesceRapidUpdates !== false;
+      if (shouldCoalesce && this.totalDataPoints > 1000) {
+        this.LOG(`[PERF] Scheduling coalesced update for ${this.totalDataPoints} data points`);
+        this.scheduleDataUpdate(myNewOptions);
+      } else {
+        // Use incremental updates with lazyUpdate for better performance
+        this.chart.setOption(myNewOptions, { 
+          notMerge: false, 
+          lazyUpdate: true,
+          replaceMerge: ['series']  // Only replace series data
+        });
+      }
     }
     
     // Hide the loading spinner after data is rendered
@@ -1332,6 +1351,56 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   private getEChartsUpdateDelay(): number {
     return this.ctx.settings?.echartsUpdateDelay || 50;
+  }
+
+  // Critical INP performance methods to prevent 1,728ms presentation delays
+  private scheduleDataUpdate(options: any): void {
+    // Coalesce rapid updates to prevent jank
+    this.pendingDataUpdates.push(options);
+    
+    if (this.rafId) {
+      return; // Update already scheduled
+    }
+    
+    this.rafId = requestAnimationFrame(() => {
+      this.processCoalescedUpdates();
+      this.rafId = null;
+    });
+  }
+
+  private processCoalescedUpdates(): void {
+    if (this.isUpdating || !this.pendingDataUpdates.length) {
+      return;
+    }
+
+    this.isUpdating = true;
+    const now = performance.now();
+    
+    // If we're updating too frequently, defer to prevent jank
+    if (now - this.lastUpdateTime < 16) { // 60fps throttle
+      this.rafId = requestAnimationFrame(() => {
+        this.processCoalescedUpdates();
+        this.rafId = null;
+      });
+      return;
+    }
+
+    // Use the latest update options (discard older ones)
+    const latestOptions = this.pendingDataUpdates[this.pendingDataUpdates.length - 1];
+    this.pendingDataUpdates.length = 0;
+
+    // Apply the update with minimal work
+    if (this.chart && !this.chart.isDisposed()) {
+      this.chart.setOption(latestOptions, { 
+        notMerge: false, 
+        lazyUpdate: true,
+        replaceMerge: ['series'],
+        silent: true  // Prevent events during update
+      });
+    }
+
+    this.lastUpdateTime = now;
+    this.isUpdating = false;
   }
   
   private shouldDisableAnimationsDuringInteraction(): boolean {
