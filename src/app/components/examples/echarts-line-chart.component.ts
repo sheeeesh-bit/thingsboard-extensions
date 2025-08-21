@@ -3388,7 +3388,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Determine margins based on size and sidebar visibility
     // Add extra margin when sidebar is visible to prevent Y-axis labels from clipping
     const baseLeftMargin = this.currentSize === 'small' ? 15 : 13;
-    const sidebarAdjustment = (this.isSidebarVisible && this.ctx.settings?.showEntitySidebar !== false) ? 3 : 0;
+    const sidebarAdjustment = (this.isSidebarVisible && this.ctx.settings?.showEntitySidebar !== false) ? 5 : 0;
     const leftMargin = `${baseLeftMargin + sidebarAdjustment}%`;
     const rightMargin = '1%';
     
@@ -3444,7 +3444,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const grids = [];
     // Add extra margin when sidebar is visible to prevent Y-axis labels from clipping
     const baseLeftMargin = this.currentSize === 'small' ? 12 : 10;
-    const sidebarAdjustment = (this.isSidebarVisible && this.ctx.settings?.showEntitySidebar !== false) ? 3 : 0;
+    const sidebarAdjustment = (this.isSidebarVisible && this.ctx.settings?.showEntitySidebar !== false) ? 5 : 0;
     const leftMargin = `${baseLeftMargin + sidebarAdjustment}%`;
     const rightMargin = '1%';
     
