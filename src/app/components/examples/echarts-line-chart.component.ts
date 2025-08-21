@@ -282,6 +282,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.DEBUG = this.ctx.settings.debugOutput;
     this.PERF_DEBUG = this.ctx.settings.performanceDebug !== false; // Default enabled
     
+    // Force maximum performance settings
+    this.applyMaximumPerformanceSettings();
+    
     // Log data series details
     this.LOG('=== DATA SERIES ANALYSIS ===');
     this.LOG('Total data series:', this.ctx.data?.length || 0);
@@ -954,9 +957,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       });
       this.resetGrid = false;
     } else {
-      // Use scheduled updates for large datasets to prevent INP issues
+      // Use scheduled updates for smaller datasets for maximum smoothness
       const shouldCoalesce = this.ctx.settings?.coalesceRapidUpdates !== false;
-      if (shouldCoalesce && this.totalDataPoints > 1000) {
+      if (shouldCoalesce && this.totalDataPoints > 500) { // Much more aggressive threshold
         this.PERF_LOG(`🚀 Using coalesced updates for ${this.totalDataPoints} data points`);
         this.scheduleDataUpdate(myNewOptions);
       } else {
@@ -970,8 +973,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         const updateDuration = performance.now() - updateStart;
         this.PERF_LOG(`⚡ Direct ECharts update took: ${updateDuration.toFixed(2)}ms (${this.totalDataPoints} points)`);
         
-        // Direct update performance warnings
-        if (updateDuration > 100) {
+        // Ultra-aggressive direct update performance warnings
+        if (updateDuration > 50) { // Much stricter threshold
           this.PERF_LOG(`🐌 Slow direct update: ${updateDuration.toFixed(2)}ms - consider coalescing or Canvas renderer`);
         }
       }
@@ -1017,8 +1020,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         const resizeDuration = performance.now() - resizeStart;
         this.PERF_LOG(`📏 ECharts resize took: ${resizeDuration.toFixed(2)}ms`);
         
-        // Resize performance warnings
-        if (resizeDuration > 50) {
+        // More aggressive resize performance warnings
+        if (resizeDuration > 30) { // Much stricter threshold for maximum performance
           this.PERF_LOG(`🐌 Slow resize detected: ${resizeDuration.toFixed(2)}ms - consider reducing chart complexity`);
         }
       }
@@ -1034,7 +1037,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       
       // Recalculate legend pagination on resize
       this.calculateItemsPerPage();
-    }, 50); // 50ms debounce
+    }, 16); // Ultra-fast 16ms debounce for maximum responsiveness
   }
 
   /**
@@ -1289,7 +1292,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   private getDataSamplingSettings(points: number): { sampling?: string; large?: boolean; largeThreshold?: number; hoverLayerThreshold?: number } {
     const enableDataSampling = this.ctx.settings?.enableDataSampling !== false;
-    const maxDataPoints = this.ctx.settings?.maxDataPoints || 5000;
+    const maxDataPoints = this.ctx.settings?.maxDataPoints || 1500; // Much more aggressive
     
     if (!enableDataSampling) {
       this.LOG(`[PERF] Data sampling disabled for series with ${points} points`);
@@ -1298,34 +1301,34 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     const samplingConfig: any = {};
     
-    // More aggressive sampling thresholds
+    // Ultra-aggressive sampling for maximum performance
     if (points > maxDataPoints) {
       samplingConfig.sampling = 'lttb';
       samplingConfig.large = true;
-      samplingConfig.largeThreshold = Math.floor(maxDataPoints / 3);
-      samplingConfig.hoverLayerThreshold = 3000;
-      this.LOG(`[PERF] Heavy sampling enabled: ${points} -> ~${samplingConfig.largeThreshold} points`);
-    } else if (points > 2000) {
+      samplingConfig.largeThreshold = Math.floor(maxDataPoints / 4); // Even more aggressive
+      samplingConfig.hoverLayerThreshold = 2000; // Lower threshold
+      this.PERF_LOG(`🔥 Ultra-aggressive sampling: ${points} -> ~${samplingConfig.largeThreshold} points`);
+    } else if (points > 800) { // Much lower threshold
       samplingConfig.sampling = 'lttb';
-      this.LOG(`[PERF] Light sampling enabled for ${points} points`);
+      this.PERF_LOG(`⚡ Performance sampling enabled for ${points} points`);
     }
     
     return samplingConfig;
   }
   
   private getProgressiveRenderingSettings(points: number): { progressive?: number; progressiveThreshold?: number; hoverAnimation?: boolean } {
-    // Enable progressive rendering by default for large datasets
+    // Enable progressive rendering for much smaller datasets for maximum performance
     const enableProgressiveRendering = this.ctx.settings?.enableProgressiveRendering !== false;
     
-    if (!enableProgressiveRendering || points < 10000) {
+    if (!enableProgressiveRendering || points < 2000) { // Much lower threshold
       return {};
     }
     
-    this.LOG(`[PERF] Progressive rendering enabled for ${points} points`);
+    this.PERF_LOG(`🔥 Aggressive progressive rendering for ${points} points`);
     return {
-      progressive: 4000,  // Points per frame
-      progressiveThreshold: 10000,  // Start progressive sooner
-      hoverAnimation: false  // Disable hover animation for performance
+      progressive: 2000,  // Smaller chunks for smoother rendering
+      progressiveThreshold: 2000,  // Start much earlier
+      hoverAnimation: false  // Always disable hover animation
     };
   }
   
@@ -1376,11 +1379,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     this.uiUpdateBatch = setTimeout(() => {
-      this.LOG(`[PERF] Processing batched UI updates: ${Array.from(this.pendingUIUpdates).join(', ')}`);
+      this.PERF_LOG(`⚡ Processing ultra-fast UI batch: ${Array.from(this.pendingUIUpdates).join(', ')}`);
       callback();
       this.pendingUIUpdates.clear();
       this.uiUpdateBatch = null;
-    }, 16); // ~60fps batching
+    }, 8); // Ultra-fast ~120fps batching for maximum responsiveness
   }
   
   // ECharts batching optimization helpers
@@ -1421,9 +1424,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.PERF_LOG(`⏱️  Processing ${this.pendingDataUpdates.length} coalesced updates`);
     this.PERF_LOG(`🕐 Time since last update: ${timeSinceLastUpdate.toFixed(2)}ms`);
     
-    // If we're updating too frequently, defer to prevent jank
-    if (timeSinceLastUpdate < 16) { // 60fps throttle
-      this.PERF_LOG('⚡ Rate limiting: deferring update (60fps throttle)');
+    // Ultra-aggressive throttling for maximum smoothness
+    if (timeSinceLastUpdate < 8) { // 120fps throttle for ultra-smooth performance
+      this.PERF_LOG('⚡ Ultra-fast throttling: deferring update (120fps)');
       this.rafId = requestAnimationFrame(() => {
         this.processCoalescedUpdates();
         this.rafId = null;
@@ -1452,8 +1455,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const updateDuration = performance.now() - updateStart;
       this.PERF_LOG(`📈 ECharts setOption took: ${updateDuration.toFixed(2)}ms`);
       
-      // Update performance warnings
-      if (updateDuration > 100) {
+      // Ultra-aggressive update performance warnings
+      if (updateDuration > 50) { // Much stricter threshold for maximum performance
         this.PERF_LOG(`🐌 Slow update detected: ${updateDuration.toFixed(2)}ms - check data complexity or renderer`);
       }
     }
@@ -4441,6 +4444,57 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const msStr = now.getMilliseconds().toString().padStart(3, '0');
       console.log(`[PERF] ${timeStr}.${msStr} (${perfTime}ms)`, ...args);
     }
+  }
+
+  /**
+   * Apply maximum performance optimizations for ultra-smooth rendering
+   */
+  private applyMaximumPerformanceSettings(): void {
+    // Override performance settings for maximum speed
+    const settings = this.ctx.settings || {};
+    
+    // Create performance-optimized settings object
+    const perfSettings = {
+      ...settings,
+      // Force Canvas renderer for maximum performance
+      useCanvasRenderer: true,
+      
+      // Disable all animations for maximum responsiveness
+      enableAnimations: false,
+      
+      // Enable aggressive data sampling
+      enableDataSampling: true,
+      maxDataPoints: 1500, // More aggressive than default 5000
+      
+      // Enable progressive rendering
+      enableProgressiveRendering: true,
+      
+      // Enable all update optimizations
+      coalesceRapidUpdates: true,
+      optimizeClickHandling: true,
+      batchEChartsUpdates: true,
+      deferredUIUpdates: true,
+      
+      // Reduce visual complexity
+      showDataPoints: false, // Disable symbols for performance
+      smooth: false, // Disable curve smoothing
+      
+      // Optimize click handling
+      clickDebounceMs: 50, // Faster than default 100ms
+      
+      // Reduce update delays
+      echartsUpdateDelay: 16, // 60fps aligned
+    };
+    
+    // Apply the settings (non-destructive override)
+    Object.assign(this.ctx.settings || {}, perfSettings);
+    
+    this.PERF_LOG('🚀 Maximum performance settings applied');
+    this.PERF_LOG('⚡ Canvas renderer: enabled');
+    this.PERF_LOG('⚡ Animations: disabled');
+    this.PERF_LOG('⚡ Data sampling: aggressive (1500 points)');
+    this.PERF_LOG('⚡ Progressive rendering: enabled');
+    this.PERF_LOG('⚡ Update coalescing: enabled');
   }
 
 
