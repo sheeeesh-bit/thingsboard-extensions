@@ -81,9 +81,12 @@
       
       <!-- Permanent header (visible in all modes except completely hidden) -->
       <div class="sidebar-header" *ngIf="isSidebarVisible || sidebarCollapsedMode !== 'hidden'">
-        <span class="header-text" *ngIf="isSidebarVisible">Entities</span>
+        <span class="header-text" *ngIf="isSidebarVisible">
+          Devices 
+          <span class="device-count">({{ getSelectedDeviceCount() }}/{{ entityList.length }})</span>
+        </span>
         <span class="header-icon" *ngIf="!isSidebarVisible && sidebarCollapsedMode !== 'hidden'">
-          <i class="material-icons">dashboard</i>
+          <i class="material-icons">devices</i>
         </span>
       </div>
       

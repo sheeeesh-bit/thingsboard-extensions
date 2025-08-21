@@ -215,6 +215,13 @@ div[fxFlex] {
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: #6e6e73;
+      
+      .device-count {
+        font-weight: 400;
+        color: rgba(0, 0, 0, 0.4);
+        margin-left: 4px;
+        font-size: 10px;
+      }
     }
     
     .header-icon {

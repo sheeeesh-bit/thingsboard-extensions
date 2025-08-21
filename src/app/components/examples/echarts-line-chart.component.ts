@@ -245,6 +245,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }, 300); // Wait for CSS transition
   }
 
+  // Get count of selected (visible) devices
+  public getSelectedDeviceCount(): number {
+    if (!this.entityList) return 0;
+    return this.entityList.filter(entity => entity.visible).length;
+  }
 
   ngOnInit(): void {
     this.LOG(this.ctx);
