@@ -5,45 +5,43 @@
 
     <!-- Buttons at the top -->
     <div class="tb-button-container" *ngIf="ctx.settings.showImageButton !== false || ctx.settings.showExportButton !== false || ctx.settings.showResetZoomButton !== false">
-        <div class="button-group">
-            <button *ngIf="ctx.settings.showImageButton !== false" 
-                    mat-icon-button 
-                    (click)="menuButtons('genImage')" 
-                    class="tb-button"  
-                    matTooltipPosition="above" 
-                    matTooltip="Download Image">
-                <i class="material-icons">photo_camera</i>
-            </button>
-            
-            <!-- Export dropdown menu -->
-            <button *ngIf="ctx.settings.showExportButton !== false"
-                    mat-icon-button 
-                    [matMenuTriggerFor]="exportMenu" 
-                    class="tb-button" 
-                    matTooltipPosition="above" 
-                    matTooltip="Export Data">
-                <i class="material-icons">save_alt</i>
-            </button>
-            
-            <button *ngIf="ctx.settings.showResetZoomButton !== false"
-                    mat-icon-button 
-                    (click)="menuButtons('reset')" 
-                    class="tb-button" 
-                    matTooltipPosition="above" 
-                    matTooltip="Reset Zoom" 
-                    matTooltipClass="custom-tooltip">
-                <i class="material-icons">restore_page</i>
-            </button>
-            
-            <!-- Settings Dialog Button -->
-            <button mat-icon-button 
-                    (click)="openSettingsDialog()" 
-                    class="tb-button" 
-                    matTooltipPosition="above" 
-                    matTooltip="Widget Settings">
-                <i class="material-icons">settings</i>
-            </button>
-        </div>
+        <button *ngIf="ctx.settings.showImageButton !== false" 
+                mat-icon-button 
+                (click)="menuButtons('genImage')" 
+                class="tb-button"  
+                matTooltipPosition="above" 
+                matTooltip="Download Image">
+            <i class="material-icons">photo_camera</i>
+        </button>
+        
+        <!-- Export dropdown menu -->
+        <button *ngIf="ctx.settings.showExportButton !== false"
+                mat-icon-button 
+                [matMenuTriggerFor]="exportMenu" 
+                class="tb-button" 
+                matTooltipPosition="above" 
+                matTooltip="Export Data">
+            <i class="material-icons">save_alt</i>
+        </button>
+        
+        <button *ngIf="ctx.settings.showResetZoomButton !== false"
+                mat-icon-button 
+                (click)="menuButtons('reset')" 
+                class="tb-button" 
+                matTooltipPosition="above" 
+                matTooltip="Reset Zoom" 
+                matTooltipClass="custom-tooltip">
+            <i class="material-icons">restore_page</i>
+        </button>
+        
+        <!-- Settings Dialog Button -->
+        <button mat-icon-button 
+                (click)="openSettingsDialog()" 
+                class="tb-button" 
+                matTooltipPosition="above" 
+                matTooltip="Widget Settings">
+            <i class="material-icons">settings</i>
+        </button>
         
         <mat-menu #exportMenu="matMenu">
             <button mat-menu-item (click)="exportData('csv')">
