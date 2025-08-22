@@ -4375,9 +4375,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       batchEChartsUpdates: true,
       deferredUIUpdates: true,
       
-      // Reduce visual complexity
-      showDataPoints: false, // Disable symbols for performance
-      smooth: false, // Disable curve smoothing
+      // Don't override visual settings - let user control them
+      // Keep user's showDataPoints and smooth settings
       
       // Optimize click handling
       clickDebounceMs: 50, // Faster than default 100ms
