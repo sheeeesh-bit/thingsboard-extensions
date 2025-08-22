@@ -705,13 +705,14 @@ div[fxFlex] {
   flex-direction: column;
   position: relative;
   height: 100%;
-  overflow: hidden; // Prevent overflow on wrapper
+  min-height: 0; // Important for flexbox
 }
 
-// Floating overlays with Apple design
+// Fixed legend at top with Apple design
 .legend-overlay {
-  position: relative;
-  z-index: 40;
+  position: sticky;
+  top: 0;
+  z-index: 100;
   padding: 8px var(--plot-right, 1%) 6px var(--plot-left, 10%);
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   display: flex;
@@ -720,24 +721,32 @@ div[fxFlex] {
   background: linear-gradient(180deg, 
     rgba(255, 255, 255, 0.98) 0%, 
     rgba(252, 252, 254, 0.95) 100%);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
   box-shadow: 
     0 1px 0 rgba(255, 255, 255, 0.9) inset,
     0 -1px 0 rgba(0, 0, 0, 0.04) inset,
     0 2px 8px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0; // Prevent shrinking
 }
 
+// Zoom overlay at bottom
 .zoom-overlay {
-  position: relative;
-  z-index: 40;
+  position: sticky;
+  bottom: 0;
+  z-index: 100;
   background: linear-gradient(180deg, 
     rgba(252, 252, 254, 0.98) 0%, 
     rgba(255, 255, 255, 0.95) 100%);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
   box-shadow: 
     0 -1px 0 rgba(255, 255, 255, 0.9) inset,
     0 1px 0 rgba(0, 0, 0, 0.04) inset,
     0 -2px 8px rgba(0, 0, 0, 0.04);
   border-top: 1px solid rgba(0, 0, 0, 0.08);
   padding: 8px var(--plot-right, 1%) 8px var(--plot-left, 10%);
+  flex-shrink: 0; // Prevent shrinking
 }
 
 // Scrollable chart container
@@ -747,8 +756,7 @@ div[fxFlex] {
   overflow-x: hidden;
   width: 100%;
   flex: 1;
-  min-height: 0; // Allow flexbox to control height
-  max-height: 100%; // Prevent expanding beyond container
+  min-height: 0; // Important for flexbox scrolling
 }
 
 #echartContainer {
