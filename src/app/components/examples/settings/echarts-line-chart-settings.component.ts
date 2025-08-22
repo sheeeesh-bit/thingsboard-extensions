@@ -26,6 +26,9 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   showDataPoints?: boolean;
   symbolSize_data?: number;
   
+  // Line Settings
+  lineWidth?: number;
+  
   // Export Settings
   exportDecimals?: number;
   
@@ -147,6 +150,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       sidebarDisplayMode: 'full',  // Default to full table view
       showDataPoints: false,
       symbolSize_data: 5,
+      lineWidth: 3,
       exportDecimals: 6,
       multipleDevices: false,
       showPanZoomTool: true,
@@ -222,6 +226,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       smooth: [settings.smooth],
       showDataPoints: [settings.showDataPoints],
       symbolSize_data: [settings.symbolSize_data || 5],
+      lineWidth: [settings.lineWidth || 3],
       exportDecimals: [settings.exportDecimals || 6],
       multipleDevices: [settings.multipleDevices || false],
       showPanZoomTool: [settings.showPanZoomTool !== false],

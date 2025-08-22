@@ -853,9 +853,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         },
         lineStyle: {
           color: entityColor,  // Also set line color to entity color
-          width: (axisAssignment === 'Middle') 
-            ? (this.currentSize === 'small' ? 2 : this.currentSize === 'large' ? 2.5 : 3)
-            : (this.currentSize === 'small' ? 2.5 : this.currentSize === 'large' ? 3 : 3.5),
+          width: this.ctx.settings.lineWidth || 3,
           opacity: labelSelected ? 1 : 0.08,  // [CLAUDE EDIT] Lower opacity when off
           shadowBlur: labelSelected ? 2 : 0,  // Subtle shadow for depth
           shadowColor: entityColor,
@@ -868,9 +866,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         yAxisIndex: gridIndex,
         data: this.ctx.data[i].data,
         // Balanced performance settings
-        symbol: (this.ctx.settings.showDataPoints && points <= 1000) ? 'circle' : 'none',
+        symbol: this.ctx.settings.showDataPoints ? 'circle' : 'none',
         symbolSize: (this.ctx.settings.symbolSize_data || 5) * 2.5,
-        showSymbol: this.ctx.settings.showDataPoints && points <= 1000,
+        showSymbol: this.ctx.settings.showDataPoints,
         smooth: this.ctx.settings.smooth !== false ? 0.3 : false,  // Subtle smoothing by default
         // Configurable performance optimizations
         ...this.getDataSamplingSettings(points),
