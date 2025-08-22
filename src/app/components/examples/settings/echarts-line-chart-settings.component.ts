@@ -74,6 +74,7 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   minColor?: string;
   maxColor?: string;
   minMaxLineWidth?: number;
+  showMinMaxInDialog?: boolean;
   
   // Alarm Overlays
   alarmStatusVisible?: boolean;
@@ -82,6 +83,7 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   alarmShowWarning?: boolean;
   alarmShowInfo?: boolean;
   showAlarmOverlayInDialog?: boolean;
+  showAlarmLinesInDialog?: boolean;
   
   // Debug & Performance
   debugOutput?: boolean;
@@ -172,6 +174,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       minColor: '#ff4757',
       maxColor: '#5352ed',
       minMaxLineWidth: 2,
+      showMinMaxInDialog: true,
       // Alarm Overlays
       alarmStatusVisible: false,
       alarmOpacity: 0.12,
@@ -179,6 +182,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       alarmShowWarning: true,
       alarmShowInfo: false,
       showAlarmOverlayInDialog: true,
+      showAlarmLinesInDialog: true,
       debugOutput: false,
       useLazyLoading: true,
       enableAnimations: true,
@@ -251,6 +255,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       minColor: [settings.minColor || '#ff4757'],
       maxColor: [settings.maxColor || '#5352ed'],
       minMaxLineWidth: [settings.minMaxLineWidth || 2],
+      showMinMaxInDialog: [settings.showMinMaxInDialog !== false],
       
       // Alarm Overlays
       alarmStatusVisible: [settings.alarmStatusVisible || false],
@@ -259,6 +264,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       alarmShowWarning: [settings.alarmShowWarning !== false],
       alarmShowInfo: [settings.alarmShowInfo || false],
       showAlarmOverlayInDialog: [settings.showAlarmOverlayInDialog !== false],
+      showAlarmLinesInDialog: [settings.showAlarmLinesInDialog !== false],
       
       // Debug & Performance
       debugOutput: [settings.debugOutput],

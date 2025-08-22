@@ -342,6 +342,14 @@
             <label class="setting-label">Line Width: {{echartsLineChartSettingsForm.get('minMaxLineWidth')?.value}}px</label>
             <input type="range" class="apple-slider" min="1" max="5" step="1" formControlName="minMaxLineWidth">
           </div>
+          
+          <div class="toggle-row">
+            <label class="toggle-label">Show Min/Max Control in Dialog</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="showMinMaxInDialog">
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
       </div>
     </div>
@@ -408,6 +416,14 @@
             <label class="toggle-label">Show Overlay Control in Dialog</label>
             <label class="apple-switch">
               <input type="checkbox" formControlName="showAlarmOverlayInDialog">
+              <span class="slider"></span>
+            </label>
+          </div>
+          
+          <div class="toggle-row">
+            <label class="toggle-label">Show Alarm Lines Control in Dialog</label>
+            <label class="apple-switch">
+              <input type="checkbox" formControlName="showAlarmLinesInDialog">
               <span class="slider"></span>
             </label>
           </div>

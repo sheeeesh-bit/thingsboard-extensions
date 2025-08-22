@@ -21,6 +21,8 @@ export interface SettingsDialogData {
   alarmMinColor?: string;
   alarmMaxColor?: string;
   showAlarmOverlayInDialog?: boolean;
+  showAlarmLinesInDialog?: boolean;
+  showMinMaxInDialog?: boolean;
 }
 
 @Component({
@@ -168,7 +170,7 @@ export interface SettingsDialogData {
         </div>
         
         <!-- Min/Max Lines Section -->
-        <div class="settings-card">
+        <div class="settings-card" *ngIf="data.showMinMaxInDialog !== false">
           <div class="card-header">
             <div class="icon-wrapper minmax-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -327,9 +329,10 @@ export interface SettingsDialogData {
             </div>
             
             <!-- Alarm Lines Section -->
-            <div class="divider-line"></div>
-            
-            <div class="toggle-row">
+            <div *ngIf="data.showAlarmLinesInDialog !== false">
+              <div class="divider-line"></div>
+              
+              <div class="toggle-row">
               <label class="toggle-label">Show Alarm Lines</label>
               <label class="apple-switch">
                 <input type="checkbox" [(ngModel)]="data.alarmLinesVisible">
@@ -401,6 +404,7 @@ export interface SettingsDialogData {
                 </span>
                 <span class="color-picker-label">Max Threshold</span>
               </div>
+            </div>
             </div>
           </div>
         </div>
