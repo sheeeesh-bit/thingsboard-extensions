@@ -1,5 +1,8 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, AfterViewInit, OnDestroy } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+
+// Declare Coloris as global variable (loaded from CDN)
+declare const Coloris: any;
 
 export interface SettingsDialogData {
   colorScheme: string;
@@ -31,8 +34,10 @@ export interface SettingsDialogData {
     <div class="apple-dialog">
       <div class="dialog-header">
         <h2 class="dialog-title">Settings</h2>
-        <button class="close-btn" (click)="onCancel()">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <button class="close-btn" (click)="onCancel()" 
+                aria-label="Close dialog"
+                title="Close without saving">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
             <path d="M1 1L13 13M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
         </button>
@@ -133,39 +138,44 @@ export interface SettingsDialogData {
             </div>
           </div>
           
-          <div class="sidebar-options">
-            <label class="sidebar-option" [class.selected]="data.sidebarCollapsedMode === 'hidden'">
-              <input type="radio" name="sidebarMode" value="hidden" 
-                     [(ngModel)]="data.sidebarCollapsedMode">
-              <div class="option-content">
-                <div class="option-icon">
-                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                    <rect x="2" y="4" width="28" height="24" rx="2" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2" opacity="0.3"/>
-                    <path d="M12 16L20 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M16 12L16 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  </svg>
+          <div class="modern-sidebar-options">
+            <button type="button" 
+                    class="sidebar-mode-btn"
+                    [class.active]="data.sidebarCollapsedMode === 'hidden'"
+                    (click)="data.sidebarCollapsedMode = 'hidden'">
+              <div class="mode-preview">
+                <div class="preview-sidebar hidden">
+                  <div class="sidebar-indicator"></div>
                 </div>
-                <span class="option-label">Hidden</span>
-              </div>
-            </label>
-            
-            <label class="sidebar-option" [class.selected]="data.sidebarCollapsedMode === 'colors'">
-              <input type="radio" name="sidebarMode" value="colors" 
-                     [(ngModel)]="data.sidebarCollapsedMode">
-              <div class="option-content">
-                <div class="option-icon">
-                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                    <rect x="2" y="4" width="6" height="24" rx="1" fill="#f0f0f0"/>
-                    <circle cx="5" cy="8" r="2" fill="#007aff"/>
-                    <circle cx="5" cy="14" r="2" fill="#ff9500"/>
-                    <circle cx="5" cy="20" r="2" fill="#34c759"/>
-                    <rect x="10" y="4" width="20" height="24" rx="2" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
-                  </svg>
+                <div class="preview-content">
+                  <div class="content-line"></div>
+                  <div class="content-line short"></div>
+                  <div class="content-line"></div>
                 </div>
-                <span class="option-label">Colors</span>
               </div>
-            </label>
+              <span class="mode-label">Hidden</span>
+              <span class="mode-description">Completely hide sidebar</span>
+            </button>
             
+            <button type="button"
+                    class="sidebar-mode-btn"
+                    [class.active]="data.sidebarCollapsedMode === 'colors'"
+                    (click)="data.sidebarCollapsedMode = 'colors'">
+              <div class="mode-preview">
+                <div class="preview-sidebar colors">
+                  <div class="color-dot" style="background: #007aff"></div>
+                  <div class="color-dot" style="background: #ff9500"></div>
+                  <div class="color-dot" style="background: #34c759"></div>
+                </div>
+                <div class="preview-content">
+                  <div class="content-line"></div>
+                  <div class="content-line short"></div>
+                  <div class="content-line"></div>
+                </div>
+              </div>
+              <span class="mode-label">Color Strip</span>
+              <span class="mode-description">Show only color indicators</span>
+            </button>
           </div>
         </div>
         
@@ -235,28 +245,29 @@ export interface SettingsDialogData {
             </div>
             
             <div class="control-group" *ngIf="data.minMaxVisible">
-              <label class="control-label">Minimum Line Color</label>
-              <div class="color-picker-control">
-                <input type="color" 
-                       [(ngModel)]="data.minColor"
-                       class="apple-color-picker">
-                <span class="color-preview" 
-                      [style.background-color]="data.minColor">
-                </span>
-                <span class="color-picker-label">Min</span>
-              </div>
-            </div>
-            
-            <div class="control-group" *ngIf="data.minMaxVisible">
-              <label class="control-label">Maximum Line Color</label>
-              <div class="color-picker-control">
-                <input type="color" 
-                       [(ngModel)]="data.maxColor"
-                       class="apple-color-picker">
-                <span class="color-preview" 
-                      [style.background-color]="data.maxColor">
-                </span>
-                <span class="color-picker-label">Max</span>
+              <label class="control-label">Line Colors</label>
+              <div class="modern-color-picker-group">
+                <div class="color-picker-item">
+                  <div class="color-swatch" [style.background]="data.minColor"></div>
+                  <div class="color-info">
+                    <span class="color-label">Minimum</span>
+                    <input type="text" 
+                           [(ngModel)]="data.minColor"
+                           class="coloris-input"
+                           data-coloris>
+                  </div>
+                </div>
+                
+                <div class="color-picker-item">
+                  <div class="color-swatch" [style.background]="data.maxColor"></div>
+                  <div class="color-info">
+                    <span class="color-label">Maximum</span>
+                    <input type="text" 
+                           [(ngModel)]="data.maxColor"
+                           class="coloris-input"
+                           data-coloris>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -292,7 +303,7 @@ export interface SettingsDialogData {
               <div class="slider-control">
                 <input type="range" min="5" max="30" step="1" 
                        [(ngModel)]="opacityPercent"
-                       (input)="data.alarmOpacity = opacityPercent / 100"
+                       (input)="onOpacityChange()"
                        class="apple-slider">
                 <span class="slider-value">{{opacityPercent}}%</span>
               </div>
@@ -381,28 +392,29 @@ export interface SettingsDialogData {
             </div>
             
             <div class="control-group" *ngIf="data.alarmLinesVisible">
-              <label class="control-label">Minimum Threshold Color</label>
-              <div class="color-picker-control">
-                <input type="color" 
-                       [(ngModel)]="data.alarmMinColor"
-                       class="apple-color-picker">
-                <span class="color-preview" 
-                      [style.background-color]="data.alarmMinColor">
-                </span>
-                <span class="color-picker-label">Min Threshold</span>
-              </div>
-            </div>
-            
-            <div class="control-group" *ngIf="data.alarmLinesVisible">
-              <label class="control-label">Maximum Threshold Color</label>
-              <div class="color-picker-control">
-                <input type="color" 
-                       [(ngModel)]="data.alarmMaxColor"
-                       class="apple-color-picker">
-                <span class="color-preview" 
-                      [style.background-color]="data.alarmMaxColor">
-                </span>
-                <span class="color-picker-label">Max Threshold</span>
+              <label class="control-label">Alarm Line Colors</label>
+              <div class="modern-color-picker-group">
+                <div class="color-picker-item">
+                  <div class="color-swatch" [style.background]="data.alarmMinColor"></div>
+                  <div class="color-info">
+                    <span class="color-label">Min Threshold</span>
+                    <input type="text" 
+                           [(ngModel)]="data.alarmMinColor"
+                           class="coloris-input"
+                           data-coloris>
+                  </div>
+                </div>
+                
+                <div class="color-picker-item">
+                  <div class="color-swatch" [style.background]="data.alarmMaxColor"></div>
+                  <div class="color-info">
+                    <span class="color-label">Max Threshold</span>
+                    <input type="text" 
+                           [(ngModel)]="data.alarmMaxColor"
+                           class="coloris-input"
+                           data-coloris>
+                  </div>
+                </div>
               </div>
             </div>
             </div>
@@ -556,21 +568,26 @@ export interface SettingsDialogData {
       box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
     }
     
-    .color-preview {
-      display: flex !important;
-      gap: 8px !important;
-      align-items: center !important;
+    .color-option.selected .color-name {
+      color: #007aff;
+      font-weight: 600;
+    }
+    
+    .color-option .color-preview {
+      display: flex;
+      gap: 8px;
+      align-items: center;
     }
     
     .color-dot {
-      display: inline-block !important;
-      width: 18px !important;
-      height: 18px !important;
-      border-radius: 50% !important;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
-      transition: transform 0.2s ease !important;
-      flex-shrink: 0 !important;
-      border: none !important;
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+      transition: transform 0.2s ease;
+      flex-shrink: 0;
+      border: 1px solid rgba(0, 0, 0, 0.08);
     }
     
     .color-option:hover .color-dot {
@@ -585,10 +602,115 @@ export interface SettingsDialogData {
     }
     
     /* Sidebar Options */
-    .sidebar-options {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
+    /* Modern Sidebar Options */
+    .modern-sidebar-options {
+      display: flex;
       gap: 12px;
+      padding: 12px 0;
+    }
+    
+    .sidebar-mode-btn {
+      flex: 1;
+      padding: 16px;
+      background: linear-gradient(180deg, #ffffff 0%, #f9f9fb 100%);
+      border: 2px solid #e5e5e7;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .sidebar-mode-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+      border-color: #007aff;
+    }
+    
+    .sidebar-mode-btn.active {
+      background: linear-gradient(180deg, #007aff 0%, #0051d5 100%);
+      border-color: #0051d5;
+      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+    }
+    
+    .sidebar-mode-btn.active .mode-label,
+    .sidebar-mode-btn.active .mode-description {
+      color: white;
+    }
+    
+    .mode-preview {
+      width: 100%;
+      height: 60px;
+      background: #f5f5f7;
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      gap: 6px;
+      position: relative;
+    }
+    
+    .sidebar-mode-btn.active .mode-preview {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    
+    .preview-sidebar {
+      width: 20px;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+    }
+    
+    .preview-sidebar.hidden {
+      border: 2px dashed rgba(0, 0, 0, 0.2);
+      opacity: 0.3;
+    }
+    
+    .preview-sidebar.colors {
+      background: white;
+      padding: 4px;
+    }
+    
+    .preview-sidebar .color-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+    
+    .preview-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      padding: 0 4px;
+    }
+    
+    .content-line {
+      height: 3px;
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 2px;
+    }
+    
+    .content-line.short {
+      width: 60%;
+    }
+    
+    .mode-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1d1d1f;
+    }
+    
+    .mode-description {
+      font-size: 11px;
+      color: #86868b;
+      text-align: center;
     }
     
     .sidebar-option {
@@ -1028,11 +1150,129 @@ export interface SettingsDialogData {
     }
     
     /* Color Picker Controls */
-    .color-picker-control {
+    /* Modern Color Picker */
+    .modern-color-picker-group {
+      display: flex;
+      gap: 12px;
+      padding: 8px 0;
+    }
+    
+    .color-picker-item {
+      flex: 1;
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 8px 0;
+      padding: 12px;
+      background: linear-gradient(180deg, #ffffff 0%, #f9f9fb 100%);
+      border: 1px solid #e5e5e7;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .color-picker-item:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      border-color: #007aff;
+    }
+    
+    .color-swatch {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      box-shadow: 
+        0 2px 8px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    
+    .color-icon {
+      opacity: 0.8;
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+    }
+    
+    .color-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    
+    .color-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1d1d1f;
+    }
+    
+    .color-value {
+      font-size: 11px;
+      color: #86868b;
+      font-family: 'SF Mono', Monaco, monospace;
+      text-transform: uppercase;
+    }
+    
+    .coloris-input {
+      width: 100%;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-family: 'SF Mono', Monaco, monospace;
+      border: 1px solid #e5e5e7;
+      border-radius: 6px;
+      background: white;
+      color: #1d1d1f;
+      text-transform: uppercase;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    
+    .coloris-input:hover {
+      border-color: #007aff;
+      box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+    }
+    
+    .coloris-input:focus {
+      outline: none;
+      border-color: #007aff;
+      box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+    }
+    
+    /* Coloris picker customizations */
+    :global(.clr-picker) {
+      border-radius: 12px !important;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    :global(.clr-picker.clr-large) {
+      width: 280px !important;
+    }
+    
+    :global(.clr-swatches) {
+      padding: 12px !important;
+    }
+    
+    :global(.clr-swatch) {
+      width: 28px !important;
+      height: 28px !important;
+      border-radius: 6px !important;
+      margin: 4px !important;
+    }
+    
+    .hidden-color-input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+    
+    /* Legacy color picker - hide it */
+    .color-picker-control {
+      display: none;
     }
     
     .apple-color-picker {
@@ -1057,14 +1297,7 @@ export interface SettingsDialogData {
       box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
     }
     
-    .color-preview {
-      width: 20px;
-      height: 20px;
-      border-radius: 6px;
-      border: 2px solid rgba(0, 0, 0, 0.1);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      flex-shrink: 0;
-    }
+    /* Removed old color-preview style that was creating phantom boxes */
     
     .color-picker-label {
       font-size: 13px;
@@ -1078,10 +1311,30 @@ export interface SettingsDialogData {
       background: #e5e5e7;
       margin: 20px 0;
     }
+    
+    /* Hide Coloris trigger button that appears on first load */
+    button[aria-labelledby="clr-open-label"] {
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+    
+    /* Also hide the Coloris color preview square that might appear */
+    .clr-field button {
+      display: none !important;
+    }
+    
+    /* Ensure Coloris wrapper doesn't create extra space */
+    .clr-field {
+      display: contents;
+    }
   `]
 })
-export class EchartsSettingsDialogComponent {
+export class EchartsSettingsDialogComponent implements AfterViewInit, OnDestroy {
   opacityPercent: number;
+  hasChanges = false;
   
   constructor(
     public dialogRef: MatDialogRef<EchartsSettingsDialogComponent>,
@@ -1090,13 +1343,13 @@ export class EchartsSettingsDialogComponent {
     // Initialize default values if not provided
     this.data.minMaxVisible = this.data.minMaxVisible ?? false;
     this.data.minMaxStyle = this.data.minMaxStyle ?? 'dashed';
-    this.data.minMaxColor = this.data.minMaxColor ?? 'rgba(128, 128, 128, 0.5)';
-    this.data.minColor = this.data.minColor ?? '#ff4757';
-    this.data.maxColor = this.data.maxColor ?? '#5352ed';
-    this.data.minMaxLineWidth = this.data.minMaxLineWidth ?? 2;
+    this.data.minMaxColor = this.validateColor(this.data.minMaxColor) ?? 'rgba(128, 128, 128, 0.5)';
+    this.data.minColor = this.validateColor(this.data.minColor) ?? '#ff4757';
+    this.data.maxColor = this.validateColor(this.data.maxColor) ?? '#5352ed';
+    this.data.minMaxLineWidth = this.clampValue(this.data.minMaxLineWidth ?? 2, 1, 5);
     
     this.data.alarmStatusVisible = this.data.alarmStatusVisible ?? false;
-    this.data.alarmOpacity = this.data.alarmOpacity ?? 0.12;
+    this.data.alarmOpacity = this.clampValue(this.data.alarmOpacity ?? 0.12, 0, 1);
     this.data.alarmShowCritical = this.data.alarmShowCritical ?? true;
     this.data.alarmShowWarning = this.data.alarmShowWarning ?? true;
     this.data.alarmShowInfo = this.data.alarmShowInfo ?? false;
@@ -1104,19 +1357,330 @@ export class EchartsSettingsDialogComponent {
     // Initialize alarm lines settings
     this.data.alarmLinesVisible = this.data.alarmLinesVisible ?? false;
     this.data.alarmLineStyle = this.data.alarmLineStyle ?? 'dashed';
-    this.data.alarmLineWidth = this.data.alarmLineWidth ?? 2;
-    this.data.alarmMinColor = this.data.alarmMinColor ?? '#ff9500';
-    this.data.alarmMaxColor = this.data.alarmMaxColor ?? '#ff3b30';
+    this.data.alarmLineWidth = this.clampValue(this.data.alarmLineWidth ?? 2, 1, 5);
+    this.data.alarmMinColor = this.validateColor(this.data.alarmMinColor) ?? '#ff9500';
+    this.data.alarmMaxColor = this.validateColor(this.data.alarmMaxColor) ?? '#ff3b30';
     
     // Convert opacity to percentage for slider
     this.opacityPercent = Math.round((this.data.alarmOpacity ?? 0.12) * 100);
   }
+  
+  private validateColor(color: string | undefined): string | undefined {
+    if (!color) return undefined;
+    // Basic color validation - check if it's a valid hex or rgba color
+    const hexRegex = /^#([0-9A-Fa-f]{3}){1,2}$/;
+    const rgbaRegex = /^rgba?\([\d\s,\.]+\)$/;
+    if (hexRegex.test(color) || rgbaRegex.test(color)) {
+      return color;
+    }
+    return undefined;
+  }
+  
+  private clampValue(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
+  }
 
+  onOpacityChange(): void {
+    // Convert percentage back to decimal with validation
+    const clampedPercent = this.clampValue(this.opacityPercent || 12, 5, 30);
+    this.opacityPercent = clampedPercent;
+    this.data.alarmOpacity = clampedPercent / 100;
+    this.hasChanges = true;
+  }
+  
   onCancel(): void {
     this.dialogRef.close();
   }
 
   onApply(): void {
+    // Validate all values before applying
+    this.data.minMaxLineWidth = this.clampValue(this.data.minMaxLineWidth || 2, 1, 5);
+    this.data.alarmLineWidth = this.clampValue(this.data.alarmLineWidth || 2, 1, 5);
+    this.data.alarmOpacity = this.clampValue(this.data.alarmOpacity || 0.12, 0.05, 0.3);
+    
     this.dialogRef.close(this.data);
+  }
+  
+  ngAfterViewInit(): void {
+    // Load Coloris from CDN with fallback
+    setTimeout(() => {
+      this.loadColoris();
+    }, 100);
+  }
+
+  private loadColoris(): void {
+    // Check if Coloris is already loaded
+    if (typeof Coloris !== 'undefined' && Coloris) {
+      this.initializeColoris();
+      return;
+    }
+
+    // Add Coloris CSS
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = 'https://cdn.jsdelivr.net/gh/mdbassit/Coloris@latest/dist/coloris.min.css';
+    document.head.appendChild(cssLink);
+
+    // Add Coloris JS
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/gh/mdbassit/Coloris@latest/dist/coloris.min.js';
+    script.onload = () => {
+      // Wait a bit for Coloris to fully initialize
+      setTimeout(() => {
+        if (typeof Coloris !== 'undefined' && Coloris) {
+          this.initializeColoris();
+        } else {
+          console.warn('Coloris loaded but not available');
+          this.setupFallbackColorInputs();
+        }
+      }, 100);
+    };
+    script.onerror = () => {
+      console.warn('Failed to load Coloris from CDN, falling back to native color inputs');
+      this.setupFallbackColorInputs();
+    };
+    document.head.appendChild(script);
+  }
+
+  private initializeColoris(): void {
+    if (typeof Coloris === 'undefined') {
+      this.setupFallbackColorInputs();
+      return;
+    }
+
+    try {
+      // Wait a bit more for DOM to be fully ready
+      setTimeout(() => {
+        // Initialize all visible color inputs
+        const allInputs = document.querySelectorAll('.coloris-input') as NodeListOf<HTMLInputElement>;
+        
+        allInputs.forEach((input) => {
+          // Check if input is visible
+          const isVisible = input.offsetParent !== null;
+          
+          if (isVisible) {
+            // Initialize Coloris for this specific input
+            Coloris({
+              el: input,
+              theme: 'large',
+              themeMode: 'light',
+              alpha: true,
+              format: 'hex',
+              wrap: false,  // Prevent creating wrapper elements
+              swatches: [
+                '#007aff',
+                '#ff3b30',
+                '#ff9500',
+                '#34c759',
+                '#5352ed',
+                '#ff4757',
+                '#ffa502',
+                '#2ed573',
+                '#747d8c',
+                '#57606f'
+              ],
+              closeButton: true,
+              clearButton: false
+            });
+            
+            // Mark as initialized
+            input.setAttribute('data-coloris-initialized', 'true');
+            
+            // Add change listener
+            const changeHandler = () => {
+              const parent = input.closest('.color-picker-item');
+              if (parent) {
+                const swatch = parent.querySelector('.color-swatch') as HTMLElement;
+                if (swatch && input.value) {
+                  swatch.style.background = input.value;
+                }
+              }
+              this.hasChanges = true;
+            };
+            
+            input.removeEventListener('change', changeHandler);
+            input.addEventListener('change', changeHandler);
+            
+            // Also listen for the Coloris-specific event
+            input.removeEventListener('input', changeHandler);
+            input.addEventListener('input', changeHandler);
+          }
+        });
+        
+        // Re-initialize Coloris when visibility changes to catch dynamically shown inputs
+        this.setupVisibilityObserver();
+      }, 200);
+    } catch (error) {
+      console.warn('Error initializing Coloris:', error);
+      this.setupFallbackColorInputs();
+    }
+  }
+
+  private setupVisibilityObserver(): void {
+    // Create a MutationObserver to watch for visibility changes
+    const observer = new MutationObserver(() => {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        // Re-initialize Coloris for any newly visible inputs
+        if (typeof Coloris !== 'undefined') {
+          const inputs = document.querySelectorAll('.coloris-input:not([data-coloris-initialized])') as NodeListOf<HTMLInputElement>;
+          
+          inputs.forEach(input => {
+            // Check if input is actually visible
+            const isVisible = input.offsetParent !== null;
+            
+            if (isVisible) {
+              // Initialize Coloris for this specific input
+              Coloris({
+                el: input,
+                theme: 'large',
+                themeMode: 'light',
+                alpha: true,
+                format: 'hex',
+                wrap: false,  // Prevent creating wrapper elements
+                swatches: [
+                  '#007aff',
+                  '#ff3b30',
+                  '#ff9500',
+                  '#34c759',
+                  '#5352ed',
+                  '#ff4757',
+                  '#ffa502',
+                  '#2ed573',
+                  '#747d8c',
+                  '#57606f'
+                ],
+                closeButton: true,
+                clearButton: false
+              });
+              
+              // Mark as initialized
+              input.setAttribute('data-coloris-initialized', 'true');
+              
+              // Add change listener for new inputs
+              const changeHandler = () => {
+                const parent = input.closest('.color-picker-item');
+                if (parent) {
+                  const swatch = parent.querySelector('.color-swatch') as HTMLElement;
+                  if (swatch && input.value) {
+                    swatch.style.background = input.value;
+                  }
+                }
+                this.hasChanges = true;
+              };
+              
+              input.removeEventListener('change', changeHandler);
+              input.addEventListener('change', changeHandler);
+              input.removeEventListener('input', changeHandler);
+              input.addEventListener('input', changeHandler);
+            }
+          });
+        }
+      }, 50);
+    });
+
+    // Observe the dialog content for changes
+    const dialogContent = document.querySelector('.dialog-content');
+    if (dialogContent) {
+      observer.observe(dialogContent, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class']
+      });
+
+      // Store observer for cleanup
+      (this as any).visibilityObserver = observer;
+    }
+  }
+
+  private setupFallbackColorInputs(): void {
+    // Convert text inputs to native color inputs as fallback
+    const inputs = document.querySelectorAll('.coloris-input:not([data-fallback-initialized])') as NodeListOf<HTMLInputElement>;
+    inputs.forEach((input) => {
+      // Check if input is visible
+      const isVisible = input.offsetParent !== null;
+      
+      if (isVisible) {
+        // Mark as initialized to prevent double initialization
+        input.setAttribute('data-fallback-initialized', 'true');
+        
+        // Create a native color input
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.value = this.convertToHex(input.value) || '#000000';
+        colorInput.className = 'native-color-input';
+        colorInput.style.width = '100%';
+        colorInput.style.height = '32px';
+        colorInput.style.border = '1px solid #e5e5e7';
+        colorInput.style.borderRadius = '6px';
+        colorInput.style.cursor = 'pointer';
+        colorInput.style.marginTop = '4px';
+        
+        // Add change handler
+        colorInput.addEventListener('change', (e) => {
+          const target = e.target as HTMLInputElement;
+          input.value = target.value;
+          
+          const parent = input.closest('.color-picker-item');
+          if (parent) {
+            const swatch = parent.querySelector('.color-swatch') as HTMLElement;
+            if (swatch) {
+              swatch.style.background = target.value;
+            }
+          }
+          
+          // Update the data model
+          const inputName = input.getAttribute('ng-reflect-name');
+          if (inputName && this.data[inputName as keyof SettingsDialogData] !== undefined) {
+            (this.data as any)[inputName] = target.value;
+          }
+          
+          this.hasChanges = true;
+        });
+        
+        // Replace text input with color input
+        input.style.display = 'none';
+        input.parentNode?.insertBefore(colorInput, input.nextSibling);
+      }
+    });
+  }
+
+  private convertToHex(color: string): string | null {
+    if (!color) return null;
+    
+    // If already hex, return as is
+    if (color.startsWith('#')) {
+      return color.length === 7 ? color : null;
+    }
+    
+    // Convert rgba to hex (simplified, doesn't handle alpha)
+    if (color.startsWith('rgba') || color.startsWith('rgb')) {
+      const matches = color.match(/\d+/g);
+      if (matches && matches.length >= 3) {
+        const r = parseInt(matches[0]).toString(16).padStart(2, '0');
+        const g = parseInt(matches[1]).toString(16).padStart(2, '0');
+        const b = parseInt(matches[2]).toString(16).padStart(2, '0');
+        return `#${r}${g}${b}`;
+      }
+    }
+    
+    return null;
+  }
+  
+  ngOnDestroy(): void {
+    // Clean up MutationObserver
+    if ((this as any).visibilityObserver) {
+      (this as any).visibilityObserver.disconnect();
+    }
+    
+    // Clean up Coloris if available
+    try {
+      if (typeof Coloris !== 'undefined') {
+        Coloris.close();
+      }
+    } catch {
+      // Coloris not available
+    }
   }
 }
