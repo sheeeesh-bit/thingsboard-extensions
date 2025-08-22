@@ -1712,7 +1712,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         alarmLineStyle: this.alarmLineStyle || 'dashed',
         alarmLineWidth: this.alarmLineWidth || 2,
         alarmMinColor: this.alarmMinColor || '#ff9500',
-        alarmMaxColor: this.alarmMaxColor || '#ff3b30'
+        alarmMaxColor: this.alarmMaxColor || '#ff3b30',
+        showAlarmOverlayInDialog: this.ctx.settings?.showAlarmOverlayInDialog !== false
       }
     });
 

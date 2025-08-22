@@ -20,6 +20,7 @@ export interface SettingsDialogData {
   alarmLineWidth?: number;
   alarmMinColor?: string;
   alarmMaxColor?: string;
+  showAlarmOverlayInDialog?: boolean;
 }
 
 @Component({
@@ -276,7 +277,7 @@ export interface SettingsDialogData {
           </div>
           
           <div class="settings-controls">
-            <div class="toggle-row">
+            <div class="toggle-row" *ngIf="data.showAlarmOverlayInDialog !== false">
               <label class="toggle-label">Show Alarm Overlays</label>
               <label class="apple-switch">
                 <input type="checkbox" [(ngModel)]="data.alarmStatusVisible">
@@ -284,7 +285,7 @@ export interface SettingsDialogData {
               </label>
             </div>
             
-            <div class="control-group" *ngIf="data.alarmStatusVisible">
+            <div class="control-group" *ngIf="data.alarmStatusVisible && data.showAlarmOverlayInDialog !== false">
               <label class="control-label">Overlay Opacity</label>
               <div class="slider-control">
                 <input type="range" min="5" max="30" step="1" 

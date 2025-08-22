@@ -81,6 +81,7 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   alarmShowCritical?: boolean;
   alarmShowWarning?: boolean;
   alarmShowInfo?: boolean;
+  showAlarmOverlayInDialog?: boolean;
   
   // Debug & Performance
   debugOutput?: boolean;
@@ -177,6 +178,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       alarmShowCritical: true,
       alarmShowWarning: true,
       alarmShowInfo: false,
+      showAlarmOverlayInDialog: true,
       debugOutput: false,
       useLazyLoading: true,
       enableAnimations: true,
@@ -256,6 +258,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       alarmShowCritical: [settings.alarmShowCritical !== false],
       alarmShowWarning: [settings.alarmShowWarning !== false],
       alarmShowInfo: [settings.alarmShowInfo || false],
+      showAlarmOverlayInDialog: [settings.showAlarmOverlayInDialog !== false],
       
       // Debug & Performance
       debugOutput: [settings.debugOutput],
