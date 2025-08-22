@@ -49,17 +49,23 @@ button[mat-icon-button]:hover {
   transition: background-color 0.3s ease;
 }
 
-// Apple-style button container
+// Apple-style button container wrapper
 .tb-button-container {
   margin-top: 8px;
   margin-bottom: 20px;
   margin-right: 10px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+// Apple-style button group
+.button-group {
   display: inline-flex;
   background: #f2f2f7;
   border-radius: 9px;
   padding: 2px;
   gap: 2px;
-  margin-left: auto;
 }
 
 // Apple-style buttons
