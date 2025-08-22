@@ -58,30 +58,42 @@ button[mat-icon-button]:hover {
   gap: 8px; // Space between individual buttons
 }
 
-// Modern Apple-style individual buttons
+// Glossy Apple-style buttons (like macOS Big Sur)
 button[mat-icon-button].tb-button {
-  border-radius: 10px !important;
-  background: linear-gradient(180deg, #ffffff 0%, #f9f9fb 100%) !important;
+  border-radius: 11px !important;
+  background: linear-gradient(180deg, 
+    rgba(255, 255, 255, 0.9) 0%, 
+    rgba(255, 255, 255, 0.7) 50%,
+    rgba(255, 255, 255, 0.6) 100%) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
   color: #1d1d1f !important;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  width: 44px !important;
-  height: 44px !important;
+  width: 42px !important;
+  height: 42px !important;
   position: relative !important;
-  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
   overflow: hidden !important;
   box-shadow: 
-    0 1px 3px rgba(0, 0, 0, 0.05),
-    0 2px 6px rgba(0, 0, 0, 0.02),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+    0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    0 2px 4px rgba(0, 0, 0, 0.08),
+    0 8px 16px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.04) !important;
   
   &:hover:not(:active) {
-    background: linear-gradient(180deg, #ffffff 0%, #fcfcfd 100%) !important;
-    transform: translateY(-1px);
+    background: linear-gradient(180deg, 
+      rgba(255, 255, 255, 0.95) 0%, 
+      rgba(255, 255, 255, 0.8) 50%,
+      rgba(255, 255, 255, 0.7) 100%) !important;
+    transform: translateY(-0.5px) scale(1.02);
     box-shadow: 
-      0 4px 8px rgba(0, 0, 0, 0.08),
-      0 2px 4px rgba(0, 0, 0, 0.04),
-      inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
-    border-color: rgba(0, 0, 0, 0.1) !important;
+      0 0 0 0.5px rgba(0, 0, 0, 0.15),
+      0 4px 8px rgba(0, 0, 0, 0.12),
+      0 12px 20px rgba(0, 0, 0, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 1),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.8) !important;
   }
   
   &:active {
@@ -709,16 +721,30 @@ div[fxFlex] {
 .legend-overlay {
   top: 0;
   padding: 8px var(--plot-right, 1%) 6px var(--plot-left, 10%);
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: center;
   gap: 8px;
+  background: linear-gradient(180deg, 
+    rgba(255, 255, 255, 0.98) 0%, 
+    rgba(252, 252, 254, 0.95) 100%);
+  box-shadow: 
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.04) inset,
+    0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .zoom-overlay {
   bottom: 0;
+  background: linear-gradient(180deg, 
+    rgba(252, 252, 254, 0.98) 0%, 
+    rgba(255, 255, 255, 0.95) 100%);
+  box-shadow: 
+    0 -1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 1px 0 rgba(0, 0, 0, 0.04) inset,
+    0 -2px 8px rgba(0, 0, 0, 0.04);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
   padding: 8px var(--plot-right, 1%) 8px var(--plot-left, 10%);
-  border-top: 1px solid #e5e7eb;
 }
 
 // Scrollable chart container
@@ -755,7 +781,7 @@ div[fxFlex] {
   padding: 0 4px;
 }
 
-// Pagination buttons - Apple-like minimal design
+// Pagination buttons - Glossy Apple design
 .legend-pager {
   display: flex;
   align-items: center;
@@ -763,10 +789,18 @@ div[fxFlex] {
   width: 28px;
   height: 28px;
   padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(249, 249, 249, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: linear-gradient(180deg, 
+    rgba(255, 255, 255, 0.9) 0%, 
+    rgba(255, 255, 255, 0.7) 100%);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
   border-radius: 10px;
   color: #333;
+  box-shadow: 
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
@@ -808,10 +842,18 @@ div[fxFlex] {
   height: 30px;
   padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  background: rgba(249, 249, 249, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: linear-gradient(180deg, 
+    rgba(255, 255, 255, 0.9) 0%, 
+    rgba(255, 255, 255, 0.7) 100%);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
   color: #1d1d1f;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  box-shadow: 
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
   font-size: 13px;
   font-weight: 500;
   line-height: 1;
