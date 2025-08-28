@@ -505,6 +505,73 @@
   }
 }
 
+// Format help styling
+.format-help {
+  margin-top: 8px;
+  padding: 12px;
+  background: rgba(0, 122, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 122, 255, 0.1);
+  
+  .help-text {
+    color: #666;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: block;
+    margin-bottom: 4px;
+  }
+  
+  .help-list {
+    margin: 4px 0 12px 0;
+    padding-left: 16px;
+    
+    li {
+      font-size: 12px;
+      color: #333;
+      margin: 2px 0;
+      
+      code {
+        background: rgba(0, 122, 255, 0.08);
+        padding: 2px 4px;
+        border-radius: 4px;
+        font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+        font-size: 11px;
+        color: #007aff;
+      }
+    }
+  }
+}
+
+// Preview box
+.preview-box {
+  margin-top: 12px;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.03), rgba(0, 122, 255, 0.08));
+  border-radius: 8px;
+  border: 1px solid rgba(0, 122, 255, 0.15);
+  
+  .preview-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .preview-content {
+    margin-top: 4px;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+    font-size: 13px;
+    color: #007aff;
+    padding: 8px;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 122, 255, 0.2);
+  }
+}
+
 // Math global for template
 ::ng-deep {
   .apple-settings-form {

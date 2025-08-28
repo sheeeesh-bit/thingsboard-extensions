@@ -295,6 +295,65 @@
           <label class="input-label">Show All if Series Count ≤</label>
           <input type="number" class="apple-input" formControlName="tooltipShowAllIfSeriesCountLTE" placeholder="0">
         </div>
+        
+        <!-- Tooltip Label Format -->
+        <div class="setting-group">
+          <label class="setting-label">Tooltip Label Format</label>
+          <p class="setting-description">Customize how labels appear in tooltips</p>
+          <div class="segmented-control">
+            <button type="button" class="segment"
+                    [class.active]="echartsLineChartSettingsForm.get('tooltipLabelPreset')?.value === 'default'"
+                    (click)="echartsLineChartSettingsForm.get('tooltipLabelPreset')?.setValue('default')">
+              Default
+            </button>
+            <button type="button" class="segment"
+                    [class.active]="echartsLineChartSettingsForm.get('tooltipLabelPreset')?.value === 'compact'"
+                    (click)="echartsLineChartSettingsForm.get('tooltipLabelPreset')?.setValue('compact')">
+              Compact
+            </button>
+            <button type="button" class="segment"
+                    [class.active]="echartsLineChartSettingsForm.get('tooltipLabelPreset')?.value === 'detailed'"
+                    (click)="echartsLineChartSettingsForm.get('tooltipLabelPreset')?.setValue('detailed')">
+              Detailed
+            </button>
+            <button type="button" class="segment"
+                    [class.active]="echartsLineChartSettingsForm.get('tooltipLabelPreset')?.value === 'custom'"
+                    (click)="echartsLineChartSettingsForm.get('tooltipLabelPreset')?.setValue('custom')">
+              Custom
+            </button>
+          </div>
+        </div>
+        
+        <!-- Custom Format Input -->
+        <div class="input-group" *ngIf="echartsLineChartSettingsForm.get('tooltipLabelPreset')?.value === 'custom'">
+          <label class="input-label">Custom Format</label>
+          <input type="text" class="apple-input" formControlName="tooltipLabelFormat" 
+                 placeholder="e.g., {device.limit(20)} | {label}: {value}">
+          <div class="format-help">
+            <small class="help-text">Available variables:</small>
+            <ul class="help-list">
+              <li><code>{device}</code> - Device name</li>
+              <li><code>{label}</code> - Series label</li>
+              <li><code>{value}</code> - Data value</li>
+              <li><code>{unit}</code> - Unit (if available)</li>
+              <li><code>.limit(n)</code> - Limit to n characters</li>
+            </ul>
+            <small class="help-text">Examples:</small>
+            <ul class="help-list">
+              <li><code>{device.limit(10)} | {label}</code></li>
+              <li><code>[{device}] {label}: {value}</code></li>
+              <li><code>{label.limit(15)} = {value} {unit}</code></li>
+            </ul>
+          </div>
+        </div>
+        
+        <!-- Format Preview -->
+        <div class="preview-box" *ngIf="echartsLineChartSettingsForm.get('tooltipLabelPreset')?.value !== 'custom'">
+          <label class="preview-label">Format Preview:</label>
+          <div class="preview-content">
+            {{ getTooltipPresetFormat() }}
+          </div>
+        </div>
       </div>
     </div>
 

@@ -1820,6 +1820,71 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return parts.length > 1 ? parts[1] : key;
   }
   
+  /**
+   * Format tooltip label according to user settings
+   */
+  private formatTooltipLabel(seriesName: string, value?: number, unit?: string): string {
+    // Get format preset and custom format
+    const preset = this.ctx.settings?.tooltipLabelPreset || 'default';
+    let format = this.ctx.settings?.tooltipLabelFormat || '{device} | {label}: {value}';
+    
+    // Use preset formats
+    if (preset !== 'custom') {
+      switch (preset) {
+        case 'compact':
+          format = '{label}: {value}';
+          break;
+        case 'detailed':
+          format = '[{device}] {label}: {value} {unit}';
+          break;
+        default:
+          format = '{device} | {label}: {value}';
+      }
+    }
+    
+    // Extract device and label from series name
+    const parts = seriesName.split(' :: ');
+    const deviceName = parts.length > 1 ? parts[0] : '';
+    const label = parts.length > 1 ? parts[1] : seriesName;
+    
+    // Helper function to limit string length
+    const limitString = (str: string, maxLength: number): string => {
+      if (str.length <= maxLength) return str;
+      return str.substring(0, maxLength) + '...';
+    };
+    
+    // Process the format string
+    let result = format;
+    
+    // Handle .limit() functions first
+    result = result.replace(/\{device\.limit\((\d+)\)\}/g, (match, limit) => {
+      return limitString(deviceName, parseInt(limit, 10));
+    });
+    
+    result = result.replace(/\{label\.limit\((\d+)\)\}/g, (match, limit) => {
+      return limitString(label, parseInt(limit, 10));
+    });
+    
+    // Replace placeholders
+    result = result.replace(/\{device\}/g, deviceName);
+    result = result.replace(/\{label\}/g, label);
+    
+    if (value !== undefined) {
+      const decimals = this.ctx.decimals ?? 2;
+      result = result.replace(/\{value\}/g, isFinite(value) ? value.toFixed(decimals) : '');
+    } else {
+      result = result.replace(/\{value\}/g, '');
+    }
+    
+    result = result.replace(/\{unit\}/g, unit || '');
+    
+    // Clean up empty brackets/spaces
+    result = result.replace(/\[\s*\]/g, '');
+    result = result.replace(/\s+/g, ' ').trim();
+    
+    return result;
+  }
+  
   
   // Get grouped legend state (unique labels only)
   private getGroupLegendState(): { data: string[]; selected: Record<string, boolean> } {
@@ -4273,11 +4338,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             const decimals = this.ctx.decimals ?? 2;
             for (const it of items) {
               const val = Number(it.value[1]);
-              // Use the label we already extracted (it has gridPos ordering)
-              const displayName = it.label || this.extractLabelFromKey(it.seriesName);
+              // Format label according to user settings
+              const displayName = this.formatTooltipLabel(it.seriesName, val, unit);
               html += `<tr>
                 <td style="padding:2px 6px 2px 0;white-space:nowrap">${it.marker} ${displayName}</td>
-                <td style="padding:2px 0;text-align:right">${isFinite(val) ? val.toFixed(decimals) : ''}${unit ? ' ' + unit : ''}</td>
               </tr>`;
             }
             if (hiddenCount > 0) {

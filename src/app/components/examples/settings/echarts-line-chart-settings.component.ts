@@ -64,6 +64,8 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   tooltipOnlyHoveredGrid?: boolean;
   tooltipMaxItems?: number;
   tooltipShowAllIfSeriesCountLTE?: number;
+  tooltipLabelFormat?: string;  // Custom format for tooltip labels
+  tooltipLabelPreset?: 'default' | 'compact' | 'detailed' | 'custom';  // Preset formats
   
   // Features - UI Element Visibility
   showImageButton?: boolean;
@@ -185,6 +187,8 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       tooltipOnlyHoveredGrid: false,
       tooltipMaxItems: 10,
       tooltipShowAllIfSeriesCountLTE: 0,
+      tooltipLabelPreset: 'default',
+      tooltipLabelFormat: '{device} | {label}: {value}',
       // Features - default all to true (visible)
       showImageButton: true,
       showExportButton: true,
@@ -276,6 +280,8 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       tooltipOnlyHoveredGrid: [settings.tooltipOnlyHoveredGrid || false],
       tooltipMaxItems: [settings.tooltipMaxItems || 10],
       tooltipShowAllIfSeriesCountLTE: [settings.tooltipShowAllIfSeriesCountLTE || 0],
+      tooltipLabelPreset: [settings.tooltipLabelPreset || 'default'],
+      tooltipLabelFormat: [settings.tooltipLabelFormat || '{device} | {label}: {value}'],
       
       // Features - UI Element Visibility
       showImageButton: [settings.showImageButton !== false],
@@ -376,6 +382,20 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
     this.expandedSubsections[subsection] = !this.expandedSubsections[subsection];
   }
 
+  getTooltipPresetFormat(): string {
+    const preset = this.echartsLineChartSettingsForm.get('tooltipLabelPreset')?.value;
+    switch (preset) {
+      case 'default':
+        return '{device} | {label}: {value}';
+      case 'compact':
+        return '{label}: {value}';
+      case 'detailed':
+        return '[{device}] {label}: {value} {unit}';
+      default:
+        return this.echartsLineChartSettingsForm.get('tooltipLabelFormat')?.value || '{device} | {label}: {value}';
+    }
+  }
+  
   openDebugLoggingDialog(): void {
     const dialogData: DebugLoggingDialogData = {
       normalLogs: this.echartsLineChartSettingsForm.get('debugNormalLogs')?.value || false,
