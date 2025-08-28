@@ -305,9 +305,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.minMaxDebugLogs = this.ctx.settings?.debugMinMaxLogs === true;
     
     // Initialize alarm settings from widget configuration
-    this.alarmStatusVisible = this.ctx.settings?.alarmStatusVisible === true;
-    this.alarmDebugLogs = this.ctx.settings?.debugAlarmLogs !== false; // Default to true for debugging
-    this.alarmLinesVisible = this.ctx.settings?.alarmLinesVisible !== false; // Default to true unless explicitly set to false
+    // Check if alarm support is enabled first
+    const alarmSupportEnabled = this.ctx.settings?.alarmSupportEnabled === true;
+    
+    // Only enable alarm features if alarm support is enabled
+    this.alarmStatusVisible = alarmSupportEnabled && this.ctx.settings?.alarmStatusVisible === true;
+    this.alarmDebugLogs = this.ctx.settings?.debugAlarmLogs === true;
+    this.alarmLinesVisible = alarmSupportEnabled && this.ctx.settings?.alarmLinesVisible === true;
     this.alarmLineStyle = this.ctx.settings?.alarmLineStyle || 'dashed';
     this.alarmLineWidth = this.ctx.settings?.alarmLineWidth || 2;
     this.alarmMinColor = this.ctx.settings?.alarmMinColor || '#ff9500';
@@ -1711,8 +1715,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         alarmLineWidth: this.alarmLineWidth || 2,
         alarmMinColor: this.alarmMinColor || '#ff9500',
         alarmMaxColor: this.alarmMaxColor || '#ff3b30',
-        showAlarmOverlayInDialog: this.ctx.settings?.showAlarmOverlayInDialog !== false,
-        showAlarmLinesInDialog: this.ctx.settings?.showAlarmLinesInDialog !== false,
+        showAlarmOverlayInDialog: alarmSupportEnabled && this.ctx.settings?.showAlarmOverlayInDialog !== false,
+        showAlarmLinesInDialog: alarmSupportEnabled && this.ctx.settings?.showAlarmLinesInDialog !== false,
         showMinMaxInDialog: this.ctx.settings?.showMinMaxInDialog !== false
       }
     });

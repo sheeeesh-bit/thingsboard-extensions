@@ -79,6 +79,9 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   minMaxLineWidth?: number;
   showMinMaxInDialog?: boolean;
   
+  // Alarm Support
+  alarmSupportEnabled?: boolean;  // Main toggle for all alarm features
+  
   // Alarm Overlays
   alarmStatusVisible?: boolean;
   alarmOpacity?: number;
@@ -87,6 +90,13 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   alarmShowInfo?: boolean;
   showAlarmOverlayInDialog?: boolean;
   showAlarmLinesInDialog?: boolean;
+  
+  // Alarm Lines
+  alarmLinesVisible?: boolean;
+  alarmLineStyle?: 'dashed' | 'solid' | 'dotted';
+  alarmLineWidth?: number;
+  alarmMinColor?: string;
+  alarmMaxColor?: string;
   
   // Debug & Performance
   debugOutput?: boolean;
@@ -128,6 +138,12 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
     export: false,
     ui: false,
     performance: false
+  };
+  
+  // Track which subsections are expanded
+  public expandedSubsections: { [key: string]: boolean } = {
+    alarmLines: false,
+    alarmOverlays: false
   };
 
   constructor(
@@ -179,6 +195,8 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       maxColor: '#5352ed',
       minMaxLineWidth: 2,
       showMinMaxInDialog: true,
+      // Alarm Support
+      alarmSupportEnabled: false,
       // Alarm Overlays
       alarmStatusVisible: false,
       alarmOpacity: 0.12,
@@ -187,6 +205,12 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       alarmShowInfo: false,
       showAlarmOverlayInDialog: true,
       showAlarmLinesInDialog: true,
+      // Alarm Lines - default to false
+      alarmLinesVisible: false,
+      alarmLineStyle: 'dashed',
+      alarmLineWidth: 2,
+      alarmMinColor: '#ff9500',
+      alarmMaxColor: '#ff3b30',
       debugOutput: false,
       useLazyLoading: true,
       enableAnimations: true,
@@ -262,6 +286,9 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       minMaxLineWidth: [settings.minMaxLineWidth || 2],
       showMinMaxInDialog: [settings.showMinMaxInDialog !== false],
       
+      // Alarm Support
+      alarmSupportEnabled: [settings.alarmSupportEnabled || false],
+      
       // Alarm Overlays
       alarmStatusVisible: [settings.alarmStatusVisible || false],
       alarmOpacity: [settings.alarmOpacity || 0.12],
@@ -270,6 +297,13 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       alarmShowInfo: [settings.alarmShowInfo || false],
       showAlarmOverlayInDialog: [settings.showAlarmOverlayInDialog !== false],
       showAlarmLinesInDialog: [settings.showAlarmLinesInDialog !== false],
+      
+      // Alarm Lines
+      alarmLinesVisible: [settings.alarmLinesVisible || false],
+      alarmLineStyle: [settings.alarmLineStyle || 'dashed'],
+      alarmLineWidth: [settings.alarmLineWidth || 2],
+      alarmMinColor: [settings.alarmMinColor || '#ff9500'],
+      alarmMaxColor: [settings.alarmMaxColor || '#ff3b30'],
       
       // Debug & Performance
       debugOutput: [settings.debugOutput],
@@ -328,6 +362,10 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
   
   toggleSection(section: string): void {
     this.expandedSections[section] = !this.expandedSections[section];
+  }
+  
+  toggleSubsection(subsection: string): void {
+    this.expandedSubsections[subsection] = !this.expandedSubsections[subsection];
   }
 
   openDebugLoggingDialog(): void {

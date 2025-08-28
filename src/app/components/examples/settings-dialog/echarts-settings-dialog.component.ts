@@ -284,8 +284,8 @@ export interface SettingsDialogData {
               </svg>
             </div>
             <div>
-              <h3 class="card-title">Alarm Overlays</h3>
-              <p class="card-subtitle">Display alarm thresholds for all devices</p>
+              <h3 class="card-title">Alarm</h3>
+              <p class="card-subtitle">Configure alarm visualization settings</p>
             </div>
           </div>
           

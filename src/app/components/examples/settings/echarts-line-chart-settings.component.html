@@ -358,7 +358,7 @@
       </div>
     </div>
 
-    <!-- Alarm Overlays (Always Expanded) -->
+    <!-- Alarm Support (Always Expanded) -->
     <div class="settings-section">
       <div class="section-header">
         <div class="section-icon alarm-icon">
@@ -369,67 +369,107 @@
           </svg>
         </div>
         <div class="section-info">
-          <h3 class="section-title">Alarm Overlays</h3>
-          <p class="section-subtitle">Display device alarm thresholds</p>
+          <h3 class="section-title">Alarm Support</h3>
+          <p class="section-subtitle">Configure alarm visualization features</p>
         </div>
       </div>
       
       <div class="settings-content">
         <div class="toggle-row">
-          <label class="toggle-label">Enable Alarm Overlays</label>
+          <label class="toggle-label">Enable Alarm Support</label>
           <label class="apple-switch">
-            <input type="checkbox" formControlName="alarmStatusVisible">
+            <input type="checkbox" formControlName="alarmSupportEnabled">
             <span class="slider"></span>
           </label>
         </div>
         
-        <div class="toggle-row">
-          <label class="toggle-label">Show Overlay Control in Dialog</label>
-          <label class="apple-switch">
-            <input type="checkbox" formControlName="showAlarmOverlayInDialog">
-            <span class="slider"></span>
-          </label>
-        </div>
-        
-        <div class="toggle-row">
-          <label class="toggle-label">Show Alarm Lines Control in Dialog</label>
-          <label class="apple-switch">
-            <input type="checkbox" formControlName="showAlarmLinesInDialog">
-            <span class="slider"></span>
-          </label>
-        </div>
-        
-        <div class="subsettings" *ngIf="echartsLineChartSettingsForm.get('alarmStatusVisible')?.value">
-          <div class="setting-group">
-            <label class="setting-label">Opacity: {{Math.round((echartsLineChartSettingsForm.get('alarmOpacity')?.value || 0.12) * 100)}}%</label>
-            <input type="range" class="apple-slider" min="0.05" max="0.3" step="0.01" formControlName="alarmOpacity">
+        <div class="subsettings" *ngIf="echartsLineChartSettingsForm.get('alarmSupportEnabled')?.value">
+          <!-- Alarm Lines Section -->
+          <div class="subsection-header" (click)="toggleSubsection('alarmLines')">
+            <h4 class="subsection-title">Alarm Lines</h4>
+            <div class="subsection-chevron" [class.rotated]="expandedSubsections['alarmLines']">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
           </div>
           
-          <div class="checkbox-group">
-            <label class="apple-checkbox">
-              <input type="checkbox" formControlName="alarmShowCritical">
-              <span class="checkbox-box"></span>
-              <span class="checkbox-label">
-                <span class="severity-dot critical"></span>
-                Critical Alarms
-              </span>
-            </label>
-            <label class="apple-checkbox">
-              <input type="checkbox" formControlName="alarmShowWarning">
-              <span class="checkbox-box"></span>
-              <span class="checkbox-label">
-                <span class="severity-dot warning"></span>
-                Warning Alarms
-              </span>
-            </label>
-            <label class="apple-checkbox">
-              <input type="checkbox" formControlName="alarmShowInfo">
-              <span class="checkbox-box"></span>
-              <span class="checkbox-label">
-                <span class="severity-dot info"></span>
-                Info Alarms
-              </span>
-            </label>
+          <div class="subsection-content" *ngIf="expandedSubsections['alarmLines']">
+            <div class="toggle-row">
+              <label class="toggle-label">Enable by Default</label>
+              <label class="apple-switch">
+                <input type="checkbox" formControlName="alarmLinesVisible">
+                <span class="slider"></span>
+              </label>
+            </div>
+            
+            <div class="toggle-row">
+              <label class="toggle-label">Show Control in Dialog</label>
+              <label class="apple-switch">
+                <input type="checkbox" formControlName="showAlarmLinesInDialog">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          
+          <!-- Alarm Overlays Section -->
+          <div class="subsection-header" (click)="toggleSubsection('alarmOverlays')">
+            <h4 class="subsection-title">Alarm Overlays</h4>
+            <div class="subsection-chevron" [class.rotated]="expandedSubsections['alarmOverlays']">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+          
+          <div class="subsection-content" *ngIf="expandedSubsections['alarmOverlays']">
+            <div class="toggle-row">
+              <label class="toggle-label">Enable by Default</label>
+              <label class="apple-switch">
+                <input type="checkbox" formControlName="alarmStatusVisible">
+                <span class="slider"></span>
+              </label>
+            </div>
+            
+            <div class="toggle-row">
+              <label class="toggle-label">Show Control in Dialog</label>
+              <label class="apple-switch">
+                <input type="checkbox" formControlName="showAlarmOverlayInDialog">
+                <span class="slider"></span>
+              </label>
+            </div>
+            
+            <div class="setting-group" *ngIf="echartsLineChartSettingsForm.get('alarmStatusVisible')?.value">
+              <label class="setting-label">Opacity: {{Math.round((echartsLineChartSettingsForm.get('alarmOpacity')?.value || 0.12) * 100)}}%</label>
+              <input type="range" class="apple-slider" min="0.05" max="0.3" step="0.01" formControlName="alarmOpacity">
+            </div>
+            
+            <div class="checkbox-group" *ngIf="echartsLineChartSettingsForm.get('alarmStatusVisible')?.value">
+              <label class="apple-checkbox">
+                <input type="checkbox" formControlName="alarmShowCritical">
+                <span class="checkbox-box"></span>
+                <span class="checkbox-label">
+                  <span class="severity-dot critical"></span>
+                  Critical Alarms
+                </span>
+              </label>
+              <label class="apple-checkbox">
+                <input type="checkbox" formControlName="alarmShowWarning">
+                <span class="checkbox-box"></span>
+                <span class="checkbox-label">
+                  <span class="severity-dot warning"></span>
+                  Warning Alarms
+                </span>
+              </label>
+              <label class="apple-checkbox">
+                <input type="checkbox" formControlName="alarmShowInfo">
+                <span class="checkbox-box"></span>
+                <span class="checkbox-label">
+                  <span class="severity-dot info"></span>
+                  Info Alarms
+                </span>
+              </label>
+            </div>
           </div>
         </div>
       </div>
