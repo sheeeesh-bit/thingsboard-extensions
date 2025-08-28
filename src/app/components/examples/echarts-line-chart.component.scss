@@ -450,32 +450,20 @@ div[fxFlex] {
     overflow-x: hidden;
     min-height: 0; // Important for flex scrolling
     
-    .color-box {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      
-      &:hover {
-        transform: scale(1.1);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-      }
-      
-      &.color-box--disabled {
-        opacity: 0.3;
-        filter: grayscale(0.5);
-      }
-    }
-    
-    // When collapsed, use smaller swatch-box style from full mode
-    &.collapsed-swatches {
+    // Use swatch-box style for colors mode (both expanded and collapsed)
+    &.swatch-style {
       align-items: center;
       gap: 8px;
       
       .swatch-box {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
         cursor: pointer;
+        box-shadow: 
+          inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+          0 1px 3px rgba(0, 0, 0, 0.12),
+          0 1px 2px rgba(0, 0, 0, 0.08);
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         
         &:hover {
