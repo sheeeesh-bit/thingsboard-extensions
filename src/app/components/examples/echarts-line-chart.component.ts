@@ -4275,15 +4275,47 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             xAxisIndex: 'all'
           }]
         },
-        // Ultra-fast position function - no complex grid calculations
-        position: (point: number[]) => {
+        // Smart position function with boundary detection
+        position: (point: number[], params: any, dom: HTMLElement, rect: any, size: { contentSize: number[] }) => {
           // Fast grid estimation without expensive containPixel calls
           if (point && this.currentGrids > 1) {
             const normalizedY = point[1] / (this.chart?.getHeight() || 600);
             this.hoveredGridIndex = Math.floor(normalizedY * this.currentGrids);
           }
-          // Fixed offset positioning for speed
-          return [point[0] + 15, point[1] - 25];
+          
+          // Get chart dimensions
+          const chartWidth = this.chart?.getWidth() || window.innerWidth;
+          const chartHeight = this.chart?.getHeight() || window.innerHeight;
+          
+          // Tooltip dimensions
+          const tooltipWidth = size.contentSize[0];
+          const tooltipHeight = size.contentSize[1];
+          
+          // Default position (right of cursor)
+          let x = point[0] + 15;
+          let y = point[1] - 25;
+          
+          // Check right boundary - if tooltip would go off screen, show on left
+          if (x + tooltipWidth > chartWidth - 10) {
+            x = point[0] - tooltipWidth - 15;
+          }
+          
+          // Check left boundary
+          if (x < 10) {
+            x = 10;
+          }
+          
+          // Check bottom boundary
+          if (y + tooltipHeight > chartHeight - 10) {
+            y = chartHeight - tooltipHeight - 10;
+          }
+          
+          // Check top boundary
+          if (y < 10) {
+            y = 10;
+          }
+          
+          return [x, y];
         },
         formatter: (params: any[]) => {
           if (!params?.length) return '';
