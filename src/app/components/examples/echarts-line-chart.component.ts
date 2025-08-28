@@ -1850,6 +1850,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Get the proper display name for the device (same as sidebar)
     const deviceName = this.getEntityDisplayName(entityName);
     
+    // Get the entity ID from the datasource
+    let deviceId = '';
+    const entityData = this.ctx?.data?.find(d => d.datasource?.entityName === entityName);
+    if (entityData?.datasource?.entityId) {
+      const entityId = entityData.datasource.entityId;
+      deviceId = typeof entityId === 'string' 
+        ? entityId 
+        : (entityId as any).id || '';
+    }
+    
     // Helper function to limit string length
     const limitString = (str: string, maxLength: number): string => {
       if (str.length <= maxLength) return str;
@@ -1868,8 +1878,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       return limitString(label, parseInt(limit, 10));
     });
     
+    result = result.replace(/\{deviceId\.limit\((\d+)\)\}/g, (match, limit) => {
+      return limitString(deviceId, parseInt(limit, 10));
+    });
+    
     // Replace placeholders
     result = result.replace(/\{device\}/g, deviceName);
+    result = result.replace(/\{deviceId\}/g, deviceId);
     result = result.replace(/\{label\}/g, label);
     
     if (value !== undefined) {

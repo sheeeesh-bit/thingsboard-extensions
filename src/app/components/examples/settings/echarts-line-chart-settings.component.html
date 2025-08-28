@@ -333,6 +333,7 @@
             <small class="help-text">Available variables:</small>
             <ul class="help-list">
               <li><code>{{ '{' }}device{{ '}' }}</code> - Device name</li>
+              <li><code>{{ '{' }}deviceId{{ '}' }}</code> - Device ID</li>
               <li><code>{{ '{' }}label{{ '}' }}</code> - Series label</li>
               <li><code>{{ '{' }}value{{ '}' }}</code> - Data value</li>
               <li><code>{{ '{' }}unit{{ '}' }}</code> - Unit (if available)</li>
@@ -343,6 +344,7 @@
               <li><code>{{ '{' }}device.limit(10){{ '}' }} | {{ '{' }}label{{ '}' }}</code></li>
               <li><code>[{{ '{' }}device{{ '}' }}] {{ '{' }}label{{ '}' }}: {{ '{' }}value{{ '}' }}</code></li>
               <li><code>{{ '{' }}label.limit(15){{ '}' }} = {{ '{' }}value{{ '}' }} {{ '{' }}unit{{ '}' }}</code></li>
+              <li><code>{{ '{' }}device{{ '}' }} ({{ '{' }}deviceId.limit(8){{ '}' }})</code></li>
             </ul>
           </div>
         </div>
