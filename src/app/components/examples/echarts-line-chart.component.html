@@ -137,7 +137,7 @@
              class="color-box"
              [class.color-box--disabled]="!entity.visible"
              [style.background-color]="entity.color"
-             [title]="'label: ' + entity.label + (entity.deviceName ? ' (deviceName: ' + entity.deviceName + ')' : '') + '\nData from entity server scope attributes\nClick to toggle'"
+             [title]="entity.label + (entity.deviceName ? ' (' + entity.deviceName + ')' : '')"
              (click)="toggleEntityVisibility(entity.name)">
         </div>
       </div>
