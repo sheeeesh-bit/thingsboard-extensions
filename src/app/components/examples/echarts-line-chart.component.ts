@@ -1842,10 +1842,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
     }
     
-    // Extract device and label from series name
+    // Extract entity name and label from series name
     const parts = seriesName.split(' :: ');
-    const deviceName = parts.length > 1 ? parts[0] : '';
+    const entityName = parts.length > 1 ? parts[0] : '';
     const label = parts.length > 1 ? parts[1] : seriesName;
+    
+    // Get the proper display name for the device (same as sidebar)
+    const deviceName = this.getEntityDisplayName(entityName);
     
     // Helper function to limit string length
     const limitString = (str: string, maxLength: number): string => {
