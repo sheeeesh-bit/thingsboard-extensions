@@ -131,11 +131,22 @@
         </table>
       </div>
       
-      <!-- Colors only mode (when visible or collapsed with colors mode) -->
-      <div class="colors-container" *ngIf="(isSidebarVisible && sidebarDisplayMode === 'colors') || (!isSidebarVisible && sidebarCollapsedMode === 'colors')">
+      <!-- Colors only mode when sidebar is expanded -->
+      <div class="colors-container" *ngIf="isSidebarVisible && sidebarDisplayMode === 'colors'">
         <div *ngFor="let entity of entityList" 
              class="color-box"
              [class.color-box--disabled]="!entity.visible"
+             [style.background-color]="entity.color"
+             [title]="entity.label + (entity.deviceName ? ' (' + entity.deviceName + ')' : '')"
+             (click)="toggleEntityVisibility(entity.name)">
+        </div>
+      </div>
+      
+      <!-- Colors mode when sidebar is collapsed - use swatch-box style like full mode -->
+      <div class="colors-container collapsed-swatches" *ngIf="!isSidebarVisible && sidebarCollapsedMode === 'colors'">
+        <div *ngFor="let entity of entityList" 
+             class="swatch-box"
+             [class.swatch-disabled]="!entity.visible"
              [style.background-color]="entity.color"
              [title]="entity.label + (entity.deviceName ? ' (' + entity.deviceName + ')' : '')"
              (click)="toggleEntityVisibility(entity.name)">

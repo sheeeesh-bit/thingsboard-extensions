@@ -468,6 +468,27 @@ div[fxFlex] {
         filter: grayscale(0.5);
       }
     }
+    
+    // When collapsed, use smaller swatch-box style from full mode
+    &.collapsed-swatches {
+      align-items: center;
+      gap: 8px;
+      
+      .swatch-box {
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        
+        &:hover {
+          transform: scale(1.15);
+          box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        &.swatch-disabled {
+          opacity: 0.3;
+          filter: grayscale(0.5);
+        }
+      }
+    }
   }
   
   
