@@ -4244,7 +4244,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       tooltip: {
         trigger: 'axis',
         triggerOn: 'mousemove|click',
-        confine: false,
+        confine: true,  // Keep tooltip within chart bounds
         animation: false,
         transitionDuration: 0,
         renderMode: 'html',  // HTML mode for proper formatting
@@ -4287,32 +4287,37 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           const chartWidth = this.chart?.getWidth() || window.innerWidth;
           const chartHeight = this.chart?.getHeight() || window.innerHeight;
           
-          // Tooltip dimensions
-          const tooltipWidth = size.contentSize[0];
-          const tooltipHeight = size.contentSize[1];
+          // Tooltip dimensions - with fallback values
+          const tooltipWidth = size?.contentSize?.[0] || 200;
+          const tooltipHeight = size?.contentSize?.[1] || 100;
           
-          // Default position (right of cursor)
-          let x = point[0] + 15;
-          let y = point[1] - 25;
+          // Cursor offset
+          const offsetX = 15;
+          const offsetY = 15;
+          const margin = 10;
           
-          // Check right boundary - if tooltip would go off screen, show on left
-          if (x + tooltipWidth > chartWidth - 10) {
-            x = point[0] - tooltipWidth - 15;
+          // Calculate position - prefer right side, but flip if needed
+          let x = point[0] + offsetX;
+          let y = point[1] - offsetY;
+          
+          // Check if tooltip fits on the right
+          if (x + tooltipWidth + margin > chartWidth) {
+            // Try left side
+            x = point[0] - tooltipWidth - offsetX;
+            
+            // If still doesn't fit, align with right edge
+            if (x < margin) {
+              x = Math.min(point[0] + offsetX, chartWidth - tooltipWidth - margin);
+              if (x < margin) x = margin;
+            }
           }
           
-          // Check left boundary
-          if (x < 10) {
-            x = 10;
+          // Vertical boundary check
+          if (y < margin) {
+            y = point[1] + offsetY;  // Try below cursor
           }
-          
-          // Check bottom boundary
-          if (y + tooltipHeight > chartHeight - 10) {
-            y = chartHeight - tooltipHeight - 10;
-          }
-          
-          // Check top boundary
-          if (y < 10) {
-            y = 10;
+          if (y + tooltipHeight + margin > chartHeight) {
+            y = Math.max(margin, chartHeight - tooltipHeight - margin);
           }
           
           return [x, y];
