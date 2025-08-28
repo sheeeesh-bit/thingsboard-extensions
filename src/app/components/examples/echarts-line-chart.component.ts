@@ -237,7 +237,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // Sidebar state
   public isSidebarVisible = true;
   public sidebarDisplayMode: 'full' | 'compact' | 'colors' = 'full';
-  public sidebarCollapsedMode: 'hidden' | 'icons' | 'colors' | 'dots' = 'hidden';
+  public sidebarCollapsedMode: 'hidden' | 'colors' = 'hidden';
   public sidebarWidth = 240; // Default width, will be calculated dynamically
   
   // UI feedback states

@@ -22,7 +22,7 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   sidebarDisplayMode?: 'full' | 'compact' | 'colors';  // How to display the sidebar
   
   // Sidebar Settings
-  sidebarCollapsedMode?: 'hidden' | 'icons' | 'colors' | 'dots';  // How sidebar appears when collapsed
+  sidebarCollapsedMode?: 'hidden' | 'colors';  // How sidebar appears when collapsed
   
   
   // Data Point Settings

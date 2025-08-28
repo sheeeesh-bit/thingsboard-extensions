@@ -178,19 +178,9 @@
               Hidden
             </button>
             <button type="button" class="segment"
-                    [class.active]="echartsLineChartSettingsForm.get('sidebarCollapsedMode')?.value === 'icons'"
-                    (click)="echartsLineChartSettingsForm.get('sidebarCollapsedMode')?.setValue('icons')">
-              Icons
-            </button>
-            <button type="button" class="segment"
                     [class.active]="echartsLineChartSettingsForm.get('sidebarCollapsedMode')?.value === 'colors'"
                     (click)="echartsLineChartSettingsForm.get('sidebarCollapsedMode')?.setValue('colors')">
               Colors
-            </button>
-            <button type="button" class="segment"
-                    [class.active]="echartsLineChartSettingsForm.get('sidebarCollapsedMode')?.value === 'dots'"
-                    (click)="echartsLineChartSettingsForm.get('sidebarCollapsedMode')?.setValue('dots')">
-              Dots
             </button>
           </div>
         </div>
