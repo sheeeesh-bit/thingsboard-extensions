@@ -453,7 +453,8 @@ div[fxFlex] {
     // Use swatch-box style for colors mode (both expanded and collapsed)
     &.swatch-style {
       align-items: center;
-      gap: 8px;
+      gap: 4px; // Tighter spacing to match table rows
+      padding: 8px 12px;
       
       .swatch-box {
         width: 24px;
@@ -465,6 +466,20 @@ div[fxFlex] {
           0 1px 3px rgba(0, 0, 0, 0.12),
           0 1px 2px rgba(0, 0, 0, 0.08);
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+        
+        // Glossy/shiny effect like in full mode
+        &::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 40%;
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent);
+          pointer-events: none;
+        }
         
         &:hover {
           transform: scale(1.15);
@@ -474,6 +489,7 @@ div[fxFlex] {
         &.swatch-disabled {
           opacity: 0.3;
           filter: grayscale(0.5);
+          background: linear-gradient(135deg, #e0e0e0, #bdbdbd) !important;
         }
       }
     }
