@@ -237,7 +237,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // Sidebar state
   public isSidebarVisible = true;
   public sidebarDisplayMode: 'full' | 'compact' | 'colors' = 'full';
-  public sidebarCollapsedMode: 'hidden' | 'colors' = 'hidden';
+  public sidebarCollapsedMode: 'hidden' | 'icons' | 'colors' | 'dots' = 'hidden';
   public sidebarWidth = 240; // Default width, will be calculated dynamically
   
   // UI feedback states
@@ -289,8 +289,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   ngOnInit(): void {
     
-    // Initialize sidebar display mode from settings
+    // Initialize sidebar settings
     this.sidebarDisplayMode = this.ctx.settings?.sidebarDisplayMode || 'full';
+    this.sidebarCollapsedMode = this.ctx.settings?.sidebarCollapsedMode || 'hidden';
     
     // Initialize color scheme
     this.currentColorScheme = this.ctx.settings?.colorScheme || 'default';

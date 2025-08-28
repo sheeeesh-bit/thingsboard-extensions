@@ -21,6 +21,9 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   customEntityAttribute?: string;  // Custom attribute name if 'custom' is selected
   sidebarDisplayMode?: 'full' | 'compact' | 'colors';  // How to display the sidebar
   
+  // Sidebar Settings
+  sidebarCollapsedMode?: 'hidden' | 'icons' | 'colors' | 'dots';  // How sidebar appears when collapsed
+  
   
   // Data Point Settings
   showDataPoints?: boolean;
@@ -133,6 +136,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
   // Track which sections are expanded
   public expandedSections: { [key: string]: boolean } = {
     design: true,      // Default expanded
+    sidebar: false,
     grid: false,
     tooltip: false,
     export: false,
@@ -164,6 +168,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       entityDisplayAttribute: 'label',  // Default to label attribute
       customEntityAttribute: '',
       sidebarDisplayMode: 'full',  // Default to full table view
+      sidebarCollapsedMode: 'hidden',  // Default to hidden when collapsed
       showDataPoints: false,
       symbolSize_data: 5,
       lineWidth: 3,
@@ -245,6 +250,9 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       entityDisplayAttribute: [settings.entityDisplayAttribute || 'label'],
       customEntityAttribute: [settings.customEntityAttribute || ''],
       sidebarDisplayMode: [settings.sidebarDisplayMode || 'full'],
+      
+      // Sidebar Settings
+      sidebarCollapsedMode: [settings.sidebarCollapsedMode || 'hidden'],
       
       // Graph Settings
       smooth: [settings.smooth],
