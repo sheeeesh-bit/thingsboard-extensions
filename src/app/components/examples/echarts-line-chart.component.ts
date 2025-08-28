@@ -1694,6 +1694,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   public openSettingsDialog(): void {
+    const alarmSupportEnabled = this.ctx.settings?.alarmSupportEnabled === true;
     const dialogRef = this.dialog.open(EchartsSettingsDialogComponent, {
       width: '500px',
       data: { 

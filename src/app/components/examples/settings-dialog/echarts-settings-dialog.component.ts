@@ -273,8 +273,8 @@ export interface SettingsDialogData {
           </div>
         </div>
         
-        <!-- Alarm Overlays Section -->
-        <div class="settings-card">
+        <!-- Alarm Section - Only show if either overlay or lines dialog is enabled -->
+        <div class="settings-card" *ngIf="data.showAlarmOverlayInDialog !== false || data.showAlarmLinesInDialog !== false">
           <div class="card-header">
             <div class="icon-wrapper alarm-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
