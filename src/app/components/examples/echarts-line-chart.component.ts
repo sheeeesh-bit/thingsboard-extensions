@@ -1848,7 +1848,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const label = parts.length > 1 ? parts[1] : seriesName;
     
     // Get the proper display name for the device (same as sidebar)
-    const deviceName = this.getEntityDisplayName(entityName);
+    const deviceDisplayName = this.getEntityDisplayName(entityName);
+    
+    // Get the deviceName attribute (what shows in parentheses in sidebar)
+    const attrs = this.getEntityAttributes(entityName);
+    const deviceName = attrs.deviceName || '';
     
     // Get the entity ID from the datasource
     let deviceId = '';
@@ -1871,6 +1875,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Handle .limit() functions first
     result = result.replace(/\{device\.limit\((\d+)\)\}/g, (match, limit) => {
+      return limitString(deviceDisplayName, parseInt(limit, 10));
+    });
+    
+    result = result.replace(/\{deviceName\.limit\((\d+)\)\}/g, (match, limit) => {
       return limitString(deviceName, parseInt(limit, 10));
     });
     
@@ -1883,7 +1891,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     });
     
     // Replace placeholders
-    result = result.replace(/\{device\}/g, deviceName);
+    result = result.replace(/\{device\}/g, deviceDisplayName);
+    result = result.replace(/\{deviceName\}/g, deviceName);
     result = result.replace(/\{deviceId\}/g, deviceId);
     result = result.replace(/\{label\}/g, label);
     
