@@ -805,6 +805,8 @@ div[fxFlex] {
   width: 100%;
   margin: 0;
   padding: 0;
+  padding-left: 30px; // Shift chart area to avoid sidebar toggle overlap
+  box-sizing: border-box; // Prevent width overflow with padding
   min-width: 600px;
 }
 

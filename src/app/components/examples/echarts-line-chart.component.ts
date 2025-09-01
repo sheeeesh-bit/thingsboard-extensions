@@ -266,6 +266,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public toggleSidebar(): void {
     this.isSidebarVisible = !this.isSidebarVisible;
     
+    // Update margins and sync overlays immediately
+    const margins = this.getPlotMargins();
+    this.syncLegendToGridMargins(margins.left, margins.right);
+    
+    // Force grid reset to apply new margins
+    this.resetGrid = true;
+    
     // Update grid margins immediately
     this.onDataUpdated();
     
@@ -1050,19 +1057,39 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // Unified helper for consistent plot margins across all modes
   private getPlotMargins(): { left: string; right: string } {
-    const isScrollable = this.currentGrids > (this.ctx.settings?.scrollingStartsAfter || 3);
+    // Check if sidebar feature is completely disabled
+    if (this.ctx.settings?.showEntitySidebar === false) {
+      // When sidebar is disabled entirely (no toggle button)
+      return {
+        left: '60px', // Ensure room for axis labels even without sidebar
+        right: `${this.ctx.settings?.grid_layout_right || 40}px`
+      };
+    }
     
-    // Use consistent base margins
-    const baseLeftMargin = isScrollable ? 
-      (this.currentSize === 'small' ? 12 : 10) :
-      (this.currentSize === 'small' ? 15 : 13);
+    // Calculate actual left margin based on sidebar state
+    let actualLeftMargin: number;
+    const extraGap = 12; // Fixed gap to keep sidebar toggle away from y-axis text
     
-    // Add sidebar adjustment if visible
-    const sidebarAdjustment = (this.isSidebarVisible && this.ctx.settings?.showEntitySidebar !== false) ? 5 : 0;
+    if (this.isSidebarVisible) {
+      // When sidebar is visible, the outer layout already accounts for sidebar width
+      // We need enough space for toggle button and y-axis labels
+      const base = this.ctx.settings?.grid_layout_left ?? 60;
+      actualLeftMargin = Math.max(60, base); // Minimum space for toggle + labels
+    } else if (this.sidebarCollapsedMode === 'colors') {
+      // When sidebar is collapsed to colors mode (60px width including colors)
+      actualLeftMargin = 100; // 60px colors + 40px padding
+    } else {
+      // When sidebar is completely hidden but toggle button is visible
+      actualLeftMargin = 75; // 32px toggle button + 43px padding for comfortable spacing
+    }
     
+    // Add the extra gap to ensure clean separation
+    actualLeftMargin += extraGap;
+    
+    // Convert to pixels for consistency (ECharts accepts px values in grid config)
     return {
-      left: `${baseLeftMargin + sidebarAdjustment}%`,
-      right: '1%'
+      left: `${actualLeftMargin}px`,
+      right: `${this.ctx.settings?.grid_layout_right || 40}px`
     };
   }
 
@@ -2273,6 +2300,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // Calculate sidebar width based on longest entity name
   private calculateDynamicSidebarWidth(): void {
+    const oldWidth = this.sidebarWidth;
+    
     if (!this.entityList || this.entityList.length === 0) {
       this.sidebarWidth = 240; // Default width
       return;
@@ -2300,6 +2329,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const minWidth = 180; // Minimum width
     this.sidebarWidth = Math.min(Math.max(calculatedWidth, minWidth), maxAllowedWidth);
     
+    // If width changed and sidebar is visible, update grid margins
+    if (oldWidth !== this.sidebarWidth && this.isSidebarVisible) {
+      const margins = this.getPlotMargins();
+      this.syncLegendToGridMargins(margins.left, margins.right);
+      
+      // Force grid reset to apply new margins
+      this.resetGrid = true;
+    }
   }
   
   // Toggle visibility for all series of an entity
@@ -2492,6 +2529,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       useDirtyRect: true  // Dirty rect rendering for selective updates
     });
     const initDuration = performance.now() - initStart;
+    
+    // Ensure ECharts recalculates layout with the container padding
+    setTimeout(() => {
+      if (this.chart && !this.chart.isDisposed()) {
+        this.chart.resize();
+      }
+    }, 0);
     
     // Renderer performance recommendation
     if (!useCanvasRenderer && this.totalDataPoints > 1000) {
