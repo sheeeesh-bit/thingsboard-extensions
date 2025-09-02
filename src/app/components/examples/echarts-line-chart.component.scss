@@ -1165,23 +1165,25 @@ div[fxFlex] {
     }
     
     &.active {
+      // Keep similar to normal state, just subtle changes
       background: linear-gradient(180deg, 
-        rgba(0, 122, 255, 0.9) 0%,
-        rgba(0, 92, 255, 0.9) 100%);
-      border-color: rgba(0, 122, 255, 0.3);
-      color: white;
+        rgba(245, 245, 247, 0.95) 0%, 
+        rgba(235, 235, 237, 0.9) 100%);
+      border-color: rgba(0, 0, 0, 0.15);
+      color: #1d1d1f;
       box-shadow: 
-        0 0 0 0.5px rgba(0, 122, 255, 0.4),
-        0 2px 8px rgba(0, 122, 255, 0.25),
-        0 8px 20px rgba(0, 122, 255, 0.15),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        0 0 0 0.5px rgba(0, 0, 0, 0.18),
+        0 1px 2px rgba(0, 0, 0, 0.08),
+        inset 0 1px 3px rgba(0, 0, 0, 0.05);
+      transform: scale(0.98);
       
       .material-icons {
-        color: white;
+        color: #2c2c2e; // Keep same color as normal state
       }
       
       .pulldown-arrow {
         transform: rotate(180deg);
+        color: #007aff; // Only arrow gets blue accent
       }
     }
     
