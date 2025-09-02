@@ -11,7 +11,8 @@
                 (click)="menuButtons('genImage')" 
                 class="tb-button"  
                 matTooltipPosition="above" 
-                matTooltip="Download Image">
+                matTooltip="Download Image"
+                matTooltipClass="modern-tooltip">
             <i class="material-icons">photo_camera</i>
         </button>
         
@@ -25,7 +26,7 @@
                     [disabled]="isExporting"
                     matTooltipPosition="above"
                     matTooltip="Export Data"
-                    matTooltipClass="custom-tooltip">
+                    matTooltipClass="modern-tooltip">
                 <i class="material-icons" *ngIf="!isExporting">save_alt</i>
                 <i class="material-icons rotating" *ngIf="isExporting">sync</i>
                 <span class="pulldown-label">Export</span>
@@ -45,7 +46,7 @@
                 class="tb-button" 
                 matTooltipPosition="above" 
                 matTooltip="Reset Zoom" 
-                matTooltipClass="custom-tooltip">
+                matTooltipClass="modern-tooltip">
             <i class="material-icons">restore_page</i>
         </button>
         
@@ -55,7 +56,8 @@
                 (click)="openSettingsDialog()" 
                 class="tb-button" 
                 matTooltipPosition="above" 
-                matTooltip="Widget Settings">
+                matTooltip="Widget Settings"
+                matTooltipClass="modern-tooltip">
             <i class="material-icons">settings</i>
         </button>
         
@@ -64,9 +66,13 @@
   <!-- Chart and sidebar container -->
   <div fxFlex class="echarts-layout">
     <!-- Sidebar toggle button (always visible) -->
-    <button class="sidebar-toggle-btn" 
+    <button mat-icon-button
+            class="sidebar-toggle-btn" 
+            [disableRipple]="true"
             (click)="toggleSidebar()"
-            [title]="isSidebarVisible ? 'Hide sidebar' : 'Show sidebar'"
+            [matTooltip]="isSidebarVisible ? 'Hide sidebar' : 'Show sidebar'"
+            matTooltipPosition="right"
+            matTooltipClass="modern-tooltip"
             [attr.data-sidebar-state]="!isSidebarVisible ? sidebarCollapsedMode : 'visible'"
             [attr.data-sidebar-mode]="isSidebarVisible ? sidebarDisplayMode : sidebarCollapsedMode"
             [style.left.px]="isSidebarVisible && sidebarDisplayMode !== 'colors' ? sidebarWidth : null"
@@ -105,8 +111,12 @@
               <td class="swatch-cell">
                 <div class="swatch-box" [style.background-color]="entity.color"></div>
               </td>
-              <td class="entity-name" [title]="entity.label + (entity.deviceName ? '(' + entity.deviceName + ')' : '')">{{ entity.displayName }}</td>
-              <td class="entity-count" [title]="'Series: ' + entity.count + ', Points: ' + entity.dataPoints">
+              <td class="entity-name" 
+                  [matTooltip]="entity.label + (entity.deviceName ? ' (' + entity.deviceName + ')' : '')"
+                  matTooltipClass="modern-tooltip">{{ entity.displayName }}</td>
+              <td class="entity-count" 
+                  [matTooltip]="'Series: ' + entity.count + ', Points: ' + entity.dataPoints"
+                  matTooltipClass="modern-tooltip">
                 {{ entity.count }}<span class="data-points"> ({{ entity.dataPoints }})</span>
               </td>
             </tr>
@@ -125,7 +135,9 @@
               <td class="swatch-cell">
                 <div class="swatch-box" [style.background-color]="entity.color"></div>
               </td>
-              <td class="entity-name-compact" [title]="entity.label + (entity.deviceName ? '(' + entity.deviceName + ')' : '')">
+              <td class="entity-name-compact" 
+                  [matTooltip]="entity.label + (entity.deviceName ? ' (' + entity.deviceName + ')' : '')"
+                  matTooltipClass="modern-tooltip">
                 {{ entity.displayName }}
               </td>
             </tr>
@@ -139,7 +151,8 @@
              class="swatch-box"
              [class.swatch-disabled]="!entity.visible"
              [style.background-color]="entity.color"
-             [title]="entity.label + (entity.deviceName ? ' (' + entity.deviceName + ')' : '')"
+             [matTooltip]="entity.label + (entity.deviceName ? ' (' + entity.deviceName + ')' : '')"
+             matTooltipClass="modern-tooltip"
              (click)="toggleEntityVisibility(entity.name)">
         </div>
       </div>
@@ -166,13 +179,16 @@
         <div class="legend-viewport" #legendViewport>
           <div class="legend-track" #legendTrack>
             <button *ngFor="let item of legendPageItems"
+                    mat-button
                     type="button"
                     class="legend-chip"
+                    [disableRipple]="true"
                     [class.is-off]="!item.selected"
                     [class.pulse]="lastPulsedLabel === item.label"
                     (click)="toggleLabel(item)"
                     [attr.aria-pressed]="item.selected"
-                    [title]="!canTurnOff(item.label) ? 'At least one series must remain visible' : item.label">
+                    [matTooltip]="!canTurnOff(item.label) ? 'At least one series must remain visible' : item.label"
+                    matTooltipClass="modern-tooltip">
               <span class="plot-number">{{ item.plotNumber }}</span>
               <span class="label-text">{{ item.label }}</span>
             </button>

@@ -11,14 +11,22 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatRadioModule } from '@angular/material/radio';
 import { EchartsLineChartComponent } from './echarts-line-chart.component';
+import { EchartsLineChartRefactoredComponent } from './echarts-line-chart-refactored.component';
 import { EchartsLineChartSettingsComponent } from './settings/echarts-line-chart-settings.component';
 import { EchartsLineChartDataKeySettingsComponent } from './data-key-settings/echarts-line-chart-data-key-settings.component';
 import { EchartsSettingsDialogComponent } from './settings-dialog/echarts-settings-dialog.component';
 import { DebugLoggingDialogComponent } from './debug-dialog/debug-logging-dialog.component';
 
+// Import services
+import { ChartManagementService } from '../../services/chart-management.service';
+import { DataProcessingService } from '../../services/data-processing.service';
+import { ExportService } from '../../services/export.service';
+import { ErrorHandlingService } from '../../services/error-handling.service';
+
 @NgModule({
   declarations: [
     EchartsLineChartComponent,
+    EchartsLineChartRefactoredComponent,
     EchartsLineChartSettingsComponent,
     EchartsLineChartDataKeySettingsComponent,
     EchartsSettingsDialogComponent,
@@ -38,8 +46,15 @@ import { DebugLoggingDialogComponent } from './debug-dialog/debug-logging-dialog
   ],
   exports: [
     EchartsLineChartComponent,
+    EchartsLineChartRefactoredComponent,
     EchartsLineChartSettingsComponent,
     EchartsLineChartDataKeySettingsComponent
+  ],
+  providers: [
+    ChartManagementService,
+    DataProcessingService,
+    ExportService,
+    ErrorHandlingService
   ]
 })
 
