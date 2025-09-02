@@ -21,6 +21,7 @@ import {
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import * as XLSX from 'xlsx';
+import JSZip from 'jszip';
 import { Observable, of, firstValueFrom } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { MatDialog } from '@angular/material/dialog';
@@ -101,6 +102,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public hasNoVisibleData = false;
   private isInitialLoad = true;  // Track if this is the first data load
   private hasReceivedData = false;  // Track if we've ever received data
+  public isExporting = false;  // Track export loading state
+  public showExportOptions = false;  // Track export pulldown state
   
   // Entity sidebar model
   public entityList: Array<{
@@ -3241,13 +3244,49 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
   }
 
-  public exportData(format: 'csv' | 'xls' | 'xlsx'): void {
+  public async exportData(format: 'csv' | 'xls' | 'xlsx'): Promise<void> {
     
     if (!this.ctx.data || this.ctx.data.length === 0) {
       console.warn('[Chart Widget] No data available for export');
       return;
     }
     
+    console.log(`[DEBUG EXPORT] Starting export - Format: ${format}`);
+    console.log(`[DEBUG EXPORT] Setting isExporting = true`);
+    this.isExporting = true;
+    const isMultipleDevices = this.ctx.settings?.multipleDevices;
+    console.log(`[DEBUG EXPORT] Multiple devices mode: ${isMultipleDevices}`);
+    
+    try {
+      // Check if multiple devices mode is enabled
+      if (isMultipleDevices) {
+        console.log(`[DEBUG EXPORT] Calling exportMultipleDevices`);
+        await this.exportMultipleDevices(format);
+        console.log(`[DEBUG EXPORT] exportMultipleDevices completed, isExporting = ${this.isExporting}`);
+        // Loading state is cleared inside exportMultipleDevices when download starts
+      } else {
+        console.log(`[DEBUG EXPORT] Calling exportSingleFile`);
+        this.exportSingleFile(format);
+        console.log(`[DEBUG EXPORT] exportSingleFile completed, isExporting = ${this.isExporting}`);
+      }
+    } catch (error) {
+      console.error('[Chart Widget] Export failed:', error);
+      console.log(`[DEBUG EXPORT] Error occurred, isExporting = ${this.isExporting}`);
+    } finally {
+      console.log(`[DEBUG EXPORT] In finally block - isMultipleDevices: ${isMultipleDevices}, isExporting: ${this.isExporting}`);
+      // Only clear loading state for single device exports or errors
+      // Multiple device exports clear it manually when download starts
+      if (!isMultipleDevices || this.isExporting) {
+        console.log(`[DEBUG EXPORT] Setting isExporting = false in finally block`);
+        this.isExporting = false;
+      } else {
+        console.log(`[DEBUG EXPORT] NOT setting isExporting = false in finally block (should have been cleared already)`);
+      }
+      console.log(`[DEBUG EXPORT] Final isExporting state: ${this.isExporting}`);
+    }
+  }
+
+  private exportSingleFile(format: 'csv' | 'xls' | 'xlsx'): void {
     // Build dynamic headers based on actual data keys
     const headers = ['Timestamp'];
     const dataKeyOrder: string[] = [];
@@ -3489,6 +3528,371 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.downloadFileWithDynamicName(blob, 'xlsx');
     }
     
+  }
+
+  private async exportMultipleDevices(format: 'csv' | 'xls' | 'xlsx'): Promise<void> {
+    console.log(`[DEBUG MULTIPLE] exportMultipleDevices started, isExporting = ${this.isExporting}`);
+    
+    // Group data by device (entity name)
+    const deviceDataMap = new Map<string, any[]>();
+    
+    this.ctx.data.forEach((series) => {
+      const entityName = series.datasource?.entityName || 'Unknown Device';
+      if (!deviceDataMap.has(entityName)) {
+        deviceDataMap.set(entityName, []);
+      }
+      deviceDataMap.get(entityName)!.push(series);
+    });
+
+    console.log(`[DEBUG MULTIPLE] Found ${deviceDataMap.size} devices`);
+
+    if (deviceDataMap.size === 0) {
+      console.warn('[Chart Widget] No device data available for export');
+      return;
+    }
+
+    // Create ZIP archive
+    console.log(`[DEBUG MULTIPLE] Creating ZIP archive`);
+    const zip = new JSZip();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+
+    // Process each device - filter out devices with no data points
+    let exportedDeviceCount = 0;
+    for (const [entityName, deviceSeries] of deviceDataMap.entries()) {
+      // Check if this device has any data points
+      const totalDataPoints = deviceSeries.reduce((sum, series) => 
+        sum + (series.data?.length || 0), 0);
+      
+      if (totalDataPoints === 0) {
+        console.log(`[Chart Widget] Skipping device "${entityName}" - no data points`);
+        continue;
+      }
+      
+      console.log(`[DEBUG MULTIPLE] Processing device "${entityName}" with ${totalDataPoints} data points`);
+      const { blob, filename } = await this.createDeviceFile(entityName, deviceSeries, format);
+      zip.file(filename, blob);
+      exportedDeviceCount++;
+    }
+
+    console.log(`[DEBUG MULTIPLE] Processed ${exportedDeviceCount} devices with data`);
+
+    if (exportedDeviceCount === 0) {
+      console.log(`[DEBUG MULTIPLE] No devices with data points - throwing error, isExporting = ${this.isExporting}`);
+      throw new Error('No devices with data points found for export. All devices have been skipped.');
+    }
+
+    // Generate ZIP and download
+    console.log(`[DEBUG MULTIPLE] Generating ZIP blob, isExporting = ${this.isExporting}`);
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    console.log(`[DEBUG MULTIPLE] ZIP blob generated, isExporting = ${this.isExporting}`);
+    
+    const zipFilename = `multiple-devices-export_${timestamp}.zip`;
+    
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      console.log(`[DEBUG MULTIPLE] Creating download link, isExporting = ${this.isExporting}`);
+      const url = URL.createObjectURL(zipBlob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', zipFilename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      
+      console.log(`[DEBUG MULTIPLE] About to click download link, isExporting = ${this.isExporting}`);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clear loading state immediately after download starts and trigger change detection
+      console.log(`[DEBUG MULTIPLE] Setting isExporting = false after download click`);
+      this.isExporting = false;
+      console.log(`[DEBUG MULTIPLE] Loading state cleared, isExporting = ${this.isExporting}`);
+      
+      // Trigger change detection immediately to update UI
+      if (this.ctx && this.ctx.detectChanges) {
+        console.log(`[DEBUG MULTIPLE] Triggering change detection`);
+        this.ctx.detectChanges();
+      }
+      
+      // Cleanup URL after a brief delay to ensure download started
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } else {
+      console.log(`[DEBUG MULTIPLE] Download not supported, isExporting = ${this.isExporting}`);
+    }
+    
+    console.log(`[DEBUG MULTIPLE] exportMultipleDevices completed, isExporting = ${this.isExporting}`);
+  }
+
+  private async createDeviceFile(entityName: string, deviceSeries: any[], format: 'csv' | 'xls' | 'xlsx'): Promise<{ blob: Blob; filename: string }> {
+    // Get device display name and attributes for filename using same logic as main export
+    const attrs = this.getEntityAttributes(entityName);
+    const label = attrs.label || this.getEntityDisplayName(entityName);
+    const deviceName = attrs.deviceName || 'unknown';
+    
+    // Build dynamic headers based on device's data keys
+    const headers = ['Timestamp'];
+    const dataKeyOrder: string[] = [];
+    
+    deviceSeries.forEach((series) => {
+      const seriesName = series.dataKey.label || series.dataKey.name;
+      if (!dataKeyOrder.includes(seriesName)) {
+        dataKeyOrder.push(seriesName);
+        headers.push(seriesName);
+      }
+    });
+    
+    // Group points by timestamp for this device
+    const timestampMap = new Map<number, Record<string, number>>();
+    
+    deviceSeries.forEach((series) => {
+      if (series.data) {
+        series.data.forEach((point) => {
+          const timestamp = point[0];
+          const value = point[1];
+          
+          if (!timestampMap.has(timestamp)) {
+            timestampMap.set(timestamp, {});
+          }
+          
+          const seriesName = series.dataKey.label || series.dataKey.name;
+          timestampMap.get(timestamp)![seriesName] = value;
+        });
+      }
+    });
+    
+    // Sort timestamps
+    const sortedTimestamps = Array.from(timestampMap.keys()).sort((a, b) => a - b);
+    
+    // Calculate metadata
+    const seriesCount = dataKeyOrder.length;
+    const totalDataPoints = deviceSeries.reduce((sum, series) => 
+      sum + (series.data?.length || 0), 0);
+    
+    // Create data rows
+    const dataRows: any[] = [];
+    sortedTimestamps.forEach((timestamp) => {
+      const dataPoint = timestampMap.get(timestamp)!;
+      const row: any[] = [this.formatLocalTimestamp(timestamp)];
+      
+      dataKeyOrder.forEach((key) => {
+        const value = dataPoint[key];
+        const series = deviceSeries.find(s => 
+          (s.dataKey.label || s.dataKey.name) === key
+        );
+        const decimals = this.ctx.settings?.exportDecimals ?? series?.dataKey?.decimals ?? this.ctx.decimals ?? 6;
+        row.push(this.formatNum(value, decimals));
+      });
+      
+      dataRows.push(row);
+    });
+
+    // Generate filename with proper format - same as main export
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const ms = String(now.getMilliseconds()).padStart(3, '0');
+    
+    // Format: label[deviceName]_YYYY-MM-DD_HH-mm-ss-SSS.ext
+    const timestamp = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}-${ms}`;
+    const sanitizedLabel = label.replace(/[^a-zA-Z0-9-_[\]]/g, '_');
+    const sanitizedDeviceName = deviceName.replace(/[^a-zA-Z0-9-_[\]]/g, '_');
+    const filename = `${sanitizedLabel}[${sanitizedDeviceName}]_${timestamp}.${format}`;
+
+    let blob: Blob;
+
+    if (format === 'csv') {
+      // Generate CSV content with metadata headers
+      let csvContent = '';
+      
+      // Add metadata rows
+      csvContent += `Label: ${label}\n`;
+      csvContent += `Device ID: ${deviceName}\n`;
+      csvContent += `Series Count: ${seriesCount}\n`;
+      csvContent += `Data Points: ${totalDataPoints}\n`;
+      csvContent += '\n'; // Empty line separator
+      
+      // Add data headers and rows
+      csvContent += headers.join(';') + '\n';
+      dataRows.forEach(row => {
+        csvContent += row.join(';') + '\n';
+      });
+      blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+
+    } else if (format === 'xls') {
+      // Generate XLS (HTML) content
+      // Remove invalid Excel sheet name characters: : \ / ? * [ ]
+      const sanitizedLabel = label.replace(/[:\\\/\?\*\[\]]/g, '_');
+      const sheetName = sanitizedLabel.length > 31 ? sanitizedLabel.substring(0, 31) : sanitizedLabel;
+      
+      let htmlContent = '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+                       'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
+                       'xmlns="http://www.w3.org/TR/REC-html40">\n';
+      htmlContent += '<meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8"/>\n';
+      htmlContent += '<head><!--[if gte mso 9]><xml>\n';
+      htmlContent += '<x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>';
+      htmlContent += `<x:Name>${sheetName}</x:Name>`;
+      htmlContent += '<x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>';
+      htmlContent += '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook>';
+      htmlContent += '</xml><![endif]--></head>\n';
+      htmlContent += '<body><table>';
+      
+      // Add metadata rows
+      htmlContent += `<tr><td colspan="${headers.length}"><b>Label:</b> ${label}</td></tr>`;
+      htmlContent += `<tr><td colspan="${headers.length}"><b>Device ID:</b> ${deviceName}</td></tr>`;
+      htmlContent += `<tr><td colspan="${headers.length}"><b>Series Count:</b> ${seriesCount}</td></tr>`;
+      htmlContent += `<tr><td colspan="${headers.length}"><b>Data Points:</b> ${totalDataPoints}</td></tr>`;
+      htmlContent += '<tr><td colspan="' + headers.length + '">&nbsp;</td></tr>'; // Empty row
+      
+      // Add data headers
+      htmlContent += '<tr>';
+      headers.forEach(header => {
+        htmlContent += `<td><b>${header}</b></td>`;
+      });
+      htmlContent += '</tr>';
+      
+      // Add data rows
+      dataRows.forEach(row => {
+        htmlContent += '<tr>';
+        row.forEach((cell: any) => {
+          htmlContent += `<td>${cell}</td>`;
+        });
+        htmlContent += '</tr>';
+      });
+      
+      htmlContent += '</table></body></html>';
+      blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel' });
+
+    } else { // xlsx
+      // Generate XLSX content
+      const xlsxDataRows: any[] = [];
+      sortedTimestamps.forEach((timestamp) => {
+        const dataPoint = timestampMap.get(timestamp)!;
+        const row: any[] = [this.formatLocalTimestamp(timestamp)];
+        
+        dataKeyOrder.forEach((key) => {
+          const value = dataPoint[key];
+          const series = deviceSeries.find(s => 
+            (s.dataKey.label || s.dataKey.name) === key
+          );
+          const decimals = this.ctx.settings?.exportDecimals ?? series?.dataKey?.decimals ?? this.ctx.decimals ?? 6;
+          
+          const numValue = Number(value);
+          if (isFinite(numValue)) {
+            const roundedValue = parseFloat(numValue.toFixed(decimals));
+            row.push(roundedValue);
+          } else {
+            row.push('');
+          }
+        });
+        
+        xlsxDataRows.push(row);
+      });
+      
+      // Create XLSX data with metadata headers
+      const metadataRows = [
+        [`Label: ${label}`],
+        [`Device ID: ${deviceName}`],
+        [`Series Count: ${seriesCount}`],
+        [`Data Points: ${totalDataPoints}`],
+        [], // Empty row
+      ];
+      
+      const worksheet_data = [...metadataRows, headers, ...xlsxDataRows];
+      const worksheet = XLSX.utils.aoa_to_sheet(worksheet_data);
+      
+      // Apply styling to metadata rows (bold)
+      for (let row = 0; row < metadataRows.length - 1; row++) { // -1 to skip empty row
+        const cellRef = XLSX.utils.encode_cell({ r: row, c: 0 });
+        if (worksheet[cellRef]) {
+          worksheet[cellRef].s = {
+            font: { bold: true, color: { rgb: "000000" } }
+          };
+        }
+      }
+      
+      // Apply header styling (headers are now at row 5 after metadata)
+      const headerRowIndex = metadataRows.length;
+      const headerRange = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');
+      for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
+        const cellRef = XLSX.utils.encode_cell({ r: headerRowIndex, c: col });
+        if (worksheet[cellRef]) {
+          worksheet[cellRef].s = {
+            font: { bold: true, color: { rgb: "000000" } },
+            fill: { fgColor: { rgb: "E0E0E0" } },
+            alignment: { horizontal: "center", vertical: "center" }
+          };
+        }
+      }
+      
+      // Apply number formatting to data cells (now starting after metadata + headers)
+      for (let row = headerRowIndex + 1; row <= headerRowIndex + xlsxDataRows.length; row++) {
+        for (let col = 1; col < headers.length; col++) {
+          const cellRef = XLSX.utils.encode_cell({ r: row, c: col });
+          if (worksheet[cellRef] && typeof worksheet[cellRef].v === 'number') {
+            worksheet[cellRef].t = 'n';
+          }
+        }
+      }
+      
+      // Set column widths
+      const columnWidths = headers.map((header, index) => {
+        let maxWidth = header.length;
+        xlsxDataRows.forEach(row => {
+          const cellValue = row[index];
+          if (cellValue !== undefined && cellValue !== null) {
+            const strLength = cellValue.toString().length;
+            if (strLength > maxWidth) {
+              maxWidth = strLength;
+            }
+          }
+        });
+        return { wch: Math.min(Math.max(maxWidth + 2, 10), 50) };
+      });
+      worksheet['!cols'] = columnWidths;
+      
+      // Add autofilter
+      worksheet['!autofilter'] = { ref: worksheet['!ref'] || 'A1:A1' };
+      
+      // Create workbook with sanitized and truncated sheet name (Excel limits: no invalid chars, 31 chars max)
+      const workbook = XLSX.utils.book_new();
+      const sanitizedLabel = label.replace(/[:\\\/\?\*\[\]]/g, '_');
+      const truncatedSheetName = sanitizedLabel.length > 31 ? sanitizedLabel.substring(0, 31) : sanitizedLabel;
+      XLSX.utils.book_append_sheet(workbook, worksheet, truncatedSheetName);
+      
+      // Set workbook properties
+      workbook.Props = {
+        Title: label,
+        Subject: 'ThingsBoard Chart Data Export',
+        Author: 'ThingsBoard',
+        Manager: 'ThingsBoard Platform',
+        Company: 'ThingsBoard',
+        Category: 'IoT Data',
+        Keywords: 'ThingsBoard, IoT, Time Series',
+        Comments: `Exported from ${label} device`,
+        CreatedDate: new Date(),
+        ModifiedDate: new Date(),
+        Application: 'ThingsBoard Platform',
+        AppVersion: '3.0'
+      };
+      
+      const excelBuffer = XLSX.write(workbook, { 
+        bookType: 'xlsx', 
+        type: 'array',
+        bookSST: true,
+        compression: true,
+        Props: workbook.Props,
+        cellDates: false,
+        cellStyles: true
+      });
+      
+      blob = new Blob([excelBuffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+    }
+
+    return { blob, filename };
   }
   
 

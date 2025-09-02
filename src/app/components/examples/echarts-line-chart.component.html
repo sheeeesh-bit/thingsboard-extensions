@@ -7,6 +7,7 @@
     <div class="tb-button-container" *ngIf="ctx.settings.showImageButton !== false || ctx.settings.showExportButton !== false || ctx.settings.showResetZoomButton !== false">
         <button *ngIf="ctx.settings.showImageButton !== false" 
                 mat-icon-button 
+                [disableRipple]="true"
                 (click)="menuButtons('genImage')" 
                 class="tb-button"  
                 matTooltipPosition="above" 
@@ -14,18 +15,32 @@
             <i class="material-icons">photo_camera</i>
         </button>
         
-        <!-- Export dropdown menu -->
-        <button *ngIf="ctx.settings.showExportButton !== false"
-                mat-icon-button 
-                [matMenuTriggerFor]="exportMenu" 
-                class="tb-button" 
-                matTooltipPosition="above" 
-                matTooltip="Export Data">
-            <i class="material-icons">save_alt</i>
-        </button>
+        <!-- Export pull-down button group -->
+        <div *ngIf="ctx.settings.showExportButton !== false" 
+             class="export-pulldown"
+             [class.loading]="isExporting">
+            <button class="pulldown-trigger"
+                    [class.active]="showExportOptions"
+                    (click)="showExportOptions = !showExportOptions"
+                    [disabled]="isExporting"
+                    matTooltipPosition="above"
+                    matTooltip="Export Data"
+                    matTooltipClass="custom-tooltip">
+                <i class="material-icons" *ngIf="!isExporting">save_alt</i>
+                <i class="material-icons rotating" *ngIf="isExporting">sync</i>
+                <span class="pulldown-label">Export</span>
+                <i class="material-icons pulldown-arrow">expand_more</i>
+            </button>
+            <div class="pulldown-options" *ngIf="showExportOptions && !isExporting">
+                <button class="option-button" (click)="exportData('csv'); showExportOptions = false">CSV</button>
+                <button class="option-button" (click)="exportData('xls'); showExportOptions = false">XLS</button>
+                <button class="option-button" (click)="exportData('xlsx'); showExportOptions = false">XLSX</button>
+            </div>
+        </div>
         
         <button *ngIf="ctx.settings.showResetZoomButton !== false"
                 mat-icon-button 
+                [disableRipple]="true"
                 (click)="menuButtons('reset')" 
                 class="tb-button" 
                 matTooltipPosition="above" 
@@ -36,6 +51,7 @@
         
         <!-- Settings Dialog Button -->
         <button mat-icon-button 
+                [disableRipple]="true"
                 (click)="openSettingsDialog()" 
                 class="tb-button" 
                 matTooltipPosition="above" 
@@ -43,20 +59,6 @@
             <i class="material-icons">settings</i>
         </button>
         
-        <mat-menu #exportMenu="matMenu">
-            <button mat-menu-item (click)="exportData('csv')">
-                <i class="material-icons">description</i>
-                <span>Export as CSV</span>
-            </button>
-            <button mat-menu-item (click)="exportData('xls')">
-                <i class="material-icons">table_chart</i>
-                <span>Export as XLS</span>
-            </button>
-            <button mat-menu-item (click)="exportData('xlsx')">
-                <i class="material-icons">grid_on</i>
-                <span>Export as XLSX</span>
-            </button>
-        </mat-menu>
     </div>
   
   <!-- Chart and sidebar container -->

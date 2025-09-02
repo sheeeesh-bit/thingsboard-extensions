@@ -60,6 +60,17 @@ button[mat-icon-button]:hover {
 
 // Glossy Apple-style buttons (like macOS Big Sur)
 button[mat-icon-button].tb-button {
+  // Remove Material Design state layer (gray circle on hover)
+  --mat-icon-button-hover-state-layer-opacity: 0;
+  --mat-icon-button-focus-state-layer-opacity: 0;
+  --mat-icon-button-pressed-state-layer-opacity: 0;
+  
+  // Hard kill the persistent ripple element
+  .mat-mdc-button-persistent-ripple::before {
+    opacity: 0 !important;
+    background: transparent !important;
+  }
+  
   border-radius: 11px !important;
   background: linear-gradient(180deg, 
     rgba(255, 255, 255, 0.9) 0%, 
@@ -120,24 +131,7 @@ button[mat-icon-button].tb-button {
     transform: translateY(-1px);
   }
   
-  // Ripple effect
-  &::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    border-radius: 50%;
-    background: rgba(0, 122, 255, 0.1);
-    transform: translate(-50%, -50%);
-    transition: width 0.3s, height 0.3s;
-  }
-  
-  &:active::after {
-    width: 100%;
-    height: 100%;
-  }
+  // Ripple effect removed - no ::after pseudo-element needed
 }
 
 // Active/selected button state
@@ -1087,5 +1081,355 @@ div[fxFlex] {
   }
   100% { 
     transform: scale(1.2);
+  }
+}
+
+// ===============================
+// Export Loading Animation
+// ===============================
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.rotating {
+  animation: rotate 1s linear infinite;
+}
+
+.tb-button.loading {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+// ===============================
+// Apple Style Pull-down Export Button
+// ===============================
+.export-pulldown {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  
+  .pulldown-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 0 10px;
+    height: 42px;
+    min-width: 42px;
+    border-radius: 11px;
+    background: linear-gradient(180deg, 
+      rgba(255, 255, 255, 0.9) 0%, 
+      rgba(255, 255, 255, 0.7) 50%,
+      rgba(255, 255, 255, 0.6) 100%);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 
+      0 0 0 0.5px rgba(0, 0, 0, 0.12),
+      0 2px 4px rgba(0, 0, 0, 0.08),
+      0 8px 16px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1d1d1f;
+    overflow: hidden;
+    position: relative;
+    
+    &:hover:not(:disabled):not(.active) {
+      background: linear-gradient(180deg, 
+        rgba(255, 255, 255, 0.95) 0%, 
+        rgba(255, 255, 255, 0.8) 50%,
+        rgba(255, 255, 255, 0.7) 100%);
+      transform: translateY(-0.5px) scale(1.02);
+      box-shadow: 
+        0 0 0 0.5px rgba(0, 0, 0, 0.15),
+        0 4px 8px rgba(0, 0, 0, 0.12),
+        0 12px 24px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+    }
+    
+    &:active:not(:disabled) {
+      transform: scale(0.96) translateY(0);
+      background: linear-gradient(180deg, 
+        #f5f5f7 0%, 
+        #ececef 100%);
+      box-shadow: 
+        0 1px 2px rgba(0, 0, 0, 0.05),
+        inset 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+    
+    &.active {
+      background: linear-gradient(180deg, 
+        rgba(0, 122, 255, 0.9) 0%,
+        rgba(0, 92, 255, 0.9) 100%);
+      border-color: rgba(0, 122, 255, 0.3);
+      color: white;
+      box-shadow: 
+        0 0 0 0.5px rgba(0, 122, 255, 0.4),
+        0 2px 8px rgba(0, 122, 255, 0.25),
+        0 8px 20px rgba(0, 122, 255, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      
+      .material-icons {
+        color: white;
+      }
+      
+      .pulldown-arrow {
+        transform: rotate(180deg);
+      }
+    }
+    
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .material-icons {
+      font-size: 22px;
+      color: #2c2c2e;
+      font-weight: 400;
+      transition: all 0.2s ease;
+      
+      &.rotating {
+        animation: rotate 1s linear infinite;
+      }
+    }
+    
+    .pulldown-label {
+      font-weight: 500;
+      margin: 0 1px;
+      letter-spacing: -0.01em;
+    }
+    
+    .pulldown-arrow {
+      font-size: 18px;
+      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      margin-left: -2px;
+    }
+  }
+  
+  .pulldown-options {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 100px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 12px;
+    box-shadow: 
+      0 0 0 0.5px rgba(0, 0, 0, 0.04),
+      0 4px 12px rgba(0, 0, 0, 0.12),
+      0 12px 32px rgba(0, 0, 0, 0.08);
+    padding: 6px;
+    z-index: 1000;
+    animation: pulldownSlide 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    transform-origin: top center;
+    overflow: hidden;
+    
+    .option-button {
+      display: block;
+      width: 100%;
+      padding: 9px 14px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      font-weight: 450;
+      letter-spacing: -0.01em;
+      color: #1d1d1f;
+      cursor: pointer;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      text-align: center;
+      position: relative;
+      
+      &:hover {
+        background: linear-gradient(180deg, 
+          rgba(0, 122, 255, 0.04) 0%, 
+          rgba(0, 122, 255, 0.08) 100%);
+        color: #007aff;
+      }
+      
+      &:active {
+        background: rgba(0, 122, 255, 0.12);
+        transform: scale(0.97);
+      }
+      
+      &:not(:last-child) {
+        margin-bottom: 2px;
+      }
+    }
+  }
+  
+  &.loading {
+    .pulldown-trigger {
+      opacity: 0.7;
+    }
+  }
+}
+
+@keyframes pulldownSlide {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+// ===============================
+// Apple Style Dropdown Menu - Minimal Design (Keep for other menus if needed)
+// ===============================
+::ng-deep .apple-style-menu {
+  .mat-mdc-menu-panel {
+    // Clean minimal border radius
+    border-radius: 14px !important;
+    
+    // Subtle shadow for depth - more refined than before
+    box-shadow: 
+      0 0 0 0.5px rgba(0, 0, 0, 0.04),
+      0 3px 8px rgba(0, 0, 0, 0.12),
+      0 8px 30px rgba(0, 0, 0, 0.08) !important;
+    
+    // Clean white background with subtle glass effect
+    border: 0.5px solid rgba(0, 0, 0, 0.06) !important;
+    backdrop-filter: blur(30px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(30px) saturate(180%) !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    
+    // Refined padding
+    padding: 6px !important;
+    min-width: 200px !important;
+    overflow: hidden !important;
+  }
+
+  .apple-menu-item {
+    // Smooth rounded corners
+    border-radius: 10px !important;
+    margin: 1px 0 !important;
+    padding: 10px 14px !important;
+    
+    // Clean typography
+    font-size: 13.5px !important;
+    font-weight: 400 !important;
+    letter-spacing: -0.01em !important;
+    color: #1d1d1f !important;
+    
+    // Smooth transitions
+    transition: all 0.15s cubic-bezier(0.4, 0.0, 0.2, 1) !important;
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    min-height: 36px !important;
+    
+    // Remove default Material ripple effect
+    &::before {
+      display: none !important;
+    }
+
+    &:hover:not([disabled]) {
+      // Subtle blue hover state
+      background: linear-gradient(180deg, 
+        rgba(0, 122, 255, 0.04) 0%, 
+        rgba(0, 122, 255, 0.08) 100%) !important;
+      color: #007aff !important;
+      
+      .material-icons {
+        color: #007aff !important;
+        transform: scale(1.05) !important;
+      }
+    }
+
+    &:active:not([disabled]) {
+      transform: scale(0.97) !important;
+      background: rgba(0, 122, 255, 0.12) !important;
+    }
+
+    &[disabled] {
+      opacity: 0.35 !important;
+      cursor: not-allowed !important;
+      color: #8e8e93 !important;
+    }
+
+    .material-icons {
+      font-size: 18px !important;
+      color: #6e6e73 !important;
+      margin-right: 0 !important;
+      transition: all 0.15s ease !important;
+    }
+
+    span:first-of-type:not(.material-icons) {
+      flex: 1 !important;
+      text-align: left !important;
+      font-weight: 450 !important;
+    }
+
+    // Multi-device badge - more subtle
+    .device-mode-badge {
+      background: linear-gradient(135deg, 
+        rgba(0, 122, 255, 0.9) 0%, 
+        rgba(90, 200, 250, 0.9) 100%) !important;
+      color: white !important;
+      font-size: 9px !important;
+      font-weight: 600 !important;
+      padding: 2px 6px !important;
+      border-radius: 10px !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.3px !important;
+      box-shadow: 0 1px 3px rgba(0, 122, 255, 0.2) !important;
+      flex: none !important;
+    }
+  }
+
+  // Add subtle divider between menu items (optional)
+  .apple-menu-item + .apple-menu-item {
+    position: relative;
+    
+    &::before {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: 14px;
+      right: 14px;
+      height: 0.5px;
+      background: rgba(0, 0, 0, 0.05);
+      display: none; // Hidden by default for cleaner look
+    }
+  }
+
+  .mat-mdc-menu-item-text {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    gap: 10px !important;
+  }
+  
+  // Smooth menu animation
+  &.mat-mdc-menu-panel {
+    animation: appleMenuSlide 0.2s cubic-bezier(0.4, 0.0, 0.2, 1) !important;
+  }
+}
+
+@keyframes appleMenuSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
