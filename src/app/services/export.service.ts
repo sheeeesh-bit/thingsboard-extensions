@@ -386,7 +386,7 @@ export class ExportService {
     }
 
     return ctx.attributeService
-      .getEntityAttributes(entity, 'SERVER_SCOPE' as string, ['label', 'deviceName'])
+      .getEntityAttributes(entity, 'SERVER_SCOPE' as any, ['label', 'deviceName'])
       .pipe(
         map((attrs: Array<{ key: string; value: string }>) => {
           const labelAttr = attrs.find(a => a.key === 'label');

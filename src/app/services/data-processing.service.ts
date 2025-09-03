@@ -45,7 +45,7 @@ export class DataProcessingService {
         }
 
         // Group data by entity
-        const entityDataMap = this.groupDataByEntity(datasource.data as ChartDataPoint[]);
+        const entityDataMap = this.groupDataByEntity(datasource.data as unknown as ChartDataPoint[]);
 
         // Create series for each entity
         entityDataMap.forEach((entityData, entityName) => {
@@ -281,7 +281,7 @@ export class DataProcessingService {
           return;
         }
 
-        (datasource.data as ChartDataPoint[]).forEach((point: ChartDataPoint) => {
+        (datasource.data as unknown as ChartDataPoint[]).forEach((point: ChartDataPoint) => {
           if (!point.entityName) return;
 
           if (!entityMap.has(point.entityName)) {
