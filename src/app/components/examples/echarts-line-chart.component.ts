@@ -5,11 +5,8 @@ import {
   Input,
   OnInit,
   ViewChild,
-  OnDestroy,
-  Renderer2,
-  Inject,
+  OnDestroy
 } from '@angular/core';
-import { DOCUMENT } from '@angular/common';
 import * as echarts from 'echarts/core';
 import { WidgetContext } from '@home/models/widget-component.models';
 import { LineChart } from 'echarts/charts';
@@ -230,11 +227,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private uiUpdateBatch: any = null;
   
   // ECharts interaction optimization state
-  
-  // Tooltip management
-  private activeTooltips = new Set<Element>();
-  private tooltipMutationObserver: MutationObserver;
-  private tooltipCleanupInterval: any;
   private pendingChartActions: Array<{type: string, name: string, legendIndex: number}> = [];
   private chartActionBatch: any = null;
   private originalAnimationState: boolean | null = null;
@@ -271,11 +263,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return this.ctx.settings?.multipleDevices ? axisPositionMapExtended : axisPositionMapStandard;
   }
   
-  constructor(
-    private dialog: MatDialog,
-    private renderer: Renderer2,
-    @Inject(DOCUMENT) private document: Document
-  ) {}
+  constructor(private dialog: MatDialog) {}
   
   // Toggle sidebar visibility
   public toggleSidebar(): void {
@@ -665,7 +653,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     if ((this as any).stateCheckInterval) {
       clearInterval((this as any).stateCheckInterval);
     }
-    
     
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
@@ -3021,22 +3008,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Store handlers for cleanup
     (this as any).windowResizeHandler = windowResizeHandler;
     (this as any).visibilityChangeHandler = visibilityChangeHandler;
-  }
-
-  private setupTooltipManagement(): void {
-    // Use CSS to ensure only one tooltip is visible at a time
-    // This approach is less invasive than JavaScript manipulation
-    const style = this.document.createElement('style');
-    style.textContent = `
-      /* Ensure only the most recently shown tooltip is visible */
-      .mat-mdc-tooltip:not(:last-child) {
-        display: none !important;
-      }
-    `;
-    this.document.head.appendChild(style);
-    
-    // Store style reference for cleanup
-    (this as any).tooltipStyleElement = style;
   }
 
   /**
