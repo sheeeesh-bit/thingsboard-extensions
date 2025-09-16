@@ -818,19 +818,11 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
   top: 0;
   z-index: 100;
   padding: 8px var(--plot-right, 1%) 6px var(--plot-left, 10%);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08); // Keep the bottom line
   display: flex;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(180deg, 
-    rgba(255, 255, 255, 0.98) 0%, 
-    rgba(252, 252, 254, 0.95) 100%);
-  backdrop-filter: saturate(180%) blur(12px);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
-  box-shadow: 
-    0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.04) inset,
-    0 2px 8px rgba(0, 0, 0, 0.04);
+  background: transparent; // Remove background
   flex-shrink: 0; // Prevent shrinking
 }
 
@@ -949,7 +941,7 @@ button[mat-button].legend-chip {
   --mat-button-hover-state-layer-opacity: 0;
   --mat-button-focus-state-layer-opacity: 0;
   --mat-button-pressed-state-layer-opacity: 0;
-  
+
   // Hard kill the persistent ripple element
   .mat-mdc-button-persistent-ripple::before {
     opacity: 0 !important;
@@ -961,6 +953,7 @@ button[mat-button].legend-chip {
   height: 30px !important;
   min-width: auto !important;
   padding: 0 12px !important;
+  margin: 1px 0 !important; // Add 1px margin top and bottom to each chip
   border-radius: 999px !important;
   border: 1px solid rgba(255, 255, 255, 0.6) !important;
   background: linear-gradient(180deg, 
