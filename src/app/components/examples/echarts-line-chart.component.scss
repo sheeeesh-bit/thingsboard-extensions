@@ -386,21 +386,23 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
     min-height: var(--legend-height, 48px);
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+    padding: 0 8px;
     background: rgba(255, 255, 255, 0.98);
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     border-bottom: 1px solid rgba(0, 0, 0, 0.06);
     z-index: 10;
     flex-shrink: 0;
-    
+
     .header-text {
       font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: #6e6e73;
-      
+      flex: 1;
+
       .device-count {
         font-weight: 400;
         color: rgba(0, 0, 0, 0.4);
@@ -408,12 +410,41 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
         font-size: 10px;
       }
     }
-    
+
     .header-icon {
       color: #6e6e73;
-      
+
       .material-icons {
         font-size: 18px;
+      }
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 2px;
+
+      .header-action-btn {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        min-height: 28px;
+        padding: 0;
+        border-radius: 6px;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        color: #6e6e73;
+
+        .material-icons {
+          font-size: 16px;
+        }
+
+        &:hover {
+          background: rgba(0, 0, 0, 0.05);
+          color: #1d1d1f;
+        }
+
+        &:active {
+          transform: scale(0.95);
+        }
       }
     }
   }
@@ -824,6 +855,30 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
   gap: 8px;
   background: transparent; // Remove background
   flex-shrink: 0; // Prevent shrinking
+
+  // Warning indicator for data issues
+  .legend-warning {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(255, 152, 0, 0.1);
+    color: #ff9800;
+    margin-right: 4px;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+
+    .material-icons {
+      font-size: 16px;
+    }
+
+    &:hover {
+      background: rgba(255, 152, 0, 0.15);
+      transform: scale(1.05);
+    }
+  }
 }
 
 // Zoom overlay at bottom

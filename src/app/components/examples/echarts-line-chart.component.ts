@@ -181,6 +181,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private currentGrids = 3;
   private currentGridNames: string[] = [];
   
+  // Plot (label) state tracking - persists across device toggles
+  private plotLabelStates = new Map<string, boolean>(); // label -> visible state
+
   // Min/Max reference lines state
   private minMaxVisible = false;
   private minMaxCache = new Map<number, { min: number; max: number }>();
@@ -295,6 +298,208 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public getSelectedDeviceCount(): number {
     if (!this.entityList) return 0;
     return this.entityList.filter(entity => entity.visible).length;
+  }
+
+  // Check if all devices are hidden (for warning indicator)
+  public hasAllDevicesHidden(): boolean {
+    if (!this.entityList || this.entityList.length === 0) return false;
+    const visibleCount = this.getSelectedDeviceCount();
+    const totalWithData = this.entityList.filter(entity => entity.dataPoints > 0).length;
+    return totalWithData > 0 && visibleCount < totalWithData;
+  }
+
+  // Check if all devices are empty (no data at all)
+  public getAllDevicesEmpty(): boolean {
+    if (!this.entityList || this.entityList.length === 0) return true;
+    return this.entityList.every(entity => entity.dataPoints === 0);
+  }
+
+  // Hide all devices
+  public hideAllDevices(): void {
+    if (!this.ctx?.data || !this.chart || !this.entityList || this.entityList.length === 0) return;
+
+    // Note: We only hide all devices/entities, but preserve plot (label) toggle states
+    // This means if a plot was manually toggled off, it stays off
+
+    // Find devices with data to ensure at least one stays visible
+    const devicesWithData: { entityName: string; seriesKeys: string[]; dataPoints: number }[] = [];
+    const allSeriesKeys: string[] = [];
+
+    // Group by entity and count data points
+    const entityGroups: Record<string, { seriesKeys: string[]; dataPoints: number }> = {};
+
+    for (const data of this.ctx.data) {
+      const entityName = data.datasource?.entityName || 'Unknown';
+      const label = data.dataKey.label;
+      const seriesKey = this.buildSeriesKey(entityName, label);
+      allSeriesKeys.push(seriesKey);
+
+      if (!entityGroups[entityName]) {
+        entityGroups[entityName] = { seriesKeys: [], dataPoints: 0 };
+      }
+      entityGroups[entityName].seriesKeys.push(seriesKey);
+
+      // Count data points for this series
+      if (data.data && Array.isArray(data.data)) {
+        entityGroups[entityName].dataPoints += data.data.length;
+      }
+    }
+
+    // Convert to array and sort by data points (descending)
+    Object.keys(entityGroups).forEach(entityName => {
+      const group = entityGroups[entityName];
+      if (group.dataPoints > 0) {
+        devicesWithData.push({
+          entityName,
+          seriesKeys: group.seriesKeys,
+          dataPoints: group.dataPoints
+        });
+      }
+    });
+
+    devicesWithData.sort((a, b) => b.dataPoints - a.dataPoints);
+
+    // Determine which series to keep visible
+    let seriesToKeepVisible: string[] = [];
+    if (devicesWithData.length > 0) {
+      // Keep the device with the most data points visible
+      const deviceToKeep = devicesWithData[0];
+      seriesToKeepVisible = deviceToKeep.seriesKeys.filter(key => {
+        // Only keep series whose plots are not manually hidden
+        const series = this.ctx.data.find(d => this.buildSeriesKey(d.datasource?.entityName || '', d.dataKey.label) === key);
+        if (series) {
+          const label = series.dataKey.label;
+          return this.plotLabelStates.get(label) !== false;
+        }
+        return true;
+      });
+    }
+
+    // Hide all series except the ones we want to keep
+    const seriesToHide = allSeriesKeys.filter(key => !seriesToKeepVisible.includes(key));
+
+    seriesToHide.forEach(key => {
+      this.batchedDispatchAction({
+        type: 'legendUnSelect',
+        name: key,
+        legendIndex: 0
+      });
+    });
+
+    // Update UI after batch operations
+    setTimeout(() => {
+      this.refreshEntityList();
+      this.syncCustomLegendFromChart();
+
+      // Check if we need to update grid configuration
+      this.legendOverridesGrids = true;
+      const previousGridCount = this.currentGrids;
+
+      // Filter to active series with data
+      const activeSeriesWithData = seriesToKeepVisible.filter(key => {
+        const series = this.ctx.data.find(d => this.buildSeriesKey(d.datasource?.entityName || '', d.dataKey.label) === key);
+        return series && series.data && Array.isArray(series.data) && series.data.length > 0;
+      });
+
+      this.setDataGridByNames(activeSeriesWithData);
+
+      // If grid count changed, rebuild the chart
+      if (previousGridCount !== this.currentGrids) {
+        this.resetGrid = true;
+        this.applyScrollableHeight();
+        this.onDataUpdated();
+      }
+
+      this.ctx.detectChanges();
+    }, 100);
+  }
+
+  // Show all devices
+  public showAllDevices(): void {
+    if (!this.ctx?.data || !this.chart || !this.entityList || this.entityList.length === 0) return;
+
+    // Initialize plot states if not already set
+    const uniqueLabels = new Set<string>();
+    for (const data of this.ctx.data) {
+      const label = data.dataKey.label;
+      if (!this.plotLabelStates.has(label)) {
+        // If not tracked yet, default to visible
+        this.plotLabelStates.set(label, true);
+      }
+      uniqueLabels.add(label);
+    }
+
+    // Get all series keys from all entities, but only for plots that should be visible
+    const allSeriesKeys: string[] = [];
+    const seriesToShow: string[] = [];
+
+    for (const data of this.ctx.data) {
+      const entityName = data.datasource?.entityName || 'Unknown';
+      const label = data.dataKey.label;
+      const seriesKey = this.buildSeriesKey(entityName, label);
+      allSeriesKeys.push(seriesKey);
+
+      // Only show this series if its plot (label) is not manually hidden
+      const plotVisible = this.plotLabelStates.get(label) !== false;
+      if (plotVisible) {
+        seriesToShow.push(seriesKey);
+      }
+    }
+
+    // First, select all series that should be shown
+    seriesToShow.forEach(key => {
+      this.batchedDispatchAction({
+        type: 'legendSelect',
+        name: key,
+        legendIndex: 0
+      });
+    });
+
+    // Then, ensure hidden plots stay hidden
+    const hiddenPlotSeries = allSeriesKeys.filter(key => !seriesToShow.includes(key));
+    hiddenPlotSeries.forEach(key => {
+      this.batchedDispatchAction({
+        type: 'legendUnSelect',
+        name: key,
+        legendIndex: 0
+      });
+    });
+
+    // Update UI after batch operations
+    setTimeout(() => {
+      this.refreshEntityList();
+      this.syncCustomLegendFromChart();
+
+      // Check if we need to update grid configuration
+      this.legendOverridesGrids = true;
+      const previousGridCount = this.currentGrids;
+
+      // Capture scroll position before mode change
+      this.captureScrollPosition();
+
+      // Filter to only include series that have actual data AND their plot is visible
+      const activeSeriesWithData = seriesToShow.filter(key => {
+        const series = this.ctx.data.find(d => this.buildSeriesKey(d.datasource?.entityName || '', d.dataKey.label) === key);
+        return series && series.data && Array.isArray(series.data) && series.data.length > 0;
+      });
+
+      // Pass only series that have actual data
+      this.setDataGridByNames(activeSeriesWithData);
+
+      // If grid count changed, rebuild the chart
+      if (previousGridCount !== this.currentGrids) {
+        this.resetGrid = true;
+        this.applyScrollableHeight();
+        this.onDataUpdated();
+
+        // Restore appropriate scroll position after chart updates
+        setTimeout(() => {
+          this.restoreScrollPosition();
+        }, 200);
+      }
+
+      this.ctx.detectChanges();
+    }, 100);
   }
 
   ngOnInit(): void {
@@ -2376,33 +2581,42 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   private performEntityToggle(entityName: string): void {
-    // Find all series keys for this entity
+    // Find all series keys for this entity, but respect plot states
     const seriesKeys: string[] = [];
-    
+    const seriesToToggle: string[] = [];
+
     for (const data of this.ctx.data) {
       const currentEntityName = data.datasource?.entityName || 'Unknown';
       if (currentEntityName === entityName) {
         const label = data.dataKey.label;
         const seriesKey = this.buildSeriesKey(entityName, label);
         seriesKeys.push(seriesKey);
+
+        // Only include series for toggling if their plot (label) is not manually hidden
+        const plotVisible = this.plotLabelStates.get(label) !== false;
+        if (plotVisible) {
+          seriesToToggle.push(seriesKey);
+        }
       }
     }
-    
-    if (seriesKeys.length === 0) {
+
+    if (seriesToToggle.length === 0) {
+      // If all plots for this entity are manually hidden, just update UI
+      this.refreshEntityList();
       return;
     }
-    
+
     // Get current visibility state from controller legend (cached to avoid multiple calls)
     const opt: any = this.chart.getOption();
     const selected = opt?.legend?.[0]?.selected || {};
-    
-    // Check if any series is visible
-    const anyVisible = seriesKeys.some(key => selected[key] !== false);
-    
-    // Toggle all series for this entity on controller legend
+
+    // Check if any series (that should be toggleable) is visible
+    const anyVisible = seriesToToggle.some(key => selected[key] !== false);
+
+    // Toggle only series that respect plot states
     const action = anyVisible ? 'legendUnSelect' : 'legendSelect';
-    
-    seriesKeys.forEach(key => {
+
+    seriesToToggle.forEach(key => {
       this.batchedDispatchAction({
         type: action,
         name: key,
@@ -5356,12 +5570,20 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // [CLAUDE EDIT] Build/update the legend items from the grouped legend state
   private syncCustomLegendFromChart(): void {
     if (!this.chart) return;
-    
+
     const group = this.getGroupLegendState();
-    
+
+    // Initialize plot states for any new labels we haven't seen before
+    for (const label of group.data) {
+      if (!this.plotLabelStates.has(label)) {
+        // Default to visible for new plots
+        this.plotLabelStates.set(label, true);
+      }
+    }
+
     // Get the fixed plot number for each label based on its axis assignment
     const axisMap = this.getAxisPositionMap();
-    
+
     // Build legend items with colors and FIXED plot numbers
     const itemsWithPosition = group.data.map(label => {
       // Find the axis assignment for this label
@@ -5372,25 +5594,29 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           break;
         }
       }
-      
+
       // Get the fixed plot number from the axis map
       const fixedPlotNumber = (axisMap[axisAssignment] ?? 0) + 1; // Make it 1-based
-      
+
+      // Use plot state to determine selection, not just the chart legend state
+      const plotVisible = this.plotLabelStates.get(label) !== false;
+      const chartSelected = group.selected[label] !== false;
+
       return {
         label,
         color: this.pickRepresentativeColor(label),
-        selected: group.selected[label] !== false,
+        selected: plotVisible && chartSelected,
         plotNumber: fixedPlotNumber
       };
     });
-    
+
     // Sort by plot number for consistent ordering
     this.legendItems = itemsWithPosition
       .sort((a, b) => a.plotNumber - b.plotNumber || a.label.localeCompare(b.label));
-    
+
     // [CLAUDE EDIT] Apply pagination without recalculating widths
     this.applyLegendPagination();
-    
+
     // Trigger change detection
     if (this.ctx?.detectChanges) {
       this.ctx.detectChanges();
@@ -5579,25 +5805,28 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // New toggleLabel method for legend chip items
   public toggleLabel(item: { label: string; selected: boolean }): void {
     if (!this.chart) return;
-    
+
     // Find the actual item in the main array
     const mainItem = this.legendItems.find(i => i.label === item.label);
     if (!mainItem) return;
-    
+
     // Count currently selected items
     const selectedCount = this.legendItems.filter(i => i.selected).length;
-    
+
     // Guard: prevent hiding the last visible series
     if (mainItem.selected && selectedCount === 1) {
       this.pulseChip(mainItem.label);
       return;
     }
-    
-    
+
+
     // Toggle the selection
     mainItem.selected = !mainItem.selected;
     item.selected = mainItem.selected;
-    
+
+    // Track the plot state separately
+    this.plotLabelStates.set(item.label, mainItem.selected);
+
     // Perform the toggle with debouncing
     this.debouncedUIUpdate('legend-toggle', () => {
       this.performLegendToggle(item.label, mainItem.selected);
@@ -5696,7 +5925,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     // Frame rate detection
-    let lastFrameTime = performance.now();
+    const lastFrameTime = performance.now();
     let frameCount = 0;
     const checkFrameRate = () => {
       const currentTime = performance.now();
@@ -5849,7 +6078,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     // Get the full time range across all series for proper line length
-    let fullTimeRange = { start: timeDomain.start, end: timeDomain.end };
+    const fullTimeRange = { start: timeDomain.start, end: timeDomain.end };
     options.series.forEach((s: any) => {
       if (s.data?.length && !/Min Line|Max Line|Alarm Area/.test(s.name)) {
         const seriesStart = s.data[0][0];
@@ -5947,7 +6176,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     // Get the full time range
-    let fullTimeRange = { 
+    const fullTimeRange = { 
       start: baseSeries.data[0][0], 
       end: baseSeries.data[baseSeries.data.length - 1][0] 
     };
@@ -6162,7 +6391,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     // Store the last known alarm values for comparison
-    let lastAlarmValues = new Map<string, string>();
+    const lastAlarmValues = new Map<string, string>();
     
     // Set up polling interval (every 5 seconds)
     this.alarmUpdateTimer = setInterval(async () => {

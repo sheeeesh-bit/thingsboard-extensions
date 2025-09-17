@@ -91,12 +91,33 @@
       <!-- Permanent header (visible in all modes except completely hidden) -->
       <div class="sidebar-header" *ngIf="isSidebarVisible || sidebarCollapsedMode !== 'hidden'">
         <span class="header-text" *ngIf="isSidebarVisible">
-          Devices 
+          Devices
           <span class="device-count">({{ getSelectedDeviceCount() }}/{{ entityList.length }})</span>
         </span>
         <span class="header-icon" *ngIf="!isSidebarVisible && sidebarCollapsedMode !== 'hidden'">
           <i class="material-icons">devices</i>
         </span>
+        <!-- Hide All / Show All buttons -->
+        <div class="header-actions" *ngIf="isSidebarVisible && entityList.length > 0">
+          <button mat-icon-button
+                  class="header-action-btn"
+                  [disableRipple]="true"
+                  (click)="showAllDevices()"
+                  matTooltip="Show all devices"
+                  matTooltipPosition="below"
+                  matTooltipClass="modern-tooltip">
+            <i class="material-icons">visibility</i>
+          </button>
+          <button mat-icon-button
+                  class="header-action-btn"
+                  [disableRipple]="true"
+                  (click)="hideAllDevices()"
+                  matTooltip="Hide all devices"
+                  matTooltipPosition="below"
+                  matTooltipClass="modern-tooltip">
+            <i class="material-icons">visibility_off</i>
+          </button>
+        </div>
       </div>
       
       <!-- Full table mode (only when visible) -->
@@ -163,6 +184,15 @@
     <div class="chart-container-wrapper">
       <!-- Top floating legend overlay -->
       <nav class="legend-overlay" #legendOverlay aria-label="Series legend" *ngIf="ctx.settings.showCustomLegend !== false">
+        <!-- Warning indicator for data issues -->
+        <div class="legend-warning"
+             *ngIf="hasNoVisibleData || hasAllDevicesHidden()"
+             [matTooltip]="hasNoVisibleData ? 'No data available for current selection' : 'Some devices are hidden - use Show All to display them'"
+             matTooltipPosition="below"
+             matTooltipClass="modern-tooltip">
+          <i class="material-icons">{{ hasNoVisibleData ? 'info' : 'warning' }}</i>
+        </div>
+
         <!-- Previous page button - only show when pagination needed -->
         <button *ngIf="legendNeedsPagination"
                 type="button"
@@ -214,10 +244,11 @@
         <!-- No Data Message -->
         <div *ngIf="hasNoVisibleData" class="no-data-message">
           <div class="no-data-content">
-            <i class="material-icons">info_outline</i>
-            <h3>No Data Available</h3>
-            <p>All selected devices have no data in the current time range.</p>
-            <p>Please enable devices with data from the sidebar.</p>
+            <i class="material-icons">{{ getAllDevicesEmpty() ? 'error_outline' : 'info_outline' }}</i>
+            <h3>{{ getAllDevicesEmpty() ? 'No Data for These Devices' : 'No Data Available' }}</h3>
+            <p *ngIf="getAllDevicesEmpty()">None of the configured devices have data in the current time range.</p>
+            <p *ngIf="!getAllDevicesEmpty()">All visible devices have no data in the current time range.</p>
+            <p *ngIf="!getAllDevicesEmpty()">Please enable devices with data from the sidebar or adjust the time range.</p>
           </div>
         </div>
       </div>
