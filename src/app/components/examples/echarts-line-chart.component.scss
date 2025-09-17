@@ -856,7 +856,7 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
   background: transparent; // Remove background
   flex-shrink: 0; // Prevent shrinking
 
-  // Apple-style status indicator (positioned right)
+  // Consolidated status indicator (positioned right)
   .legend-status-indicator {
     display: flex;
     align-items: center;
@@ -865,32 +865,79 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
     padding-left: 12px; // Add spacing from legend items
     flex-shrink: 0;
 
-    .status-icon {
-      width: 20px;
-      height: 20px;
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 10px;
+      background: rgba(0, 122, 255, 0.08); // iOS blue background
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       cursor: help;
+      position: relative;
 
-      &--info {
-        color: #007aff; // iOS blue
-        opacity: 0.8;
+      &--warning {
+        background: rgba(255, 149, 0, 0.08); // iOS orange background
 
-        &:hover {
-          opacity: 1;
-          transform: scale(1.1);
+        .status-icon {
+          color: #ff9500;
+        }
+
+        .status-count {
+          background: #ff9500;
         }
       }
 
-      &--warning {
-        color: #ff9500; // iOS orange
-        opacity: 0.8;
+      .status-icon {
+        width: 16px;
+        height: 16px;
+        color: #007aff; // iOS blue
+        flex-shrink: 0;
+      }
 
-        &:hover {
-          opacity: 1;
-          transform: scale(1.1);
+      .status-count {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        border-radius: 8px;
+        background: #007aff;
+        color: white;
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 1;
+      }
+
+      &:hover {
+        transform: scale(1.05);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+        &.status-badge--warning {
+          background: rgba(255, 149, 0, 0.12);
+        }
+
+        &:not(.status-badge--warning) {
+          background: rgba(0, 122, 255, 0.12);
         }
       }
     }
+  }
+}
+
+// Custom tooltip for status messages
+::ng-deep .status-tooltip {
+  .mat-mdc-tooltip-surface {
+    background: rgba(30, 30, 30, 0.95) !important;
+    backdrop-filter: blur(10px);
+    border-radius: 8px !important;
+    padding: 10px 14px !important;
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+    max-width: 300px !important;
+    white-space: pre-line !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
   }
 }
 

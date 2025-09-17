@@ -314,6 +314,82 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return this.entityList.every(entity => entity.dataPoints === 0);
   }
 
+  // Get all status messages for the tooltip
+  public getStatusMessages(): { type: 'warning' | 'info', message: string }[] {
+    const messages: { type: 'warning' | 'info', message: string }[] = [];
+
+    // Check for no data conditions
+    if (this.hasNoVisibleData) {
+      if (this.getAllDevicesEmpty()) {
+        messages.push({ type: 'info', message: 'No data available for any device' });
+      } else {
+        messages.push({ type: 'info', message: 'No visible devices have data' });
+      }
+    }
+
+    // Check for hidden devices
+    if (this.hasAllDevicesHidden()) {
+      const hiddenCount = this.entityList.filter(e => !e.visible && e.dataPoints > 0).length;
+      if (hiddenCount > 0) {
+        messages.push({
+          type: 'warning',
+          message: `${hiddenCount} device${hiddenCount > 1 ? 's' : ''} with data hidden`
+        });
+      }
+    }
+
+    // Check for manually hidden plots
+    const hiddenPlots = Array.from(this.plotLabelStates.entries())
+      .filter(([label, visible]) => !visible)
+      .map(([label]) => label);
+
+    if (hiddenPlots.length > 0) {
+      messages.push({
+        type: 'warning',
+        message: `${hiddenPlots.length} plot${hiddenPlots.length > 1 ? 's' : ''} manually hidden: ${hiddenPlots.join(', ')}`
+      });
+    }
+
+    // Check for devices without data
+    const emptyDevices = this.entityList?.filter(e => e.visible && e.dataPoints === 0) || [];
+    if (emptyDevices.length > 0 && !this.getAllDevicesEmpty()) {
+      messages.push({
+        type: 'info',
+        message: `${emptyDevices.length} visible device${emptyDevices.length > 1 ? 's' : ''} without data`
+      });
+    }
+
+    return messages;
+  }
+
+  // Check if there are any status messages to show
+  public hasStatusMessages(): boolean {
+    return this.getStatusMessages().length > 0;
+  }
+
+  // Get the primary status type (warning takes precedence over info)
+  public getPrimaryStatusType(): 'warning' | 'info' {
+    const messages = this.getStatusMessages();
+    return messages.some(m => m.type === 'warning') ? 'warning' : 'info';
+  }
+
+  // Format status messages as HTML for tooltip
+  public getStatusTooltip(): string {
+    const messages = this.getStatusMessages();
+    if (messages.length === 0) return '';
+
+    if (messages.length === 1) {
+      return messages[0].message;
+    }
+
+    // Create HTML list for multiple messages
+    const listItems = messages
+      .map(m => `• ${m.message}`)
+      .join('\n');
+
+    return listItems;
+  }
+
   // Hide all devices
   public hideAllDevices(): void {
     if (!this.ctx?.data || !this.chart || !this.entityList || this.entityList.length === 0) return;

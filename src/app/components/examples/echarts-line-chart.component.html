@@ -228,24 +228,31 @@
           </svg>
         </button>
 
-        <!-- Apple-style warning indicator (right side) -->
+        <!-- Consolidated status indicator (right side) -->
         <div class="legend-status-indicator"
-             *ngIf="hasNoVisibleData || hasAllDevicesHidden()"
-             [matTooltip]="hasNoVisibleData ? 'No data available' : 'Some devices hidden'"
+             *ngIf="hasStatusMessages()"
+             [matTooltip]="getStatusTooltip()"
              matTooltipPosition="below"
-             matTooltipClass="modern-tooltip">
-          <!-- Info icon for no data -->
-          <svg *ngIf="hasNoVisibleData" class="status-icon status-icon--info" width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <circle cx="10" cy="10" r="8.5" stroke="currentColor" stroke-width="1.5"/>
-            <circle cx="10" cy="6" r="1" fill="currentColor"/>
-            <rect x="9" y="9" width="2" height="5" rx="1" fill="currentColor"/>
-          </svg>
-          <!-- Alert icon for hidden devices -->
-          <svg *ngIf="!hasNoVisibleData && hasAllDevicesHidden()" class="status-icon status-icon--warning" width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M10 2L18.66 17H1.34L10 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-            <circle cx="10" cy="14" r="0.75" fill="currentColor"/>
-            <rect x="9.25" y="8" width="1.5" height="4" rx="0.75" fill="currentColor"/>
-          </svg>
+             matTooltipClass="status-tooltip">
+          <!-- Status badge with count -->
+          <div class="status-badge" [class.status-badge--warning]="getPrimaryStatusType() === 'warning'">
+            <!-- Info icon -->
+            <svg *ngIf="getPrimaryStatusType() === 'info'" class="status-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.2"/>
+              <circle cx="8" cy="5" r="0.8" fill="currentColor"/>
+              <rect x="7.2" y="7" width="1.6" height="4" rx="0.8" fill="currentColor"/>
+            </svg>
+            <!-- Warning icon -->
+            <svg *ngIf="getPrimaryStatusType() === 'warning'" class="status-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M8 2L14.928 13.5H1.072L8 2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+              <circle cx="8" cy="11.5" r="0.6" fill="currentColor"/>
+              <rect x="7.4" y="6.5" width="1.2" height="3.5" rx="0.6" fill="currentColor"/>
+            </svg>
+            <!-- Message count if more than 1 -->
+            <span class="status-count" *ngIf="getStatusMessages().length > 1">
+              {{ getStatusMessages().length }}
+            </span>
+          </div>
         </div>
       </nav>
 
