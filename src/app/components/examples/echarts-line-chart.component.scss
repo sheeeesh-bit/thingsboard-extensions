@@ -856,27 +856,40 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
   background: transparent; // Remove background
   flex-shrink: 0; // Prevent shrinking
 
-  // Warning indicator for data issues
-  .legend-warning {
+  // Apple-style status indicator (positioned right)
+  .legend-status-indicator {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: rgba(255, 152, 0, 0.1);
-    color: #ff9800;
-    margin-right: 4px;
+    margin-left: auto; // Push to the right
+    padding-left: 12px; // Add spacing from legend items
     flex-shrink: 0;
-    transition: all 0.2s ease;
 
-    .material-icons {
-      font-size: 16px;
-    }
+    .status-icon {
+      width: 20px;
+      height: 20px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: help;
 
-    &:hover {
-      background: rgba(255, 152, 0, 0.15);
-      transform: scale(1.05);
+      &--info {
+        color: #007aff; // iOS blue
+        opacity: 0.8;
+
+        &:hover {
+          opacity: 1;
+          transform: scale(1.1);
+        }
+      }
+
+      &--warning {
+        color: #ff9500; // iOS orange
+        opacity: 0.8;
+
+        &:hover {
+          opacity: 1;
+          transform: scale(1.1);
+        }
+      }
     }
   }
 }

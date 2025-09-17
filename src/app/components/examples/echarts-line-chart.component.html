@@ -184,15 +184,6 @@
     <div class="chart-container-wrapper">
       <!-- Top floating legend overlay -->
       <nav class="legend-overlay" #legendOverlay aria-label="Series legend" *ngIf="ctx.settings.showCustomLegend !== false">
-        <!-- Warning indicator for data issues -->
-        <div class="legend-warning"
-             *ngIf="hasNoVisibleData || hasAllDevicesHidden()"
-             [matTooltip]="hasNoVisibleData ? 'No data available for current selection' : 'Some devices are hidden - use Show All to display them'"
-             matTooltipPosition="below"
-             matTooltipClass="modern-tooltip">
-          <i class="material-icons">{{ hasNoVisibleData ? 'info' : 'warning' }}</i>
-        </div>
-
         <!-- Previous page button - only show when pagination needed -->
         <button *ngIf="legendNeedsPagination"
                 type="button"
@@ -204,7 +195,7 @@
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </button>
-        
+
         <!-- Legend viewport (constrained view) -->
         <div class="legend-viewport" #legendViewport>
           <div class="legend-track" #legendTrack>
@@ -224,7 +215,7 @@
             </button>
           </div>
         </div>
-        
+
         <!-- Next page button - only show when pagination needed -->
         <button *ngIf="legendNeedsPagination"
                 type="button"
@@ -236,6 +227,26 @@
             <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
         </button>
+
+        <!-- Apple-style warning indicator (right side) -->
+        <div class="legend-status-indicator"
+             *ngIf="hasNoVisibleData || hasAllDevicesHidden()"
+             [matTooltip]="hasNoVisibleData ? 'No data available' : 'Some devices hidden'"
+             matTooltipPosition="below"
+             matTooltipClass="modern-tooltip">
+          <!-- Info icon for no data -->
+          <svg *ngIf="hasNoVisibleData" class="status-icon status-icon--info" width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="10" r="8.5" stroke="currentColor" stroke-width="1.5"/>
+            <circle cx="10" cy="6" r="1" fill="currentColor"/>
+            <rect x="9" y="9" width="2" height="5" rx="1" fill="currentColor"/>
+          </svg>
+          <!-- Alert icon for hidden devices -->
+          <svg *ngIf="!hasNoVisibleData && hasAllDevicesHidden()" class="status-icon status-icon--warning" width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M10 2L18.66 17H1.34L10 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <circle cx="10" cy="14" r="0.75" fill="currentColor"/>
+            <rect x="9.25" y="8" width="1.5" height="4" rx="0.75" fill="currentColor"/>
+          </svg>
+        </div>
       </nav>
 
       <!-- Scrollable chart container -->
