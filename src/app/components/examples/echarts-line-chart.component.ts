@@ -1766,6 +1766,25 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     if (!this.chart || !this.shouldBatchEChartsUpdates()) {
       // Direct dispatch when batching disabled
       this.chart?.dispatchAction(action);
+
+      // Immediately disable emphasis after direct dispatch to prevent glossy effects
+      const option = this.chart?.getOption() as any;
+      if (option && option.series) {
+        const updatedSeries = option.series.map((s: any) => ({
+          name: s.name,
+          emphasis: {
+            disabled: true,
+            scale: false,
+            focus: 'none'
+          }
+        }));
+        this.chart?.setOption({
+          series: updatedSeries
+        }, {
+          notMerge: false,
+          lazyUpdate: false
+        });
+      }
       return;
     }
     
@@ -1821,18 +1840,38 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.chartActionBatch = null;
       return;
     }
-    
+
     const actionCount = this.pendingChartActions.length;
-    
+
     // Process all batched actions
     this.pendingChartActions.forEach(action => {
       this.chart.dispatchAction(action);
     });
-    
+
     // Clear batch
     this.pendingChartActions = [];
     this.chartActionBatch = null;
-    
+
+    // CRITICAL: Immediately disable emphasis after legend actions to prevent glossy effects
+    // This is especially important for initial device activation
+    const option = this.chart.getOption() as any;
+    if (option && option.series) {
+      const updatedSeries = option.series.map((s: any) => ({
+        name: s.name,
+        emphasis: {
+          disabled: true,
+          scale: false,
+          focus: 'none'
+        }
+      }));
+      this.chart.setOption({
+        series: updatedSeries
+      }, {
+        notMerge: false,
+        lazyUpdate: false  // Apply immediately, not lazy
+      });
+    }
+
     // Restore animations after a short delay
     setTimeout(() => {
       this.restoreAnimations();
