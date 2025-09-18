@@ -386,21 +386,23 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
     min-height: var(--legend-height, 48px);
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+    padding: 0 8px;
     background: rgba(255, 255, 255, 0.98);
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     border-bottom: 1px solid rgba(0, 0, 0, 0.06);
     z-index: 10;
     flex-shrink: 0;
-    
+
     .header-text {
       font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: #6e6e73;
-      
+      flex: 1;
+
       .device-count {
         font-weight: 400;
         color: rgba(0, 0, 0, 0.4);
@@ -408,12 +410,41 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
         font-size: 10px;
       }
     }
-    
+
     .header-icon {
       color: #6e6e73;
-      
+
       .material-icons {
         font-size: 18px;
+      }
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 2px;
+
+      .header-action-btn {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        min-height: 28px;
+        padding: 0;
+        border-radius: 6px;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        color: #6e6e73;
+
+        .material-icons {
+          font-size: 16px;
+        }
+
+        &:hover {
+          background: rgba(0, 0, 0, 0.05);
+          color: #1d1d1f;
+        }
+
+        &:active {
+          transform: scale(0.95);
+        }
       }
     }
   }
@@ -824,6 +855,127 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
   gap: 8px;
   background: transparent; // Remove background
   flex-shrink: 0; // Prevent shrinking
+
+  // Consolidated status indicator (positioned right)
+  .legend-status-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto; // Push to the right
+    padding-left: 12px; // Add spacing from legend items
+    flex-shrink: 0;
+
+    // Clean Apple-style without background
+    .status-badge-clean {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: help;
+      position: relative;
+      padding: 2px;
+
+      .warning-icon-clean {
+        color: #ff9500; // iOS orange
+        opacity: 0.9;
+        transition: opacity 0.2s ease;
+      }
+
+      .status-count-clean {
+        font-size: 11px;
+        font-weight: 600;
+        color: #ff9500;
+        background: rgba(255, 149, 0, 0.1);
+        padding: 1px 5px;
+        border-radius: 8px;
+        line-height: 1.4;
+      }
+
+      &:hover {
+        .warning-icon-clean {
+          opacity: 1;
+        }
+
+        .status-count-clean {
+          background: rgba(255, 149, 0, 0.15);
+        }
+      }
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 10px;
+      background: rgba(0, 122, 255, 0.08); // iOS blue background
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: help;
+      position: relative;
+
+      &--warning {
+        background: rgba(255, 149, 0, 0.08); // iOS orange background
+
+        .warning-emoji {
+          color: #ff9500;
+        }
+
+        .status-count {
+          background: #ff9500;
+        }
+      }
+
+      .warning-emoji {
+        font-size: 16px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+      }
+
+      .status-count {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        border-radius: 8px;
+        background: #007aff;
+        color: white;
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 1;
+      }
+
+      &:hover {
+        transform: scale(1.05);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+        &.status-badge--warning {
+          background: rgba(255, 149, 0, 0.12);
+        }
+
+        &:not(.status-badge--warning) {
+          background: rgba(0, 122, 255, 0.12);
+        }
+      }
+    }
+  }
+}
+
+// Custom tooltip for status messages
+::ng-deep .status-tooltip {
+  .mat-mdc-tooltip-surface {
+    background: rgba(30, 30, 30, 0.95) !important;
+    backdrop-filter: blur(10px);
+    border-radius: 8px !important;
+    padding: 10px 14px !important;
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+    max-width: 300px !important;
+    white-space: pre-line !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  }
 }
 
 // Zoom overlay at bottom

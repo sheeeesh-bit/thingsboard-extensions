@@ -305,7 +305,7 @@ export class DataProcessingService {
           label: info.label || entityName,
           displayName: this.truncateDisplayName(info.label || entityName),
           deviceName: info.deviceName,
-          visible: true, // Default to visible
+          visible: false, // Default to hidden
           color: this.getEntityColor(entityName, new Map(), 0),
           count: info.count,
           dataPoints: info.dataPoints
@@ -331,7 +331,7 @@ export class DataProcessingService {
   /**
    * Truncate display names to prevent UI overflow
    */
-  private truncateDisplayName(name: string, maxLength: number = 25): string {
+  private truncateDisplayName(name: string, maxLength = 25): string {
     if (name.length <= maxLength) {
       return name;
     }

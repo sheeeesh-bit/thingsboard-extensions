@@ -91,12 +91,33 @@
       <!-- Permanent header (visible in all modes except completely hidden) -->
       <div class="sidebar-header" *ngIf="isSidebarVisible || sidebarCollapsedMode !== 'hidden'">
         <span class="header-text" *ngIf="isSidebarVisible">
-          Devices 
+          Devices
           <span class="device-count">({{ getSelectedDeviceCount() }}/{{ entityList.length }})</span>
         </span>
         <span class="header-icon" *ngIf="!isSidebarVisible && sidebarCollapsedMode !== 'hidden'">
           <i class="material-icons">devices</i>
         </span>
+        <!-- Hide All / Show All buttons -->
+        <div class="header-actions" *ngIf="isSidebarVisible && entityList.length > 0">
+          <button mat-icon-button
+                  class="header-action-btn"
+                  [disableRipple]="true"
+                  (click)="showAllDevices()"
+                  matTooltip="Show all devices"
+                  matTooltipPosition="below"
+                  matTooltipClass="modern-tooltip">
+            <i class="material-icons">visibility</i>
+          </button>
+          <button mat-icon-button
+                  class="header-action-btn"
+                  [disableRipple]="true"
+                  (click)="hideAllDevices()"
+                  matTooltip="Hide all devices"
+                  matTooltipPosition="below"
+                  matTooltipClass="modern-tooltip">
+            <i class="material-icons">visibility_off</i>
+          </button>
+        </div>
       </div>
       
       <!-- Full table mode (only when visible) -->
@@ -174,7 +195,7 @@
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </button>
-        
+
         <!-- Legend viewport (constrained view) -->
         <div class="legend-viewport" #legendViewport>
           <div class="legend-track" #legendTrack>
@@ -194,7 +215,7 @@
             </button>
           </div>
         </div>
-        
+
         <!-- Next page button - only show when pagination needed -->
         <button *ngIf="legendNeedsPagination"
                 type="button"
@@ -206,6 +227,7 @@
             <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
         </button>
+
       </nav>
 
       <!-- Scrollable chart container -->
@@ -214,10 +236,12 @@
         <!-- No Data Message -->
         <div *ngIf="hasNoVisibleData" class="no-data-message">
           <div class="no-data-content">
-            <i class="material-icons">info_outline</i>
-            <h3>No Data Available</h3>
-            <p>All selected devices have no data in the current time range.</p>
-            <p>Please enable devices with data from the sidebar.</p>
+            <i class="material-icons">{{ getSelectedDeviceCount() === 0 ? 'visibility_off' : (hasOnlyEmptyDevicesSelected() ? 'warning' : (getAllDevicesEmpty() ? 'error_outline' : 'info_outline')) }}</i>
+            <h3>{{ getSelectedDeviceCount() === 0 ? 'No Devices Selected' : (hasOnlyEmptyDevicesSelected() ? 'Selected Devices Have No Data' : (getAllDevicesEmpty() ? 'No Data Available' : 'No Data to Display')) }}</h3>
+            <p *ngIf="getSelectedDeviceCount() === 0">Please select at least one device from the sidebar to view data.</p>
+            <p *ngIf="getSelectedDeviceCount() > 0 && hasOnlyEmptyDevicesSelected()">The selected devices have no data. Please select devices with data or adjust the time range.</p>
+            <p *ngIf="getSelectedDeviceCount() > 0 && getAllDevicesEmpty() && !hasOnlyEmptyDevicesSelected()">None of the configured devices have data in the current time range.</p>
+            <p *ngIf="getSelectedDeviceCount() > 0 && !getAllDevicesEmpty() && !hasOnlyEmptyDevicesSelected()">Please select devices with data from the sidebar or adjust the time range.</p>
           </div>
         </div>
       </div>
