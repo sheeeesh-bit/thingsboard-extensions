@@ -183,6 +183,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   // Plot (label) state tracking - persists across device toggles
   private plotLabelStates = new Map<string, boolean>(); // label -> visible state
+  // Device (entity) state tracking - independent of plot states
+  private deviceVisibilityStates = new Map<string, boolean>(); // entityName -> visible state
 
   // Min/Max reference lines state
   private minMaxVisible = false;
@@ -411,27 +413,24 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public hideAllDevices(): void {
     if (!this.ctx?.data || !this.chart || !this.entityList || this.entityList.length === 0) return;
 
-    // Note: We hide ALL devices/entities, but preserve plot (label) toggle states
-    // This means if a plot was manually toggled off, it stays off
+    // Set all device states to hidden
+    for (const entity of this.entityList) {
+      this.deviceVisibilityStates.set(entity.name, false);
+    }
 
-    // Collect all series keys to hide
-    const allSeriesKeys: string[] = [];
-
+    // Update all series visibility - they will all be hidden since all devices are hidden
     for (const data of this.ctx.data) {
       const entityName = data.datasource?.entityName || 'Unknown';
       const label = data.dataKey.label;
       const seriesKey = this.buildSeriesKey(entityName, label);
-      allSeriesKeys.push(seriesKey);
-    }
 
-    // Hide all series
-    allSeriesKeys.forEach(key => {
+      // All series will be hidden (device is false, regardless of plot state)
       this.batchedDispatchAction({
         type: 'legendUnSelect',
-        name: key,
+        name: seriesKey,
         legendIndex: 0
       });
-    });
+    }
 
     // Update UI after batch operations
     setTimeout(() => {
@@ -460,52 +459,29 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public showAllDevices(): void {
     if (!this.ctx?.data || !this.chart || !this.entityList || this.entityList.length === 0) return;
 
-    // Initialize plot states if not already set
-    const uniqueLabels = new Set<string>();
-    for (const data of this.ctx.data) {
-      const label = data.dataKey.label;
-      if (!this.plotLabelStates.has(label)) {
-        // If not tracked yet, default to visible
-        this.plotLabelStates.set(label, true);
-      }
-      uniqueLabels.add(label);
+    // Set all device states to visible
+    for (const entity of this.entityList) {
+      this.deviceVisibilityStates.set(entity.name, true);
     }
 
-    // Get all series keys from all entities, but only for plots that should be visible
-    const allSeriesKeys: string[] = [];
-    const seriesToShow: string[] = [];
-
+    // Update all series visibility based on BOTH device and plot states
     for (const data of this.ctx.data) {
       const entityName = data.datasource?.entityName || 'Unknown';
       const label = data.dataKey.label;
       const seriesKey = this.buildSeriesKey(entityName, label);
-      allSeriesKeys.push(seriesKey);
 
-      // Only show this series if its plot (label) is not manually hidden
+      // Series visible only if BOTH plot and device are visible
       const plotVisible = this.plotLabelStates.get(label) !== false;
-      if (plotVisible) {
-        seriesToShow.push(seriesKey);
-      }
+      const deviceVisible = true; // All devices are now visible
+      const shouldBeVisible = plotVisible && deviceVisible;
+      const action = shouldBeVisible ? 'legendSelect' : 'legendUnSelect';
+
+      this.batchedDispatchAction({
+        type: action,
+        name: seriesKey,
+        legendIndex: 0
+      });
     }
-
-    // First, select all series that should be shown
-    seriesToShow.forEach(key => {
-      this.batchedDispatchAction({
-        type: 'legendSelect',
-        name: key,
-        legendIndex: 0
-      });
-    });
-
-    // Then, ensure hidden plots stay hidden
-    const hiddenPlotSeries = allSeriesKeys.filter(key => !seriesToShow.includes(key));
-    hiddenPlotSeries.forEach(key => {
-      this.batchedDispatchAction({
-        type: 'legendUnSelect',
-        name: key,
-        legendIndex: 0
-      });
-    });
 
     // Update UI after batch operations
     setTimeout(() => {
@@ -519,14 +495,23 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // Capture scroll position before mode change
       this.captureScrollPosition();
 
-      // Filter to only include series that have actual data AND their plot is visible
-      const activeSeriesWithData = seriesToShow.filter(key => {
-        const series = this.ctx.data.find(d => this.buildSeriesKey(d.datasource?.entityName || '', d.dataKey.label) === key);
-        return series && series.data && Array.isArray(series.data) && series.data.length > 0;
-      });
+      // Collect series that are now visible (both device and plot are visible) and have data
+      const visibleSeriesWithData: string[] = [];
+      for (const data of this.ctx.data) {
+        const entityName = data.datasource?.entityName || 'Unknown';
+        const label = data.dataKey.label;
+        const seriesKey = this.buildSeriesKey(entityName, label);
+
+        const plotVisible = this.plotLabelStates.get(label) !== false;
+        const deviceVisible = this.deviceVisibilityStates.get(entityName) !== false;
+
+        if (plotVisible && deviceVisible && data.data && Array.isArray(data.data) && data.data.length > 0) {
+          visibleSeriesWithData.push(seriesKey);
+        }
+      }
 
       // Pass only series that have actual data
-      this.setDataGridByNames(activeSeriesWithData);
+      this.setDataGridByNames(visibleSeriesWithData);
 
       // If grid count changed, rebuild the chart
       if (previousGridCount !== this.currentGrids) {
@@ -2127,13 +2112,42 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Create unique key: "entityName :: label"
     return `${entityName || 'Unknown'} :: ${label}`;
   }
-  
+
   private extractLabelFromKey(key: string): string {
     // Extract label from "entityName :: label"
     const parts = key.split(' :: ');
     return parts.length > 1 ? parts[1] : key;
   }
-  
+
+  private extractEntityFromKey(key: string): string {
+    // Extract entity from "entityName :: label"
+    const parts = key.split(' :: ');
+    return parts.length > 1 ? parts[0] : 'Unknown';
+  }
+
+  // Check if a series should be visible based on BOTH plot and device states
+  private shouldSeriesBeVisible(entityName: string, label: string): boolean {
+    // A series is visible only if BOTH plot AND device are visible
+    const plotVisible = this.plotLabelStates.get(label) !== false;
+    const deviceVisible = this.deviceVisibilityStates.get(entityName) !== false;
+    return plotVisible && deviceVisible;
+  }
+
+  // Update the combined visibility of a series in ECharts
+  private updateSeriesVisibility(entityName: string, label: string): void {
+    if (!this.chart) return;
+
+    const seriesKey = this.buildSeriesKey(entityName, label);
+    const shouldBeVisible = this.shouldSeriesBeVisible(entityName, label);
+    const action = shouldBeVisible ? 'legendSelect' : 'legendUnSelect';
+
+    this.batchedDispatchAction({
+      type: action,
+      name: seriesKey,
+      legendIndex: 0
+    });
+  }
+
   /**
    * Format tooltip label according to user settings
    */
@@ -2554,15 +2568,11 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
     }
     
-    // Get current legend selection state
-    const opt: any = this.chart.getOption();
-    const selected = opt?.legend?.[0]?.selected || {};
-    
     // Build entity list with display names and data point counts
     this.entityList = Object.keys(entityGroups).map(entityName => {
       const group = entityGroups[entityName];
-      // Entity is visible if any of its series are visible
-      const visible = group.seriesKeys.some(seriesKey => selected[seriesKey] !== false);
+      // Use device visibility state instead of checking series
+      const visible = this.deviceVisibilityStates.get(entityName) !== false;
       
       // Get both label and deviceName for tooltip
       const attrs = this.getEntityAttributes(entityName);
@@ -2700,48 +2710,30 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   private performEntityToggle(entityName: string): void {
-    // Find all series keys for this entity, but respect plot states
-    const seriesKeys: string[] = [];
-    const seriesToToggle: string[] = [];
+    // Toggle device state
+    const currentDeviceState = this.deviceVisibilityStates.get(entityName) !== false;
+    const newDeviceState = !currentDeviceState;
+    this.deviceVisibilityStates.set(entityName, newDeviceState);
 
+    // Update visibility for all series of this entity, respecting plot states
     for (const data of this.ctx.data) {
       const currentEntityName = data.datasource?.entityName || 'Unknown';
       if (currentEntityName === entityName) {
         const label = data.dataKey.label;
         const seriesKey = this.buildSeriesKey(entityName, label);
-        seriesKeys.push(seriesKey);
 
-        // Only include series for toggling if their plot (label) is not manually hidden
+        // Only show if BOTH plot and device are visible
         const plotVisible = this.plotLabelStates.get(label) !== false;
-        if (plotVisible) {
-          seriesToToggle.push(seriesKey);
-        }
+        const shouldBeVisible = plotVisible && newDeviceState;
+        const action = shouldBeVisible ? 'legendSelect' : 'legendUnSelect';
+
+        this.batchedDispatchAction({
+          type: action,
+          name: seriesKey,
+          legendIndex: 0
+        });
       }
     }
-
-    if (seriesToToggle.length === 0) {
-      // If all plots for this entity are manually hidden, just update UI
-      this.refreshEntityList();
-      return;
-    }
-
-    // Get current visibility state from controller legend (cached to avoid multiple calls)
-    const opt: any = this.chart.getOption();
-    const selected = opt?.legend?.[0]?.selected || {};
-
-    // Check if any series (that should be toggleable) is visible
-    const anyVisible = seriesToToggle.some(key => selected[key] !== false);
-
-    // Toggle only series that respect plot states
-    const action = anyVisible ? 'legendUnSelect' : 'legendSelect';
-
-    seriesToToggle.forEach(key => {
-      this.batchedDispatchAction({
-        type: action,
-        name: key,
-        legendIndex: 0  // Target controller legend
-      });
-    });
     
     // Optimized post-toggle processing
     setTimeout(() => {
@@ -6003,26 +5995,27 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   } */
   
   private performLegendToggle(label: string, shouldSelect: boolean): void {
-    const action = shouldSelect ? 'legendSelect' : 'legendUnSelect';
-    
-    // Build all controller legend keys for this label
-    const keys: string[] = [];
+    // Update plot state
+    this.plotLabelStates.set(label, shouldSelect);
+
+    // Update visibility for all series with this label, respecting device states
     for (const series of (this.ctx.data || [])) {
       if (series?.dataKey?.label === label) {
         const entityName = series.datasource?.entityName || 'Unknown';
         const seriesKey = this.buildSeriesKey(entityName, label);
-        keys.push(seriesKey);
+
+        // Only update if device state allows it
+        const deviceVisible = this.deviceVisibilityStates.get(entityName) !== false;
+        const shouldBeVisible = shouldSelect && deviceVisible;
+        const action = shouldBeVisible ? 'legendSelect' : 'legendUnSelect';
+
+        this.batchedDispatchAction({
+          type: action,
+          name: seriesKey,
+          legendIndex: 0
+        });
       }
     }
-    
-    // Dispatch actions for all matching series using batched approach
-    keys.forEach(key => {
-      this.batchedDispatchAction({ 
-        type: action, 
-        name: key, 
-        legendIndex: 0 
-      });
-    });
     
     // Optimized post-toggle processing with batched UI updates
     setTimeout(() => {
