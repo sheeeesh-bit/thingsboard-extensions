@@ -1018,7 +1018,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     } else {
       // We have data!
       this.hasReceivedData = true;
-      this.isInitialLoad = false;
+      // Don't set isInitialLoad to false here - let flushChartActionBatch handle it
+      // This ensures the glossy fix is applied on first device activation
+      // this.isInitialLoad = false;  // REMOVED - handled in flushChartActionBatch
       this.hasNoVisibleData = false;
     }
     
@@ -1248,51 +1250,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Hide the loading spinner after data is rendered
     this.chart.hideLoading();
 
-    // CRITICAL FIX: Force a complete emphasis disable on first load
-    // This ensures the glossy effect doesn't appear on initial device activation
-    console.log('[GLOSSY DEBUG] isInitialLoad:', this.isInitialLoad, 'at', new Date().toISOString());
-    if (this.isInitialLoad) {
-      console.log('[GLOSSY DEBUG] Applying initial load fix...');
-      setTimeout(() => {
-        if (this.chart && !this.chart.isDisposed()) {
-          // Get current option and rebuild series with emphasis fully disabled
-          const currentOption = this.chart.getOption() as any;
-          console.log('[GLOSSY DEBUG] Current series count:', currentOption?.series?.length);
-
-          if (currentOption && currentOption.series) {
-            // Check current emphasis state
-            const firstSeries = currentOption.series[0];
-            console.log('[GLOSSY DEBUG] First series emphasis before fix:', firstSeries?.emphasis);
-
-            const fixedSeries = currentOption.series.map((s: any) => ({
-              name: s.name,
-              emphasis: {
-                disabled: true,
-                scale: false,
-                focus: 'none'
-              },
-              stateAnimation: {
-                duration: 0
-              }
-            }));
-
-            // Force apply with no merge to ensure clean state
-            this.chart.setOption({
-              series: fixedSeries,
-              stateAnimation: { duration: 0 }
-            }, {
-              notMerge: false,
-              lazyUpdate: false,
-              replaceMerge: ['series']
-            });
-
-            console.log('[GLOSSY DEBUG] Initial load fix applied');
-          }
-        }
-        this.isInitialLoad = false;
-        console.log('[GLOSSY DEBUG] isInitialLoad set to false');
-      }, 150);
-    }
+    // NOTE: The glossy fix is now handled in flushChartActionBatch
+    // when the first device is activated. This ensures the fix is applied
+    // at the right time, matching the behavior of "hide all devices"
 
     // Refresh entity list for sidebar and sync custom legend
     setTimeout(() => {
@@ -1874,6 +1834,21 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const actionCount = this.pendingChartActions.length;
     console.log('[GLOSSY DEBUG] Flushing', actionCount, 'batched actions');
 
+    // Check if this is the first device activation (any device changing from invisible to visible)
+    let isFirstDeviceActivation = false;
+    const hasSelectActions = this.pendingChartActions.some(action => action.type === 'legendSelect');
+
+    // If we have select actions and no devices were previously visible, this is the first activation
+    if (hasSelectActions) {
+      const visibleDeviceCount = Array.from(this.deviceVisibilityStates.values()).filter(v => v).length;
+      console.log('[GLOSSY DEBUG] Visible device count before actions:', visibleDeviceCount);
+      // Check if this is truly the first activation
+      if (visibleDeviceCount === 0 || this.isInitialLoad) {
+        isFirstDeviceActivation = true;
+        console.log('[GLOSSY DEBUG] First device activation detected!');
+      }
+    }
+
     // Process all batched actions
     const processedActions = [...this.pendingChartActions];  // Keep a copy
     this.pendingChartActions.forEach(action => {
@@ -1884,62 +1859,31 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.pendingChartActions = [];
     this.chartActionBatch = null;
 
-    // CRITICAL: Immediately disable emphasis after legend actions to prevent glossy effects
-    // This is especially important for initial device activation
-    const option = this.chart.getOption() as any;
-    console.log('[GLOSSY DEBUG] Checking series after dispatch, series count:', option?.series?.length);
+    // CRITICAL FIX: If this is the first device activation, rebuild the chart
+    // This is the same approach that "hide all devices" uses which fixes the glossy issue
+    if (isFirstDeviceActivation) {
+      console.log('[GLOSSY DEBUG] Applying first device activation fix - calling onDataUpdated()');
 
-    if (option && option.series) {
-      const firstSeries = option.series[0];
-      console.log('[GLOSSY DEBUG] First series emphasis state after dispatch:', firstSeries?.emphasis);
+      // Mark that we've handled the initial load
+      this.isInitialLoad = false;
 
-      const updatedSeries = option.series.map((s: any, index: number) => ({
-        ...s,  // Keep all existing series properties
-        emphasis: {
-          disabled: true,
-          scale: false,
-          focus: 'none',
-          blurScope: 'none',
-          itemStyle: {
-            shadowBlur: 0,
-            shadowColor: 'transparent'
-          },
-          lineStyle: {
-            shadowBlur: 0,
-            shadowColor: 'transparent'
-          }
-        }
-      }));
-
-      // Update series with proper emphasis settings
-      this.chart.setOption({
-        series: updatedSeries
-      }, {
-        notMerge: false,  // Use merge to keep data
-        lazyUpdate: false,  // Apply immediately
-        replaceMerge: ['series']  // Replace series array completely
-      });
-
-      // CRITICAL: Force ECharts to remove any emphasis state by dispatching downplay
-      // This removes any lingering glossy effects from the scale:true state
+      // Small delay to let the legend actions complete
       setTimeout(() => {
-        // Downplay all series to remove any emphasis/hover state
-        this.chart.dispatchAction({
-          type: 'downplay',
-          seriesIndex: Array.from({length: option.series.length}, (_, i) => i)  // All series
-        });
-        console.log('[GLOSSY DEBUG] Dispatched downplay for all series');
-      }, 20);
-
-      // Verify the fix was applied
-      setTimeout(() => {
-        const verifyOption = this.chart.getOption() as any;
-        const verifyFirst = verifyOption?.series?.[0];
-        console.log('[GLOSSY DEBUG] Verified emphasis after fix:', verifyFirst?.emphasis);
+        // Call onDataUpdated which rebuilds the chart with correct emphasis
+        // This is exactly what "hide all devices" does that fixes the issue
+        this.onDataUpdated();
+        console.log('[GLOSSY DEBUG] First device activation fix complete');
       }, 100);
 
-      console.log('[GLOSSY DEBUG] Applied emphasis disable after batch flush');
+      // Don't continue with the old nuclear refresh approach
+      return;
     }
+
+    // For non-first activations, just refresh entity list and restore animations
+    setTimeout(() => {
+      this.refreshEntityList();
+      this.ctx.detectChanges();
+    }, 0);
 
     // Restore animations after a short delay
     setTimeout(() => {
