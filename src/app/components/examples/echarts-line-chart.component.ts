@@ -492,6 +492,25 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.refreshEntityList();
       this.syncCustomLegendFromChart();
 
+      // Ensure emphasis is disabled after showing all devices to prevent glossy effects
+      if (this.chart && !this.chart.isDisposed()) {
+        setTimeout(() => {
+          const option = this.chart.getOption() as any;
+          if (option && option.series) {
+            const updatedSeries = option.series.map((s: any) => ({
+              name: s.name,
+              emphasis: { disabled: true }
+            }));
+            this.chart.setOption({
+              series: updatedSeries
+            }, {
+              notMerge: false,
+              lazyUpdate: true
+            });
+          }
+        }, 50);
+      }
+
       // Check if we need to update grid configuration
       this.legendOverridesGrids = true;
       const previousGridCount = this.currentGrids;
@@ -1236,11 +1255,29 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Hide the loading spinner after data is rendered
     this.chart.hideLoading();
-    
+
     // Refresh entity list for sidebar and sync custom legend
     setTimeout(() => {
       this.refreshEntityList();
       this.syncCustomLegendFromChart();
+
+      // Ensure emphasis is disabled after initial render to prevent glossy effects
+      // This is especially important after first device activation
+      if (this.chart && !this.chart.isDisposed()) {
+        const option = this.chart.getOption() as any;
+        if (option && option.series) {
+          const updatedSeries = option.series.map((s: any) => ({
+            name: s.name,
+            emphasis: { disabled: true }
+          }));
+          this.chart.setOption({
+            series: updatedSeries
+          }, {
+            notMerge: false,
+            lazyUpdate: true
+          });
+        }
+      }
 
       // Force pagination calculation after legend updates
       setTimeout(() => {
