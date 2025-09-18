@@ -5725,7 +5725,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     // Frame rate detection
-    let lastFrameTime = performance.now();
+    const lastFrameTime = performance.now();
     let frameCount = 0;
     const checkFrameRate = () => {
       const currentTime = performance.now();
@@ -5878,7 +5878,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     // Get the full time range across all series for proper line length
-    let fullTimeRange = { start: timeDomain.start, end: timeDomain.end };
+    const fullTimeRange = { start: timeDomain.start, end: timeDomain.end };
     options.series.forEach((s: any) => {
       if (s.data?.length && !/Min Line|Max Line|Alarm Area/.test(s.name)) {
         const seriesStart = s.data[0][0];
@@ -5976,7 +5976,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     // Get the full time range
-    let fullTimeRange = { 
+    const fullTimeRange = { 
       start: baseSeries.data[0][0], 
       end: baseSeries.data[baseSeries.data.length - 1][0] 
     };
@@ -6191,7 +6191,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
     
     // Store the last known alarm values for comparison
-    let lastAlarmValues = new Map<string, string>();
+    const lastAlarmValues = new Map<string, string>();
     
     // Set up polling interval (every 5 seconds)
     this.alarmUpdateTimer = setInterval(async () => {

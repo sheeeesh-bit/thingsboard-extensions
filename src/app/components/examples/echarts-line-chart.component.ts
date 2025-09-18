@@ -1054,7 +1054,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       animationDurationUpdate: this.getAnimationUpdateDuration(),
       animationEasing: 'linear',  // Use linear for better performance
       animationEasingUpdate: 'linear',  // Linear easing on updates
-      useUTC: true  // Use UTC for cheaper date math
+      useUTC: true,  // Use UTC for cheaper date math
+      // Global emphasis settings to prevent glossy effects
+      emphasis: {
+        disabled: true,
+        scale: false
+      },
+      stateAnimation: {
+        duration: 0  // Disable state transition animations
+      },
+      hoverLayerThreshold: 99999  // Effectively disable hover layer for better performance
     };
     myNewOptions.series = [];
     
@@ -1103,25 +1112,52 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         id: `series_${i}_${seriesKey}`,  // Add ID for incremental updates
         name: seriesKey,  // Use unique key instead of just label
         itemStyle: {
-          normal: {
-            color: entityColor,  // Use entity-based color instead of series-specific color
-            opacity: labelSelected ? 1 : 0.08,  // [CLAUDE EDIT] Lower opacity when off
-            borderWidth: 2,
-            borderColor: '#fff',  // White border for contrast
-            shadowBlur: 4,
-            shadowColor: 'rgba(0, 0, 0, 0.1)',
-            shadowOffsetY: 2
-          }
+          color: entityColor,  // Use entity-based color instead of series-specific color
+          opacity: labelSelected ? 1 : 0.08,  // [CLAUDE EDIT] Lower opacity when off
+          borderWidth: 0,  // No border for flat look
+          borderColor: 'transparent',
+          shadowBlur: 0,  // No shadow for flat appearance
+          shadowColor: 'transparent',
+          shadowOffsetX: 0,
+          shadowOffsetY: 0
         },
         lineStyle: {
           color: entityColor,  // Also set line color to entity color
           width: this.ctx.settings.lineWidth || 3,
           opacity: labelSelected ? 1 : 0.08,  // [CLAUDE EDIT] Lower opacity when off
-          shadowBlur: labelSelected ? 2 : 0,  // Subtle shadow for depth
-          shadowColor: entityColor,
-          shadowOpacity: 0.3,
+          shadowBlur: 0,  // No shadow for flat appearance
+          shadowColor: 'transparent',
+          shadowOpacity: 0,
+          shadowOffsetX: 0,
+          shadowOffsetY: 0,
           cap: 'round',  // Rounded line ends
           join: 'round'  // Rounded line joins
+        },
+        // Disable emphasis to prevent glossy hover effects
+        emphasis: {
+          disabled: true,
+          scale: false,
+          itemStyle: {
+            borderWidth: 0,
+            shadowBlur: 0,
+            opacity: labelSelected ? 1 : 0.08
+          },
+          lineStyle: {
+            width: this.ctx.settings.lineWidth || 3,
+            shadowBlur: 0,
+            opacity: labelSelected ? 1 : 0.08
+          }
+        },
+        blur: {
+          itemStyle: {
+            opacity: labelSelected ? 1 : 0.08
+          },
+          lineStyle: {
+            opacity: labelSelected ? 1 : 0.08
+          }
+        },
+        select: {
+          disabled: true
         },
         type: 'line',
         xAxisIndex: gridIndex,
@@ -2711,11 +2747,25 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     setTimeout(() => {
       this.refreshEntityList();
       this.syncCustomLegendFromChart();
-      
+
+      // Force chart resize to fix glossy rendering issue
+      if (this.chart && !this.chart.isDisposed()) {
+        this.chart.resize();
+
+        // Also force a repaint by slightly adjusting and resetting options
+        setTimeout(() => {
+          if (this.chart && !this.chart.isDisposed()) {
+            // Force complete data update to apply flat styles correctly
+            // This rebuilds series with emphasis disabled
+            this.onDataUpdated();
+          }
+        }, 50);
+      }
+
       // Get updated legend state after timeout
       const finalOption: any = this.chart.getOption();
       const finalSelected = (finalOption?.legend?.[0]?.selected) || {};
-      
+
       const activeSeriesKeys = Object.keys(finalSelected).filter(k => finalSelected[k] !== false);
       
       // Conditional debug processing based on performance settings
