@@ -1791,7 +1791,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const option = this.chart?.getOption() as any;
       if (option && option.series) {
         const updatedSeries = option.series.map((s: any) => ({
-          name: s.name,
+          ...s,  // Keep all existing series properties
           emphasis: {
             disabled: true,
             scale: false,
@@ -1810,8 +1810,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         this.chart?.setOption({
           series: updatedSeries
         }, {
-          notMerge: true,  // Use notMerge to completely replace
-          lazyUpdate: false
+          notMerge: false,  // Use merge to keep data
+          lazyUpdate: false,
+          replaceMerge: ['series']  // Replace series array completely
         });
       }
       return;
@@ -1892,7 +1893,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       console.log('[GLOSSY DEBUG] First series emphasis state after dispatch:', firstSeries?.emphasis);
 
       const updatedSeries = option.series.map((s: any, index: number) => ({
-        name: s.name,
+        ...s,  // Keep all existing series properties
         emphasis: {
           disabled: true,
           scale: false,
@@ -1909,12 +1910,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         }
       }));
 
-      // Force a complete series replacement to ensure emphasis is properly set
+      // Update series with proper emphasis settings
       this.chart.setOption({
         series: updatedSeries
       }, {
-        notMerge: true,  // Use notMerge to completely replace
-        lazyUpdate: false  // Apply immediately, not lazy
+        notMerge: false,  // Use merge to keep data
+        lazyUpdate: false,  // Apply immediately
+        replaceMerge: ['series']  // Replace series array completely
       });
 
       // Verify the fix was applied
