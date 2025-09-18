@@ -1250,12 +1250,20 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
     // CRITICAL FIX: Force a complete emphasis disable on first load
     // This ensures the glossy effect doesn't appear on initial device activation
+    console.log('[GLOSSY DEBUG] isInitialLoad:', this.isInitialLoad, 'at', new Date().toISOString());
     if (this.isInitialLoad) {
+      console.log('[GLOSSY DEBUG] Applying initial load fix...');
       setTimeout(() => {
         if (this.chart && !this.chart.isDisposed()) {
           // Get current option and rebuild series with emphasis fully disabled
           const currentOption = this.chart.getOption() as any;
+          console.log('[GLOSSY DEBUG] Current series count:', currentOption?.series?.length);
+
           if (currentOption && currentOption.series) {
+            // Check current emphasis state
+            const firstSeries = currentOption.series[0];
+            console.log('[GLOSSY DEBUG] First series emphasis before fix:', firstSeries?.emphasis);
+
             const fixedSeries = currentOption.series.map((s: any) => ({
               name: s.name,
               emphasis: {
@@ -1277,9 +1285,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
               lazyUpdate: false,
               replaceMerge: ['series']
             });
+
+            console.log('[GLOSSY DEBUG] Initial load fix applied');
           }
         }
         this.isInitialLoad = false;
+        console.log('[GLOSSY DEBUG] isInitialLoad set to false');
       }, 150);
     }
 
@@ -1851,6 +1862,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
 
     const actionCount = this.pendingChartActions.length;
+    console.log('[GLOSSY DEBUG] Flushing', actionCount, 'batched actions');
 
     // Process all batched actions
     this.pendingChartActions.forEach(action => {
@@ -1864,7 +1876,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // CRITICAL: Immediately disable emphasis after legend actions to prevent glossy effects
     // This is especially important for initial device activation
     const option = this.chart.getOption() as any;
+    console.log('[GLOSSY DEBUG] Checking series after dispatch, series count:', option?.series?.length);
+
     if (option && option.series) {
+      const firstSeries = option.series[0];
+      console.log('[GLOSSY DEBUG] First series emphasis state after dispatch:', firstSeries?.emphasis);
+
       const updatedSeries = option.series.map((s: any) => ({
         name: s.name,
         emphasis: {
@@ -1879,6 +1896,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         notMerge: false,
         lazyUpdate: false  // Apply immediately, not lazy
       });
+      console.log('[GLOSSY DEBUG] Applied emphasis disable after batch flush');
     }
 
     // Restore animations after a short delay
@@ -2813,6 +2831,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Toggle device state
     const currentDeviceState = this.deviceVisibilityStates.get(entityName) !== false;
     const newDeviceState = !currentDeviceState;
+    console.log('[GLOSSY DEBUG] Toggling device:', entityName, 'from', currentDeviceState, 'to', newDeviceState);
     this.deviceVisibilityStates.set(entityName, newDeviceState);
 
     // Update visibility for all series of this entity, respecting plot states
