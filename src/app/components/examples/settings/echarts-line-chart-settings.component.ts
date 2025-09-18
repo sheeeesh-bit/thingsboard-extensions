@@ -74,6 +74,10 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   showEntitySidebar?: boolean;
   showCustomLegend?: boolean;
   showZoomControls?: boolean;
+
+  // Default Visibility States
+  defaultPlotsVisible?: boolean;  // Whether plots are visible by default (default: true)
+  defaultDevicesVisible?: boolean;  // Whether devices are visible by default (default: false)
   
   // Min/Max Reference Lines
   minMaxVisible?: boolean;
@@ -196,6 +200,10 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       showEntitySidebar: true,
       showCustomLegend: true,
       showZoomControls: true,
+
+      // Default Visibility States
+      defaultPlotsVisible: true,  // All plots visible by default
+      defaultDevicesVisible: false,  // All devices hidden by default
       // Min/Max Reference Lines
       minMaxVisible: false,
       minMaxStyle: 'dashed',
@@ -290,6 +298,10 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       showEntitySidebar: [settings.showEntitySidebar !== false],
       showCustomLegend: [settings.showCustomLegend !== false],
       showZoomControls: [settings.showZoomControls !== false],
+
+      // Default Visibility States
+      defaultPlotsVisible: [settings.defaultPlotsVisible !== false],  // Default true
+      defaultDevicesVisible: [settings.defaultDevicesVisible === true],  // Default false
       
       // Min/Max Reference Lines
       minMaxVisible: [settings.minMaxVisible || false],

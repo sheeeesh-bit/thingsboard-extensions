@@ -647,6 +647,34 @@
               <span class="slider"></span>
             </label>
           </div>
+
+          <!-- Default Visibility States -->
+          <div class="subsection">
+            <h4 class="subsection-title">Default Visibility</h4>
+            <p class="setting-description">Control initial visibility when widget loads</p>
+
+            <div class="toggle-row">
+              <label class="toggle-label">
+                <span>Plots Visible by Default</span>
+                <span class="setting-hint">Show all plot types (Temperature, Humidity, etc.) when widget loads</span>
+              </label>
+              <label class="apple-switch">
+                <input type="checkbox" formControlName="defaultPlotsVisible">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <label class="toggle-label">
+                <span>Devices Visible by Default</span>
+                <span class="setting-hint">Show all devices when widget loads (off = cleaner initial view)</span>
+              </label>
+              <label class="apple-switch">
+                <input type="checkbox" formControlName="defaultDevicesVisible">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
     </div>
