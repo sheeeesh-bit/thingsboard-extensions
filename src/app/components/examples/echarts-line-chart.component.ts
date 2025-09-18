@@ -1146,20 +1146,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           cap: 'round',  // Rounded line ends
           join: 'round'  // Rounded line joins
         },
-        // Disable emphasis to prevent glossy hover effects
+        // Disable all state transitions and emphasis to prevent glossy effects
+        stateAnimation: {
+          duration: 0
+        },
         emphasis: {
-          disabled: true,
-          scale: false,
-          itemStyle: {
-            borderWidth: 0,
-            shadowBlur: 0,
-            opacity: labelSelected ? 1 : 0.08
-          },
-          lineStyle: {
-            width: this.ctx.settings.lineWidth || 3,
-            shadowBlur: 0,
-            opacity: labelSelected ? 1 : 0.08
-          }
+          disabled: true
         },
         blur: {
           itemStyle: {
@@ -5144,6 +5136,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // [CLAUDE EDIT] Disable animations at root level
       animation: false,
       animationDurationUpdate: 0,
+      animationEasing: 'linear',
+      animationEasingUpdate: 'linear',
+      // Disable all state animations to prevent glossy transitions
+      stateAnimation: {
+        duration: 0,
+        easing: 'linear'
+      },
+      // Global emphasis settings to prevent glossy effects
+      emphasis: {
+        disabled: true,
+        scale: false,
+        focus: 'none'
+      },
       // Modern Apple-inspired background with subtle gradient
       backgroundColor: {
         type: 'linear',
