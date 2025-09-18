@@ -1248,28 +1248,45 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Hide the loading spinner after data is rendered
     this.chart.hideLoading();
 
+    // CRITICAL FIX: Force a complete emphasis disable on first load
+    // This ensures the glossy effect doesn't appear on initial device activation
+    if (this.isInitialLoad) {
+      setTimeout(() => {
+        if (this.chart && !this.chart.isDisposed()) {
+          // Get current option and rebuild series with emphasis fully disabled
+          const currentOption = this.chart.getOption() as any;
+          if (currentOption && currentOption.series) {
+            const fixedSeries = currentOption.series.map((s: any) => ({
+              name: s.name,
+              emphasis: {
+                disabled: true,
+                scale: false,
+                focus: 'none'
+              },
+              stateAnimation: {
+                duration: 0
+              }
+            }));
+
+            // Force apply with no merge to ensure clean state
+            this.chart.setOption({
+              series: fixedSeries,
+              stateAnimation: { duration: 0 }
+            }, {
+              notMerge: false,
+              lazyUpdate: false,
+              replaceMerge: ['series']
+            });
+          }
+        }
+        this.isInitialLoad = false;
+      }, 150);
+    }
+
     // Refresh entity list for sidebar and sync custom legend
     setTimeout(() => {
       this.refreshEntityList();
       this.syncCustomLegendFromChart();
-
-      // Ensure emphasis is disabled after initial render to prevent glossy effects
-      // This is especially important after first device activation
-      if (this.chart && !this.chart.isDisposed()) {
-        const option = this.chart.getOption() as any;
-        if (option && option.series) {
-          const updatedSeries = option.series.map((s: any) => ({
-            name: s.name,
-            emphasis: { disabled: true }
-          }));
-          this.chart.setOption({
-            series: updatedSeries
-          }, {
-            notMerge: false,
-            lazyUpdate: true
-          });
-        }
-      }
 
       // Force pagination calculation after legend updates
       setTimeout(() => {
