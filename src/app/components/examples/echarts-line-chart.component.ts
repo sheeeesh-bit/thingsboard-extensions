@@ -1795,13 +1795,22 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           emphasis: {
             disabled: true,
             scale: false,
-            focus: 'none'
+            focus: 'none',
+            blurScope: 'none',
+            itemStyle: {
+              shadowBlur: 0,
+              shadowColor: 'transparent'
+            },
+            lineStyle: {
+              shadowBlur: 0,
+              shadowColor: 'transparent'
+            }
           }
         }));
         this.chart?.setOption({
           series: updatedSeries
         }, {
-          notMerge: false,
+          notMerge: true,  // Use notMerge to completely replace
           lazyUpdate: false
         });
       }
@@ -1882,20 +1891,39 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const firstSeries = option.series[0];
       console.log('[GLOSSY DEBUG] First series emphasis state after dispatch:', firstSeries?.emphasis);
 
-      const updatedSeries = option.series.map((s: any) => ({
+      const updatedSeries = option.series.map((s: any, index: number) => ({
         name: s.name,
         emphasis: {
           disabled: true,
           scale: false,
-          focus: 'none'
+          focus: 'none',
+          blurScope: 'none',
+          itemStyle: {
+            shadowBlur: 0,
+            shadowColor: 'transparent'
+          },
+          lineStyle: {
+            shadowBlur: 0,
+            shadowColor: 'transparent'
+          }
         }
       }));
+
+      // Force a complete series replacement to ensure emphasis is properly set
       this.chart.setOption({
         series: updatedSeries
       }, {
-        notMerge: false,
+        notMerge: true,  // Use notMerge to completely replace
         lazyUpdate: false  // Apply immediately, not lazy
       });
+
+      // Verify the fix was applied
+      setTimeout(() => {
+        const verifyOption = this.chart.getOption() as any;
+        const verifyFirst = verifyOption?.series?.[0];
+        console.log('[GLOSSY DEBUG] Verified emphasis after fix:', verifyFirst?.emphasis);
+      }, 50);
+
       console.log('[GLOSSY DEBUG] Applied emphasis disable after batch flush');
     }
 
