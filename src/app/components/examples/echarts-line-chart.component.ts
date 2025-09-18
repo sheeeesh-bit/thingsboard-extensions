@@ -2609,9 +2609,30 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     if (oldWidth !== this.sidebarWidth && this.isSidebarVisible) {
       const margins = this.getPlotMargins();
       this.syncLegendToGridMargins(margins.left, margins.right);
-      
+
       // Force grid reset to apply new margins
       this.resetGrid = true;
+    }
+
+    // After sidebar width is calculated, refresh legend and check data state
+    if (oldWidth !== this.sidebarWidth) {
+      setTimeout(() => {
+        // Refresh legend pagination calculation
+        this.performPaginationCalculation();
+
+        // Re-check if we need to show the no-data overlay
+        const visibleEntities = this.entityList.filter(e => e.visible);
+        const visibleEntitiesWithData = visibleEntities.filter(e => e.dataPoints > 0);
+
+        if (visibleEntities.length === 0 || visibleEntitiesWithData.length === 0) {
+          if (!this.hasNoVisibleData) {
+            this.hasNoVisibleData = true;
+          }
+        }
+
+        // Trigger change detection to update UI
+        this.ctx.detectChanges();
+      }, 100);
     }
   }
   
@@ -2934,6 +2955,22 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       setTimeout(() => {
         this.performPaginationCalculation();
         this.ctx.detectChanges();
+
+        // Additional refresh after sidebar width has settled
+        setTimeout(() => {
+          // Re-calculate pagination with final sidebar width
+          this.performPaginationCalculation();
+
+          // Ensure no-data state is properly set
+          const visibleEntities = this.entityList.filter(e => e.visible);
+          const visibleEntitiesWithData = visibleEntities.filter(e => e.dataPoints > 0);
+
+          if (visibleEntities.length === 0 || visibleEntitiesWithData.length === 0) {
+            this.hasNoVisibleData = true;
+          }
+
+          this.ctx.detectChanges();
+        }, 300); // After sidebar animation completes
       }, 200);
     }, 100);
     
