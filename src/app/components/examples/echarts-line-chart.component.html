@@ -228,32 +228,6 @@
           </svg>
         </button>
 
-        <!-- Consolidated status indicator (right side) -->
-        <div class="legend-status-indicator"
-             *ngIf="hasStatusMessages()"
-             [matTooltip]="getStatusTooltip()"
-             matTooltipPosition="below"
-             matTooltipClass="status-tooltip">
-          <!-- Status badge with count -->
-          <div class="status-badge" [class.status-badge--warning]="getPrimaryStatusType() === 'warning'">
-            <!-- Info icon -->
-            <svg *ngIf="getPrimaryStatusType() === 'info'" class="status-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.2"/>
-              <circle cx="8" cy="5" r="0.8" fill="currentColor"/>
-              <rect x="7.2" y="7" width="1.6" height="4" rx="0.8" fill="currentColor"/>
-            </svg>
-            <!-- Warning icon -->
-            <svg *ngIf="getPrimaryStatusType() === 'warning'" class="status-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M8 2L14.928 13.5H1.072L8 2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
-              <circle cx="8" cy="11.5" r="0.6" fill="currentColor"/>
-              <rect x="7.4" y="6.5" width="1.2" height="3.5" rx="0.6" fill="currentColor"/>
-            </svg>
-            <!-- Message count if more than 1 -->
-            <span class="status-count" *ngIf="getStatusMessages().length > 1">
-              {{ getStatusMessages().length }}
-            </span>
-          </div>
-        </div>
       </nav>
 
       <!-- Scrollable chart container -->
@@ -262,11 +236,12 @@
         <!-- No Data Message -->
         <div *ngIf="hasNoVisibleData" class="no-data-message">
           <div class="no-data-content">
-            <i class="material-icons">{{ getAllDevicesEmpty() ? 'error_outline' : 'info_outline' }}</i>
-            <h3>{{ getAllDevicesEmpty() ? 'No Data for These Devices' : 'No Data Available' }}</h3>
-            <p *ngIf="getAllDevicesEmpty()">None of the configured devices have data in the current time range.</p>
-            <p *ngIf="!getAllDevicesEmpty()">All visible devices have no data in the current time range.</p>
-            <p *ngIf="!getAllDevicesEmpty()">Please enable devices with data from the sidebar or adjust the time range.</p>
+            <i class="material-icons">{{ getSelectedDeviceCount() === 0 ? 'visibility_off' : (hasOnlyEmptyDevicesSelected() ? 'warning' : (getAllDevicesEmpty() ? 'error_outline' : 'info_outline')) }}</i>
+            <h3>{{ getSelectedDeviceCount() === 0 ? 'No Devices Selected' : (hasOnlyEmptyDevicesSelected() ? 'Selected Devices Have No Data' : (getAllDevicesEmpty() ? 'No Data Available' : 'No Data to Display')) }}</h3>
+            <p *ngIf="getSelectedDeviceCount() === 0">Please select at least one device from the sidebar to view data.</p>
+            <p *ngIf="getSelectedDeviceCount() > 0 && hasOnlyEmptyDevicesSelected()">The selected devices have no data. Please select devices with data or adjust the time range.</p>
+            <p *ngIf="getSelectedDeviceCount() > 0 && getAllDevicesEmpty() && !hasOnlyEmptyDevicesSelected()">None of the configured devices have data in the current time range.</p>
+            <p *ngIf="getSelectedDeviceCount() > 0 && !getAllDevicesEmpty() && !hasOnlyEmptyDevicesSelected()">Please select devices with data from the sidebar or adjust the time range.</p>
           </div>
         </div>
       </div>

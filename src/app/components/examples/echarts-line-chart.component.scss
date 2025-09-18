@@ -865,6 +865,42 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
     padding-left: 12px; // Add spacing from legend items
     flex-shrink: 0;
 
+    // Clean Apple-style without background
+    .status-badge-clean {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: help;
+      position: relative;
+      padding: 2px;
+
+      .warning-icon-clean {
+        color: #ff9500; // iOS orange
+        opacity: 0.9;
+        transition: opacity 0.2s ease;
+      }
+
+      .status-count-clean {
+        font-size: 11px;
+        font-weight: 600;
+        color: #ff9500;
+        background: rgba(255, 149, 0, 0.1);
+        padding: 1px 5px;
+        border-radius: 8px;
+        line-height: 1.4;
+      }
+
+      &:hover {
+        .warning-icon-clean {
+          opacity: 1;
+        }
+
+        .status-count-clean {
+          background: rgba(255, 149, 0, 0.15);
+        }
+      }
+    }
+
     .status-badge {
       display: flex;
       align-items: center;
@@ -879,7 +915,7 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
       &--warning {
         background: rgba(255, 149, 0, 0.08); // iOS orange background
 
-        .status-icon {
+        .warning-emoji {
           color: #ff9500;
         }
 
@@ -888,10 +924,11 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
         }
       }
 
-      .status-icon {
-        width: 16px;
-        height: 16px;
-        color: #007aff; // iOS blue
+      .warning-emoji {
+        font-size: 16px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
         flex-shrink: 0;
       }
 

@@ -314,16 +314,33 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return this.entityList.every(entity => entity.dataPoints === 0);
   }
 
+  // Check if only empty devices are selected (visible)
+  public hasOnlyEmptyDevicesSelected(): boolean {
+    if (!this.entityList || this.entityList.length === 0) return false;
+    const visibleDevices = this.entityList.filter(entity => entity.visible);
+    if (visibleDevices.length === 0) return false;
+    return visibleDevices.every(entity => entity.dataPoints === 0);
+  }
+
   // Get all status messages for the tooltip
   public getStatusMessages(): { type: 'warning' | 'info', message: string }[] {
     const messages: { type: 'warning' | 'info', message: string }[] = [];
 
-    // Check for no data conditions
-    if (this.hasNoVisibleData) {
+    // Check if no devices are selected/visible
+    const visibleDevices = this.entityList?.filter(e => e.visible) || [];
+    if (visibleDevices.length === 0 && this.entityList?.length > 0) {
+      messages.push({ type: 'warning', message: 'No devices selected' });
+      // Make sure to show the no data overlay
+      if (!this.hasNoVisibleData) {
+        this.hasNoVisibleData = true;
+        this.ctx.detectChanges();
+      }
+    } else if (this.hasNoVisibleData) {
+      // Check for no data conditions
       if (this.getAllDevicesEmpty()) {
-        messages.push({ type: 'info', message: 'No data available for any device' });
+        messages.push({ type: 'warning', message: 'No data available for any device' });
       } else {
-        messages.push({ type: 'info', message: 'No visible devices have data' });
+        messages.push({ type: 'warning', message: 'No visible devices have data' });
       }
     }
 
@@ -354,7 +371,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const emptyDevices = this.entityList?.filter(e => e.visible && e.dataPoints === 0) || [];
     if (emptyDevices.length > 0 && !this.getAllDevicesEmpty()) {
       messages.push({
-        type: 'info',
+        type: 'warning',
         message: `${emptyDevices.length} visible device${emptyDevices.length > 1 ? 's' : ''} without data`
       });
     }
@@ -394,67 +411,21 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public hideAllDevices(): void {
     if (!this.ctx?.data || !this.chart || !this.entityList || this.entityList.length === 0) return;
 
-    // Note: We only hide all devices/entities, but preserve plot (label) toggle states
+    // Note: We hide ALL devices/entities, but preserve plot (label) toggle states
     // This means if a plot was manually toggled off, it stays off
 
-    // Find devices with data to ensure at least one stays visible
-    const devicesWithData: { entityName: string; seriesKeys: string[]; dataPoints: number }[] = [];
+    // Collect all series keys to hide
     const allSeriesKeys: string[] = [];
-
-    // Group by entity and count data points
-    const entityGroups: Record<string, { seriesKeys: string[]; dataPoints: number }> = {};
 
     for (const data of this.ctx.data) {
       const entityName = data.datasource?.entityName || 'Unknown';
       const label = data.dataKey.label;
       const seriesKey = this.buildSeriesKey(entityName, label);
       allSeriesKeys.push(seriesKey);
-
-      if (!entityGroups[entityName]) {
-        entityGroups[entityName] = { seriesKeys: [], dataPoints: 0 };
-      }
-      entityGroups[entityName].seriesKeys.push(seriesKey);
-
-      // Count data points for this series
-      if (data.data && Array.isArray(data.data)) {
-        entityGroups[entityName].dataPoints += data.data.length;
-      }
     }
 
-    // Convert to array and sort by data points (descending)
-    Object.keys(entityGroups).forEach(entityName => {
-      const group = entityGroups[entityName];
-      if (group.dataPoints > 0) {
-        devicesWithData.push({
-          entityName,
-          seriesKeys: group.seriesKeys,
-          dataPoints: group.dataPoints
-        });
-      }
-    });
-
-    devicesWithData.sort((a, b) => b.dataPoints - a.dataPoints);
-
-    // Determine which series to keep visible
-    let seriesToKeepVisible: string[] = [];
-    if (devicesWithData.length > 0) {
-      // Keep the device with the most data points visible
-      const deviceToKeep = devicesWithData[0];
-      seriesToKeepVisible = deviceToKeep.seriesKeys.filter(key => {
-        // Only keep series whose plots are not manually hidden
-        const series = this.ctx.data.find(d => this.buildSeriesKey(d.datasource?.entityName || '', d.dataKey.label) === key);
-        if (series) {
-          const label = series.dataKey.label;
-          return this.plotLabelStates.get(label) !== false;
-        }
-        return true;
-      });
-    }
-
-    // Hide all series except the ones we want to keep
-    const seriesToHide = allSeriesKeys.filter(key => !seriesToKeepVisible.includes(key));
-
-    seriesToHide.forEach(key => {
+    // Hide all series
+    allSeriesKeys.forEach(key => {
       this.batchedDispatchAction({
         type: 'legendUnSelect',
         name: key,
@@ -471,13 +442,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       this.legendOverridesGrids = true;
       const previousGridCount = this.currentGrids;
 
-      // Filter to active series with data
-      const activeSeriesWithData = seriesToKeepVisible.filter(key => {
-        const series = this.ctx.data.find(d => this.buildSeriesKey(d.datasource?.entityName || '', d.dataKey.label) === key);
-        return series && series.data && Array.isArray(series.data) && series.data.length > 0;
-      });
-
-      this.setDataGridByNames(activeSeriesWithData);
+      // No active series since we're hiding everything
+      this.setDataGridByNames([]);
 
       // If grid count changed, rebuild the chart
       if (previousGridCount !== this.currentGrids) {
@@ -1245,6 +1211,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     setTimeout(() => {
       this.refreshEntityList();
       this.syncCustomLegendFromChart();
+
+      // Force pagination calculation after legend updates
+      setTimeout(() => {
+        this.performPaginationCalculation();
+        this.ctx.detectChanges();
+      }, 200);
     }, 100);
     
     // Force resize after grid changes
@@ -1802,15 +1774,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   
   
-  // Check if an entity can be disabled (prevent disabling the last visible entity)
+  // Check if an entity can be disabled (all entities can now be disabled)
   private canDisableEntity(entityName: string): boolean {
-    const visibleEntities = this.entityList.filter(e => e.visible && e.name !== entityName);
-    const canDisable = visibleEntities.length > 0;
-    
-    if (!canDisable) {
-    }
-    
-    return canDisable;
+    // All entities can be disabled now
+    return true;
   }
   
   // Provide visual feedback when an action is blocked (pulse effect)
@@ -2575,10 +2542,35 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         visible: visible
       };
     }).sort((a, b) => a.displayName.localeCompare(b.displayName)); // Sort by display name
-    
+
+    // Check if we should show the no data overlay
+    const visibleEntities = this.entityList.filter(e => e.visible);
+    const visibleEntitiesWithData = visibleEntities.filter(e => e.dataPoints > 0);
+
+    // Show no data overlay if:
+    // 1. No devices are selected (visible)
+    // 2. Only devices with 0 data points are selected
+    if (visibleEntities.length === 0 || visibleEntitiesWithData.length === 0) {
+      if (!this.hasNoVisibleData) {
+        this.hasNoVisibleData = true;
+      }
+    } else {
+      // Only clear the flag if we actually have visible entities with data
+      // Don't clear it here if it was set by other conditions (like initial load)
+      if (this.hasNoVisibleData && visibleEntitiesWithData.length > 0) {
+        // Double check with the chart's actual data
+        const hasActualData = this.checkIfSelectedKeysHaveVisibleData(
+          visibleEntities.flatMap(e => entityGroups[e.name]?.seriesKeys || [])
+        );
+        if (hasActualData) {
+          this.hasNoVisibleData = false;
+        }
+      }
+    }
+
     // Calculate dynamic sidebar width based on longest name
     this.calculateDynamicSidebarWidth();
-    
+
     this.ctx.detectChanges();
   }
   
@@ -2628,13 +2620,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     if (!this.ctx?.data || !this.chart) return;
     
     
-    // Check if entity can be disabled (prevent disabling last visible entity)
-    const entityData = this.entityList.find(e => e.name === entityName);
-    if (entityData?.visible && !this.canDisableEntity(entityName)) {
-      // Provide visual feedback for blocked action
-      this.pulseEntityVisually(entityName);
-      return;
-    }
+    // All entities can now be disabled - no restrictions
     
     // Immediate UI feedback - update entity list optimistically
     this.batchUIUpdate('entity-list', () => {
@@ -2943,6 +2929,12 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     setTimeout(() => {
       this.refreshEntityList();
       this.syncCustomLegendFromChart();
+
+      // Force pagination calculation after legend is populated
+      setTimeout(() => {
+        this.performPaginationCalculation();
+        this.ctx.detectChanges();
+      }, 200);
     }, 100);
     
   }
@@ -4799,10 +4791,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     } catch (e) {
     }
     
-    // Default new series to ON if not in existing selection
+    // Default new series to OFF (hidden) if not in existing selection
     for (const key of data) {
       if (!(key in selected)) {
-        selected[key] = true;
+        selected[key] = false;
       }
     }
     
