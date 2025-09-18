@@ -2759,12 +2759,23 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       if (this.chart && !this.chart.isDisposed()) {
         this.chart.resize();
 
-        // Also force a repaint by slightly adjusting and resetting options
+        // Don't rebuild the entire chart - just ensure emphasis is disabled
         setTimeout(() => {
           if (this.chart && !this.chart.isDisposed()) {
-            // Force complete data update to apply flat styles correctly
-            // This rebuilds series with emphasis disabled
-            this.onDataUpdated();
+            // Disable emphasis on all series to prevent glossy effects
+            const option = this.chart.getOption() as any;
+            if (option && option.series) {
+              const updatedSeries = option.series.map((s: any) => ({
+                name: s.name,
+                emphasis: { disabled: true }
+              }));
+              this.chart.setOption({
+                series: updatedSeries
+              }, {
+                notMerge: false,
+                lazyUpdate: true
+              });
+            }
           }
         }, 50);
       }
