@@ -247,6 +247,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public sidebarDisplayMode: 'full' | 'compact' | 'colors' = 'full';
   public sidebarCollapsedMode: 'hidden' | 'colors' = 'hidden';
   public sidebarWidth = 240; // Default width, will be calculated dynamically
+
+  // Default visibility settings
+  private defaultPlotsVisible = true;  // All plots visible by default
+  private defaultDevicesVisible = false;  // All devices hidden by default
   
   // UI feedback states
   // private lastPulsedEntity: string | null = null; // Unused - removed for performance
@@ -530,11 +534,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   ngOnInit(): void {
-    
+
     // Initialize sidebar settings
     this.sidebarDisplayMode = this.ctx.settings?.sidebarDisplayMode || 'full';
     this.sidebarCollapsedMode = this.ctx.settings?.sidebarCollapsedMode || 'hidden';
-    
+
+    // Initialize default visibility settings
+    // Default: all plots visible, all devices hidden
+    this.defaultPlotsVisible = this.ctx.settings?.defaultPlotsVisible !== false; // true by default
+    this.defaultDevicesVisible = this.ctx.settings?.defaultDevicesVisible === true; // false by default
+
     // Initialize color scheme
     this.currentColorScheme = this.ctx.settings?.colorScheme || 'default';
     
@@ -2571,8 +2580,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Build entity list with display names and data point counts
     this.entityList = Object.keys(entityGroups).map(entityName => {
       const group = entityGroups[entityName];
-      // Use device visibility state instead of checking series
-      const visible = this.deviceVisibilityStates.get(entityName) !== false;
+
+      // Initialize device state if not already set
+      if (!this.deviceVisibilityStates.has(entityName)) {
+        this.deviceVisibilityStates.set(entityName, this.defaultDevicesVisible);
+      }
+
+      // Use device visibility state
+      const visible = this.deviceVisibilityStates.get(entityName)!;
       
       // Get both label and deviceName for tooltip
       const attrs = this.getEntityAttributes(entityName);
@@ -4870,10 +4885,28 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     } catch (e) {
     }
     
-    // Default new series to OFF (hidden) if not in existing selection
+    // Set initial visibility based on both plot and device states
     for (const key of data) {
       if (!(key in selected)) {
-        selected[key] = false;
+        // Extract entity and label from the series key
+        const parts = key.split(' :: ');
+        const entityName = parts[0];
+        const label = parts.length > 1 ? parts[1] : '';
+
+        // Initialize device state if needed
+        if (!this.deviceVisibilityStates.has(entityName)) {
+          this.deviceVisibilityStates.set(entityName, this.defaultDevicesVisible);
+        }
+
+        // Initialize plot state if needed
+        if (!this.plotLabelStates.has(label)) {
+          this.plotLabelStates.set(label, this.defaultPlotsVisible);
+        }
+
+        // Series is visible only if BOTH plot and device are visible
+        const plotVisible = this.plotLabelStates.get(label) !== false;
+        const deviceVisible = this.deviceVisibilityStates.get(entityName) !== false;
+        selected[key] = plotVisible && deviceVisible;
       }
     }
     
@@ -5723,8 +5756,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Initialize plot states for any new labels we haven't seen before
     for (const label of group.data) {
       if (!this.plotLabelStates.has(label)) {
-        // Default to visible for new plots
-        this.plotLabelStates.set(label, true);
+        // Use default visibility setting for new plots
+        this.plotLabelStates.set(label, this.defaultPlotsVisible);
       }
     }
 
