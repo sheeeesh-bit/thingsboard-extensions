@@ -1875,6 +1875,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     console.log('[GLOSSY DEBUG] Flushing', actionCount, 'batched actions');
 
     // Process all batched actions
+    const processedActions = [...this.pendingChartActions];  // Keep a copy
     this.pendingChartActions.forEach(action => {
       this.chart.dispatchAction(action);
     });
@@ -1919,12 +1920,23 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         replaceMerge: ['series']  // Replace series array completely
       });
 
+      // CRITICAL: Force ECharts to remove any emphasis state by dispatching downplay
+      // This removes any lingering glossy effects from the scale:true state
+      setTimeout(() => {
+        // Downplay all series to remove any emphasis/hover state
+        this.chart.dispatchAction({
+          type: 'downplay',
+          seriesIndex: Array.from({length: option.series.length}, (_, i) => i)  // All series
+        });
+        console.log('[GLOSSY DEBUG] Dispatched downplay for all series');
+      }, 20);
+
       // Verify the fix was applied
       setTimeout(() => {
         const verifyOption = this.chart.getOption() as any;
         const verifyFirst = verifyOption?.series?.[0];
         console.log('[GLOSSY DEBUG] Verified emphasis after fix:', verifyFirst?.emphasis);
-      }, 50);
+      }, 100);
 
       console.log('[GLOSSY DEBUG] Applied emphasis disable after batch flush');
     }
