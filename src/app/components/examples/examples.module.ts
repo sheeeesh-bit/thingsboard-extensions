@@ -6,15 +6,13 @@ import {
   HomeComponentsModule,
   WidgetConfigComponentsModule
 } from '@home/components/public-api';
-import { EchartsLineChartComponent } from './echarts-line-chart/echarts-line-chart.component';
-import { EchartsLineChartSettingsComponent } from './echarts-line-chart/settings/echarts-line-chart-settings.component';
-import { EchartsLineChartDataKeySettingsComponent } from './echarts-line-chart/data-key-settings/echarts-line-chart-data-key-settings.component';
+import { ScreenshotWidgetComponent } from './screenshot-widget/screenshot-widget.component';
+import { ScreenshotWidgetSettingsComponent } from './screenshot-widget/settings/screenshot-widget-settings.component';
 
 @NgModule({
   declarations: [
-    EchartsLineChartComponent,
-    EchartsLineChartSettingsComponent,
-    EchartsLineChartDataKeySettingsComponent
+    ScreenshotWidgetComponent,
+    ScreenshotWidgetSettingsComponent
   ],
   imports: [
     CommonModule,
@@ -24,9 +22,8 @@ import { EchartsLineChartDataKeySettingsComponent } from './echarts-line-chart/d
     WidgetConfigComponentsModule
   ],
   exports: [
-    EchartsLineChartComponent,
-    EchartsLineChartSettingsComponent,
-    EchartsLineChartDataKeySettingsComponent
+    ScreenshotWidgetComponent,
+    ScreenshotWidgetSettingsComponent
   ]
 })
 

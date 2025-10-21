@@ -33,7 +33,7 @@
         "serve": {
           "builder": "@tb/custom-builder:static-serve",
           "options": {
-            "port": 5000,
+            "port": 5001,
             "tsConfig": "src/tsconfig.lib.json",
             "project": "src/ng-package.json",
             "staticServeConfig": "static.serve.conf.js"

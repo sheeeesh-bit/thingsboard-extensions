@@ -1,0 +1,124 @@
+<form [formGroup]="screenshotWidgetSettingsForm">
+  <fieldset class="fields-group">
+    <legend class="group-title">General Settings</legend>
+
+    <mat-form-field class="mat-block">
+      <mat-label>Widget Title</mat-label>
+      <input matInput formControlName="widgetTitle" placeholder="Enter widget title">
+    </mat-form-field>
+
+    <section class="tb-form-panel stroked">
+      <div class="tb-form-row">
+        <mat-slide-toggle formControlName="showDebugInfo">
+          Show Debug Information
+        </mat-slide-toggle>
+      </div>
+    </section>
+  </fieldset>
+
+  <fieldset class="fields-group">
+    <legend class="group-title">Capture Settings</legend>
+
+    <mat-form-field class="mat-block">
+      <mat-label>Capture Mode</mat-label>
+      <mat-select formControlName="captureMode">
+        <mat-option value="dashboard">Full Dashboard</mat-option>
+        <mat-option value="widget">Current Widget Only</mat-option>
+        <mat-option value="custom">Custom Element (CSS Selector)</mat-option>
+      </mat-select>
+      <mat-hint>Select what to capture</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field class="mat-block" *ngIf="screenshotWidgetSettingsForm.get('captureMode').value === 'custom'">
+      <mat-label>Custom CSS Selector</mat-label>
+      <input matInput formControlName="customSelector" placeholder=".my-custom-class">
+      <mat-hint>Enter a CSS selector for the element to capture</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field class="mat-block">
+      <mat-label>Image Format</mat-label>
+      <mat-select formControlName="format">
+        <mat-option value="png">PNG (Best Quality)</mat-option>
+        <mat-option value="jpeg">JPEG (Smaller Size)</mat-option>
+      </mat-select>
+      <mat-hint>Choose image format</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field class="mat-block">
+      <mat-label>Image Quality</mat-label>
+      <input matInput type="number" formControlName="quality"
+             min="0.1" max="1" step="0.05" placeholder="0.95">
+      <mat-hint>Quality from 0.1 to 1.0 (higher = better quality)</mat-hint>
+    </mat-form-field>
+  </fieldset>
+
+  <fieldset class="fields-group">
+    <legend class="group-title">User Instructions</legend>
+
+    <section class="tb-form-panel stroked">
+      <div class="tb-form-row">
+        <mat-slide-toggle formControlName="showWarningDialog">
+          Show Warning Dialog Before Capture
+        </mat-slide-toggle>
+      </div>
+      <div class="tb-hint">Display instructions before starting the screen capture</div>
+    </section>
+
+    <mat-form-field class="mat-block" *ngIf="screenshotWidgetSettingsForm.get('showWarningDialog').value">
+      <mat-label>Warning Message</mat-label>
+      <textarea matInput formControlName="warningMessage"
+                rows="8"
+                placeholder="Enter custom warning message..."></textarea>
+      <mat-hint>Instructions shown to user before capture (supports line breaks)</mat-hint>
+    </mat-form-field>
+  </fieldset>
+
+  <fieldset class="fields-group">
+    <legend class="group-title">Advanced Settings</legend>
+
+    <mat-form-field class="mat-block">
+      <mat-label>Scroll Increment (px)</mat-label>
+      <input matInput type="number" formControlName="scrollIncrement" placeholder="1000">
+      <mat-hint>Pixels to scroll per capture for full-page screenshots</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field class="mat-block">
+      <mat-label>Render Delay (ms)</mat-label>
+      <input matInput type="number" formControlName="renderDelay" placeholder="1500">
+      <mat-hint>Time to wait after scrolling for content to render (1000-3000ms recommended)</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field class="mat-block">
+      <mat-label>Bottom Compensation (px)</mat-label>
+      <input matInput type="number" formControlName="bottomCompensation" placeholder="95">
+      <mat-hint>Extra pixels to add to bottom piece to ensure full capture (video pixels, typically 90-100)</mat-hint>
+    </mat-form-field>
+
+    <section class="tb-form-panel stroked">
+      <div class="tb-form-row">
+        <mat-slide-toggle formControlName="blockInput">
+          Block User Input During Capture
+        </mat-slide-toggle>
+      </div>
+      <div class="tb-hint">Prevents mouse/keyboard interaction while capturing (recommended)</div>
+    </section>
+
+    <section class="tb-form-panel stroked">
+      <div class="tb-form-row">
+        <mat-slide-toggle formControlName="scrollPreview">
+          Scroll Preview Mode (Debug)
+        </mat-slide-toggle>
+      </div>
+      <div class="tb-hint">Only scrolls through positions without capturing - useful for testing scroll calculation</div>
+    </section>
+
+    <section class="tb-form-panel stroked">
+      <div class="tb-form-row">
+        <mat-slide-toggle formControlName="downloadIndividual">
+          Download Individual Pieces (Debug)
+        </mat-slide-toggle>
+      </div>
+      <div class="tb-hint">Download each cropped piece separately instead of stitching - useful for debugging alignment</div>
+    </section>
+  </fieldset>
+</form>

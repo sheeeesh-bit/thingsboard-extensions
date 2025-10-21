@@ -1,0 +1,27 @@
+{
+  "widgetType": {
+    "name": "Screenshot Widget",
+    "description": "Simple widget with one button to capture and download full-page screenshots",
+    "image": null,
+    "tags": [
+      "screenshot",
+      "capture",
+      "export",
+      "utility",
+      "static"
+    ],
+    "descriptor": {
+      "type": "static",
+      "sizeX": 6,
+      "sizeY": 6,
+      "resources": [],
+      "templateHtml": "<tb-screenshot-widget [ctx]=\"ctx\"></tb-screenshot-widget>",
+      "templateCss": "",
+      "controllerScript": "self.onInit = function() {\n    console.log('[Screenshot Widget] Controller initialized');\n};\n\nself.onResize = function() {\n    if (self.ctx.widgetComponent) {\n        self.ctx.widgetComponent.onResize();\n    }\n};\n\nself.onDestroy = function() {\n    console.log('[Screenshot Widget] Controller destroyed');\n};",
+      "settingsSchema": {},
+      "dataKeySettingsSchema": {},
+      "defaultConfig": "{\"datasources\":[],\"settings\":{\"widgetTitle\":\"Screenshot\",\"showDebugInfo\":false,\"captureMode\":\"dashboard\",\"customSelector\":\"\",\"scrollIncrement\":1000,\"quality\":0.95,\"format\":\"png\"}}",
+      "settingsDirective": "tb-screenshot-widget-settings"
+    }
+  }
+}

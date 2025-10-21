@@ -1,0 +1,18 @@
+<div class="screenshot-widget-simple">
+  <!-- Just one button -->
+  <button
+    class="screenshot-capture-btn"
+    (click)="onCaptureClick()"
+    [disabled]="loading">
+    <span *ngIf="!loading">📸 Capture Screenshot</span>
+    <span *ngIf="loading">
+      <span class="spinner-small"></span>
+      {{ statusMessage || 'Capturing...' }}
+    </span>
+  </button>
+
+  <!-- Error message (minimal) -->
+  <div *ngIf="error" class="screenshot-error-simple">
+    {{ error }}
+  </div>
+</div>

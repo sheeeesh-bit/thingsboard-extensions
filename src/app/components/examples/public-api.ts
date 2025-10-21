@@ -1,4 +1,3 @@
 export * from './examples.module';
-export * from './echarts-line-chart/echarts-line-chart.component';
-export * from './echarts-line-chart/settings/echarts-line-chart-settings.component';
-export * from './echarts-line-chart/data-key-settings/echarts-line-chart-data-key-settings.component';
+export * from './screenshot-widget/screenshot-widget.component';
+export * from './screenshot-widget/settings/screenshot-widget-settings.component';

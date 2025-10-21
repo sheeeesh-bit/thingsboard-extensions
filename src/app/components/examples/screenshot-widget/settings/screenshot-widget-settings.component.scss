@@ -1,0 +1,16 @@
+:host {
+  display: block;
+}
+
+.fields-group {
+  border: none;
+  padding: 0;
+  margin-bottom: 16px;
+
+  .group-title {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 12px;
+    color: var(--mdc-theme-text-primary, #000);
+  }
+}
