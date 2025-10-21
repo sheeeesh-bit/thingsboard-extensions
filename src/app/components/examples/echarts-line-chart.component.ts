@@ -5049,7 +5049,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           width: 0.5
         }
       },
-      axisLine: { 
+      axisLine: {
         onZero: false,
         lineStyle: {
           color: '#cfd4dc'  // [CLAUDE] Apple-style axis line
@@ -5061,7 +5061,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       position: 'bottom',
       axisLabel: {
         show: true,
-        fontSize: this.currentSize === 'small' ? 14 : 
+        fontSize: this.currentSize === 'small' ? 14 :
                  this.currentSize === 'large' ? 15 : 16,
         fontWeight: '400',
         fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif',
@@ -5074,6 +5074,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         margin: 20,  // Increased margin to prevent clipping
         showMinLabel: true,
         showMaxLabel: true
+      },
+      axisPointer: {
+        label: {
+          formatter: (params: any) => {
+            // Format axisPointer label in local time (useUTC: true causes UTC display otherwise)
+            return this.firstLabelFormatterWithSeconds().format(params.value);
+          }
+        }
       },
       min: this.ctx.timeWindow.minTime,
       max: this.ctx.timeWindow.maxTime,
@@ -5093,7 +5101,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             type: 'solid'
           }
         },
-        axisLine: { 
+        axisLine: {
           onZero: false,
           show: true,
           lineStyle: {
@@ -5106,7 +5114,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         position: 'bottom', // Always position at bottom for all grids
         axisLabel: {
           show: true, // NOW SHOWING LABELS ON ALL GRIDS
-          fontSize: this.currentSize === 'small' ? 14 : 
+          fontSize: this.currentSize === 'small' ? 14 :
                    this.currentSize === 'large' ? 15 : 16,
           fontWeight: '400',
           fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif',
@@ -5119,6 +5127,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           margin: 20,  // Increased margin to prevent clipping
           showMinLabel: true,
           showMaxLabel: true
+        },
+        axisPointer: {
+          label: {
+            formatter: (params: any) => {
+              // Format axisPointer label in local time (useUTC: true causes UTC display otherwise)
+              return this.firstLabelFormatterWithSeconds().format(params.value);
+            }
+          }
         },
         min: this.ctx.timeWindow.minTime,
         max: this.ctx.timeWindow.maxTime,
