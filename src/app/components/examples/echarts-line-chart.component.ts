@@ -124,10 +124,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // Track which grid is currently hovered for tooltip filtering
   private hoveredGridIndex: number | null = null;
   
-  // Entity-based color mapping
+  // Entity-based color mapping (for multiple devices mode)
   private entityColorMap: Record<string, string> = {};
   private nextColorIndex = 0;
-  
+
+  // Label-based color mapping (for single device mode)
+  private labelColorMap: Record<string, string> = {};
+  private nextLabelColorIndex = 0;
+
+  // Device type filtering (e.g., S200 3D cannot show alpha/beta/gamma measurements)
+  private deviceTypeMap: Map<string, string> = new Map(); // entityName → deviceType (e.g., "S200 3D")
+  private deviceForbiddenMeasurements: Map<string, string[]> = new Map(); // entityName → forbidden measurement keywords
+  private isDeviceTypesFetched = false;
+
   // Custom legend overlay state
   public legendItems: Array<{
     label: string;
@@ -176,7 +185,26 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     pastel: ['#ffd6ff', '#e7c6ff', '#c8b6ff', '#b8c0ff', '#bbd0ff', '#a8dadc', '#f1faee', '#ffdab9', '#ffb5a7', '#fcd5ce'],
     monochrome: ['#001f3f', '#003366', '#004080', '#0059b3', '#0073e6', '#3399ff', '#66b3ff', '#99ccff', '#cce6ff', '#e6f2ff']
   };
-  
+
+  // Device type configuration - maps device name patterns to types and allowed measurements
+  // Example device names: "S-200-a3-2d3412ab", "S-210-b2-3e4523cd"
+  private deviceTypePatterns: Record<string, string> = {
+    'S-200': 'S200 3D',
+    'S-210': 'S210 3D XT',
+    'S-201': 'S201 3D XT self build',
+    'S-100': 'S100 6D',
+    'S-400': 'S400 GNSS'
+  };
+
+  // Device type forbidden measurements - 3D devices cannot show measurements containing these keywords
+  private deviceTypeForbiddenMeasurements: Record<string, string[]> = {
+    'S200 3D': ['alpha', 'beta', 'gamma'],
+    'S210 3D XT': ['alpha', 'beta', 'gamma'],
+    'S201 3D XT self build': ['alpha', 'beta', 'gamma'],
+    'S100 6D': [],  // 6D devices can show all measurements
+    'S400 GNSS': []  // GNSS devices can show all measurements
+  };
+
   public currentColorScheme = 'default';
   private currentGrids = 3;
   private currentGridNames: string[] = [];
@@ -559,9 +587,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.sidebarCollapsedMode = this.ctx.settings?.sidebarCollapsedMode || 'hidden';
 
     // Initialize default visibility settings
-    // Default: all plots visible, all devices hidden
+    // Default: all plots visible
     this.defaultPlotsVisible = this.ctx.settings?.defaultPlotsVisible !== false; // true by default
-    this.defaultDevicesVisible = this.ctx.settings?.defaultDevicesVisible === true; // false by default
+
+    // Device visibility: in single device mode, always show device by default
+    // In multiple devices mode, respect the setting (default hidden)
+    const isMultipleDevicesMode = this.ctx.settings?.multipleDevices === true;
+    if (isMultipleDevicesMode) {
+      // Multiple devices mode: use setting (default false)
+      this.defaultDevicesVisible = this.ctx.settings?.defaultDevicesVisible === true;
+    } else {
+      // Single device mode: always show the device by default
+      this.defaultDevicesVisible = true;
+    }
 
     // Initialize color scheme
     this.currentColorScheme = this.ctx.settings?.colorScheme || 'default';
@@ -588,39 +626,25 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.alarmMinColor = this.ctx.settings?.alarmMinColor || '#ff9500';
     this.alarmMaxColor = this.ctx.settings?.alarmMaxColor || '#ff3b30';
     
-    // Reset entity color mapping on initialization
+    // Reset color mapping on initialization
     this.entityColorMap = {};
     this.nextColorIndex = 0;
+    this.labelColorMap = {};
+    this.nextLabelColorIndex = 0;
     
     // Initialize DatePipe with user's locale
     
     // Initialize debug output first
     this.DEBUG = this.ctx.settings.debugOutput;
     this.PERF_DEBUG = this.ctx.settings.performanceDebug !== false; // Default enabled
-    
+
+    // Log comprehensive ctx debug info when debug mode is enabled
+    if (this.DEBUG) {
+      this.logCtxDebugInfo();
+    }
+
     // Force maximum performance settings
     this.applyMaximumPerformanceSettings();
-    
-    // Log data series details
-    
-    // Log first few series for debugging
-    if (this.ctx.data && this.ctx.data.length > 0) {
-      for (let i = 0; i < Math.min(5, this.ctx.data.length); i++) {
-      }
-    }
-    
-    // Log datasources information
-    if (this.ctx.datasources) {
-      this.ctx.datasources.forEach((ds, idx) => {
-      });
-    }
-    
-    if (this.ctx.data && this.ctx.data.length > 0) {
-      this.ctx.data.forEach((item: any, index: number) => {
-        const axisAssignment = item?.dataKey?.settings?.axisAssignment;
-      });
-    } else {
-    }
     
     // Setup menu buttons
     this.ctx.$scope.menuButtons = (buttonName: string) => {
@@ -701,7 +725,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // This ensures the CSS custom properties are set before the legend renders
     const margins = this.getPlotMargins();
     this.syncLegendToGridMargins(margins.left, margins.right);
-    
+
     // Delay initialization to ensure layout is complete
     setTimeout(() => {
       this.initChart();
@@ -927,14 +951,18 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
   }
 
-  public onDataUpdated(): void {
-    
+  public async onDataUpdated(): Promise<void> {
+    // If device type filtering is enabled, wait for device types to be fetched first
+    if (this.ctx.settings?.deviceTypeFiltering === true && !this.isDeviceTypesFetched) {
+      await this.fetchDeviceTypesAndFilter();
+    }
+
     // Reset hovered grid index to avoid stale references
     this.hoveredGridIndex = null;
-    
+
     // Count total data points for optimization decisions
     const dataCountStart = performance.now();
-    this.totalDataPoints = this.ctx.data?.reduce((sum, series) => 
+    this.totalDataPoints = this.ctx.data?.reduce((sum, series) =>
       sum + (series.data?.length || 0), 0) || 0;
     const dataCountDuration = performance.now() - dataCountStart;
     
@@ -1112,13 +1140,20 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       }
       
       
-      // Get entity name for color grouping
+      // Get entity name and label for color assignment
       const entityName = this.ctx.data[i].datasource?.entityName || '';
-      const entityColor = this.getColorForEntity(entityName);
       const label = this.ctx.data[i].dataKey.label;
+
+      // Check if this measurement is allowed for this device type
+      if (!this.isMeasurementAllowed(entityName, label)) {
+        continue; // Skip this series - measurement is forbidden for this device type
+      }
+
+      const dataKeyColor = this.ctx.data[i].dataKey?.color; // Custom color from data key settings
+      const seriesColor = this.getColorForSeries(entityName, label, dataKeyColor);
       const seriesKey = this.buildSeriesKey(entityName, label);
-      
-      
+
+
       // [CLAUDE EDIT] Performance optimizations
       const points = this.ctx.data[i].data?.length || 0;
       const labelSelected = this.legendItems.find(item => item.label === label)?.selected !== false;
@@ -1127,7 +1162,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         id: `series_${i}_${seriesKey}`,  // Add ID for incremental updates
         name: seriesKey,  // Use unique key instead of just label
         itemStyle: {
-          color: entityColor,  // Use entity-based color instead of series-specific color
+          color: seriesColor,  // Use mode-aware color (entity or label based)
           opacity: labelSelected ? 1 : 0.08,  // [CLAUDE EDIT] Lower opacity when off
           borderWidth: 0,  // No border for flat look
           borderColor: 'transparent',
@@ -1137,7 +1172,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
           shadowOffsetY: 0
         },
         lineStyle: {
-          color: entityColor,  // Also set line color to entity color
+          color: seriesColor,  // Also set line color to series color
           width: this.ctx.settings.lineWidth || 3,
           opacity: labelSelected ? 1 : 0.08,  // [CLAUDE EDIT] Lower opacity when off
           shadowBlur: 0,  // No shadow for flat appearance
@@ -2056,16 +2091,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       // Fallback for series without entity name
       entityName = '_unknown_' + this.nextColorIndex;
     }
-    
+
     if (!this.entityColorMap[entityName]) {
       // Get the active color palette based on selected scheme
       const activeColorScheme = this.colorSchemes[this.currentColorScheme] || this.colorSchemes.default;
-      
+
       // For extended palette, create variations if needed
       let colorToUse: string;
       const baseIndex = this.nextColorIndex % activeColorScheme.length;
       const variation = Math.floor(this.nextColorIndex / activeColorScheme.length);
-      
+
       if (variation === 0) {
         // Use base colors for first set
         colorToUse = activeColorScheme[baseIndex];
@@ -2074,12 +2109,65 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         const factor = 1 + (0.2 * variation);
         colorToUse = this.adjustColorBrightness(activeColorScheme[baseIndex], factor);
       }
-      
+
       this.entityColorMap[entityName] = colorToUse;
       this.nextColorIndex++;
     }
-    
+
     return this.entityColorMap[entityName];
+  }
+
+  // Helper to get consistent color for a label (series name)
+  private getColorForLabel(label: string): string {
+    if (!label) {
+      // Fallback for series without label
+      label = '_unknown_label_' + this.nextLabelColorIndex;
+    }
+
+    if (!this.labelColorMap[label]) {
+      // Get the active color palette based on selected scheme
+      const activeColorScheme = this.colorSchemes[this.currentColorScheme] || this.colorSchemes.default;
+
+      // For extended palette, create variations if needed
+      let colorToUse: string;
+      const baseIndex = this.nextLabelColorIndex % activeColorScheme.length;
+      const variation = Math.floor(this.nextLabelColorIndex / activeColorScheme.length);
+
+      if (variation === 0) {
+        // Use base colors for first set
+        colorToUse = activeColorScheme[baseIndex];
+      } else {
+        // Create variations for subsequent sets
+        const factor = 1 + (0.2 * variation);
+        colorToUse = this.adjustColorBrightness(activeColorScheme[baseIndex], factor);
+      }
+
+      this.labelColorMap[label] = colorToUse;
+      this.nextLabelColorIndex++;
+    }
+
+    return this.labelColorMap[label];
+  }
+
+  // Main color getter - chooses between entity-based or label-based coloring
+  // based on multipleDevices mode
+  // - Single mode: respects custom dataKey.color, falls back to label-based coloring
+  // - Multiple mode: uses color scheme (entity-based), ignores custom colors
+  private getColorForSeries(entityName: string, label: string, dataKeyColor?: string): string {
+    const isMultipleDevicesMode = this.ctx.settings?.multipleDevices === true;
+
+    if (isMultipleDevicesMode) {
+      // Multiple devices mode: use entity-based coloring from color scheme (ignore custom colors)
+      // All series from same device get same color from the active color scheme
+      return this.getColorForEntity(entityName);
+    } else {
+      // Single device mode: respect custom color if set, otherwise use label-based coloring
+      if (dataKeyColor) {
+        return dataKeyColor;
+      }
+      // Each measurement type (label) gets a different color
+      return this.getColorForLabel(label);
+    }
   }
   
   private adjustColorBrightness(color: string, factor: number): string {
@@ -2090,14 +2178,290 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const b = Math.min(255, Math.floor(parseInt(hex.substring(4, 6), 16) * factor));
     return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
   }
-  
+
+  // Comprehensive debug logging for ctx object
+  private logCtxDebugInfo(): void {
+    console.group('📊 [CTX DEBUG] Widget Context Information');
+
+    // Basic widget info
+    console.log('🔧 Widget Dimensions:', {
+      width: this.ctx.width,
+      height: this.ctx.height,
+      timeWindow: this.ctx.timeWindow
+    });
+
+    // Settings
+    console.log('⚙️ Settings:', {
+      multipleDevices: this.ctx.settings?.multipleDevices,
+      debugOutput: this.ctx.settings?.debugOutput,
+      showImageButton: this.ctx.settings?.showImageButton,
+      showExportButton: this.ctx.settings?.showExportButton,
+      showResetZoomButton: this.ctx.settings?.showResetZoomButton,
+      showEntitySidebar: this.ctx.settings?.showEntitySidebar,
+      showCustomLegend: this.ctx.settings?.showCustomLegend,
+      showZoomControls: this.ctx.settings?.showZoomControls,
+      symbolSize_data: this.ctx.settings?.symbolSize_data,
+      exportDecimals: this.ctx.settings?.exportDecimals,
+      useLazyLoading: this.ctx.settings?.useLazyLoading,
+      alarmSupportEnabled: this.ctx.settings?.alarmSupportEnabled,
+      allSettings: this.ctx.settings
+    });
+
+    // Datasources
+    if (this.ctx.datasources && this.ctx.datasources.length > 0) {
+      console.log(`📡 Datasources (${this.ctx.datasources.length}):`,
+        this.ctx.datasources.map((ds, idx) => ({
+          index: idx,
+          entityName: ds.entityName,
+          entityType: ds.entityType,
+          entityId: ds.entityId,
+          name: ds.name,
+          type: ds.type
+        }))
+      );
+    }
+
+    // Data series
+    if (this.ctx.data && this.ctx.data.length > 0) {
+      console.log(`📈 Data Series (${this.ctx.data.length}):`);
+
+      this.ctx.data.forEach((series, idx) => {
+        const dataKey = series.dataKey;
+        const datasource = series.datasource;
+
+        console.group(`  Series ${idx + 1}/${this.ctx.data.length}: ${dataKey?.label || 'Unknown'}`);
+
+        console.log('    DataKey:', {
+          name: dataKey?.name,
+          label: dataKey?.label,
+          type: dataKey?.type,
+          color: dataKey?.color,
+          units: dataKey?.units,
+          decimals: dataKey?.decimals,
+          axisAssignment: dataKey?.settings?.axisAssignment
+        });
+
+        console.log('    Datasource:', {
+          entityName: datasource?.entityName,
+          entityType: datasource?.entityType,
+          entityId: typeof datasource?.entityId === 'string' ? datasource.entityId : (datasource?.entityId as any)?.id
+        });
+
+        console.log('    Data Points:', {
+          count: series.data?.length || 0,
+          first: series.data?.[0],
+          last: series.data?.[series.data.length - 1]
+        });
+
+        console.groupEnd();
+      });
+    } else {
+      console.warn('⚠️ No data series available');
+    }
+
+    // Color scheme info
+    console.log('🎨 Color Configuration:', {
+      currentScheme: this.currentColorScheme,
+      entityColorMapSize: Object.keys(this.entityColorMap).length,
+      labelColorMapSize: Object.keys(this.labelColorMap).length,
+      isSingleDeviceMode: this.ctx.settings?.multipleDevices !== true
+    });
+
+    // Performance settings
+    console.log('⚡ Performance Settings:', {
+      PERF_DEBUG: this.PERF_DEBUG,
+      useLazyLoading: this.ctx.settings?.useLazyLoading
+    });
+
+    console.groupEnd();
+  }
+
+  /**
+   * Fetch device names and determine device types for measurement filtering
+   * Must be called before rendering chart to properly filter data keys
+   */
+  private async fetchDeviceTypesAndFilter(): Promise<void> {
+    if (this.isDeviceTypesFetched) {
+      return; // Already fetched
+    }
+
+    // Check if device type filtering is enabled
+    const filteringEnabled = this.ctx.settings?.deviceTypeFiltering === true;
+    if (!filteringEnabled) {
+      this.isDeviceTypesFetched = true;
+      if (this.DEBUG) {
+        console.log('📋 [DEVICE TYPE] Filtering disabled in settings');
+      }
+      return;
+    }
+
+    if (this.DEBUG) {
+      console.group('📋 [DEVICE TYPE] Fetching device types and filtering measurements');
+    }
+
+    try {
+      // Get unique entities from ctx.data
+      const entities = new Map<string, { entityType: string; entityId: string }>();
+
+      for (const series of this.ctx.data || []) {
+        const entityName = series.datasource?.entityName;
+        if (entityName && !entities.has(entityName)) {
+          entities.set(entityName, {
+            entityType: series.datasource.entityType,
+            entityId: series.datasource.entityId
+          });
+        }
+      }
+
+      if (this.DEBUG) {
+        console.log(`Found ${entities.size} unique entities to fetch`);
+      }
+
+      // Fetch deviceName attribute for all entities
+      const fetchPromises: Promise<void>[] = [];
+
+      for (const [entityName, entity] of entities) {
+        const promise = firstValueFrom(
+          this.ctx.attributeService.getEntityAttributes(
+            { entityType: entity.entityType, id: entity.entityId } as any,
+            'SERVER_SCOPE' as any,
+            ['deviceName']
+          )
+        ).then(attrs => {
+          // Find deviceName attribute
+          const deviceNameAttr = attrs.find((a: any) => a.key === 'deviceName');
+          const deviceName = deviceNameAttr ? String(deviceNameAttr.value) : entityName;
+
+          // Parse device type from device name
+          const deviceType = this.parseDeviceType(deviceName);
+
+          if (deviceType) {
+            this.deviceTypeMap.set(entityName, deviceType);
+
+            // Get forbidden measurements for this device type
+            const forbiddenMeasurements = this.deviceTypeForbiddenMeasurements[deviceType] || [];
+            this.deviceForbiddenMeasurements.set(entityName, forbiddenMeasurements);
+
+            if (this.DEBUG) {
+              console.log(`  ${entityName} → "${deviceName}" → ${deviceType} (forbidden: ${forbiddenMeasurements.join(', ') || 'none'})`);
+            }
+          } else {
+            if (this.DEBUG) {
+              console.warn(`  ${entityName} → "${deviceName}" → No device type match`);
+            }
+          }
+        }).catch(error => {
+          if (this.DEBUG) {
+            console.warn(`  Failed to fetch deviceName for ${entityName}:`, error);
+          }
+        });
+
+        fetchPromises.push(promise);
+      }
+
+      // Wait for all fetches to complete
+      await Promise.all(fetchPromises);
+
+      this.isDeviceTypesFetched = true;
+
+      if (this.DEBUG) {
+        console.log(`✅ Device type fetching complete. ${this.deviceTypeMap.size} devices typed.`);
+
+        // Show filtering summary
+        const totalSeries = this.ctx.data?.length || 0;
+        let filteredCount = 0;
+        const filteredLabels = new Set<string>();
+
+        for (const series of this.ctx.data || []) {
+          const entityName = series.datasource?.entityName;
+          const label = series.dataKey?.label;
+          if (entityName && label && !this.isMeasurementAllowed(entityName, label)) {
+            filteredCount++;
+            filteredLabels.add(label);
+          }
+        }
+
+        if (filteredCount > 0) {
+          console.log(`📊 Filtering Summary: ${filteredCount}/${totalSeries} series will be hidden`);
+          console.log(`   Filtered measurements: ${Array.from(filteredLabels).join(', ')}`);
+        } else {
+          console.log(`📊 No series filtered (no forbidden measurements for these devices)`);
+        }
+
+        console.groupEnd();
+      }
+
+    } catch (error) {
+      console.error('[DEVICE TYPE] Error fetching device types:', error);
+      this.isDeviceTypesFetched = true; // Mark as fetched to avoid retry loops
+      if (this.DEBUG) {
+        console.groupEnd();
+      }
+    }
+  }
+
+  /**
+   * Parse device type from device name
+   * Example: "S-200-a3-2d3412ab" → "S200 3D"
+   */
+  private parseDeviceType(deviceName: string): string | null {
+    // Check each pattern to see if device name matches
+    for (const [pattern, deviceType] of Object.entries(this.deviceTypePatterns)) {
+      if (deviceName.includes(pattern)) {
+        return deviceType;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Check if a measurement is allowed for a given device
+   * Returns true if filtering is disabled or measurement is not forbidden
+   */
+  private isMeasurementAllowed(entityName: string, measurementLabel: string): boolean {
+    // If device type filtering is disabled, allow all
+    if (this.ctx.settings?.deviceTypeFiltering !== true) {
+      return true;
+    }
+
+    // If device has no forbidden measurements defined, allow all
+    if (!this.deviceForbiddenMeasurements.has(entityName)) {
+      return true;
+    }
+
+    // Get forbidden measurements for this device
+    const forbiddenMeasurements = this.deviceForbiddenMeasurements.get(entityName) || [];
+
+    // Normalize label for comparison (lowercase, trim)
+    const normalizedLabel = measurementLabel.toLowerCase().trim();
+
+    // Check if any forbidden measurement appears in the label as a word/prefix
+    // Example: "alpha_d_avg_day" contains "alpha" → FORBIDDEN
+    // Example: "tv1_d_avg_day" does NOT contain "alpha" → ALLOWED
+    const isForbidden = forbiddenMeasurements.some(forbidden => {
+      const forbiddenLower = forbidden.toLowerCase();
+      // Match at start of label, or after separator (_, -, space)
+      const regex = new RegExp(`(^|[_\\-\\s])${forbiddenLower}([_\\-\\s]|$)`, 'i');
+      return regex.test(normalizedLabel);
+    });
+
+    if (this.DEBUG && isForbidden) {
+      const deviceType = this.deviceTypeMap.get(entityName);
+      console.log(`🚫 [DEVICE TYPE] Filtering out "${measurementLabel}" for ${entityName} (${deviceType})`);
+    }
+
+    return !isForbidden;
+  }
+
   public openSettingsDialog(): void {
     const alarmSupportEnabled = this.ctx.settings?.alarmSupportEnabled === true;
+    const isSingleDeviceMode = this.ctx.settings?.multipleDevices !== true;
     const dialogRef = this.dialog.open(EchartsSettingsDialogComponent, {
       width: '500px',
-      data: { 
+      data: {
         colorScheme: this.currentColorScheme,
         sidebarCollapsedMode: this.sidebarCollapsedMode,
+        isSingleDeviceMode: isSingleDeviceMode,
         minMaxVisible: this.minMaxVisible,
         minMaxStyle: this.minMaxStyle || 'dashed',
         minMaxColor: this.minMaxColor || 'rgba(128, 128, 128, 0.5)',
@@ -2124,7 +2488,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       if (result) {
         this.changeColorScheme(result.colorScheme);
         this.sidebarCollapsedMode = result.sidebarCollapsedMode || 'hidden';
-        
+
         // Update min/max settings
         this.minMaxVisible = result.minMaxVisible;
         this.minMaxStyle = result.minMaxStyle;
@@ -2194,11 +2558,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   
   public changeColorScheme(scheme: string): void {
     this.currentColorScheme = scheme;
-    
-    // Reset color mapping to apply new scheme
+
+    // Reset both color mappings to apply new scheme
     this.entityColorMap = {};
     this.nextColorIndex = 0;
-    
+    this.labelColorMap = {};
+    this.nextLabelColorIndex = 0;
+
     // Trigger chart update with new colors
     if (this.chart && !this.chart.isDisposed()) {
       this.onDataUpdated();
@@ -2645,21 +3011,34 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Group series by entity and count data points
     const entityGroups: Record<string, { seriesKeys: string[], color: string, dataPoints: number }> = {};
-    
+
     for (const data of this.ctx.data) {
       const entityName = data.datasource?.entityName || 'Unknown';
       const label = data.dataKey.label;
       const seriesKey = this.buildSeriesKey(entityName, label);
-      
+
       if (!entityGroups[entityName]) {
+        // Use the same color logic as getColorForSeries() to ensure sidebar matches data lines
+        const isMultipleDevicesMode = this.ctx.settings?.multipleDevices === true;
+        const dataKeyColor = data.dataKey?.color;
+        let entityColor: string;
+
+        if (isMultipleDevicesMode) {
+          // Multiple devices mode: always use entity color from scheme (ignore custom colors)
+          entityColor = this.getColorForEntity(entityName);
+        } else {
+          // Single device mode: use custom color if available, otherwise use entity color
+          entityColor = dataKeyColor || this.getColorForEntity(entityName);
+        }
+
         entityGroups[entityName] = {
           seriesKeys: [],
-          color: this.getColorForEntity(entityName),
+          color: entityColor,
           dataPoints: 0
         };
       }
       entityGroups[entityName].seriesKeys.push(seriesKey);
-      
+
       // Count data points for this series
       if (data.data && Array.isArray(data.data)) {
         entityGroups[entityName].dataPoints += data.data.length;
@@ -5851,10 +6230,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     for (const series of this.ctx.data) {
       if (series?.dataKey?.label === label) {
         const entityName = series.datasource?.entityName || 'Unknown';
-        // Return the entity color if we have it
-        if (this.entityColorMap[entityName]) {
-          return this.entityColorMap[entityName];
-        }
+        const dataKeyColor = series.dataKey?.color; // Custom color from data key settings
+        // Use mode-aware coloring (entity-based or label-based, respecting custom colors)
+        return this.getColorForSeries(entityName, label, dataKeyColor);
       }
     }
     // Fallback to a default color

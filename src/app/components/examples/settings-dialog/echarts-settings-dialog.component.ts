@@ -6,7 +6,8 @@ declare const Coloris: any;
 
 export interface SettingsDialogData {
   colorScheme: string;
-  sidebarCollapsedMode: 'hidden' | 'colors';
+  sidebarCollapsedMode?: 'hidden' | 'colors';
+  isSingleDeviceMode?: boolean;
   minMaxVisible?: boolean;
   minMaxStyle?: 'dashed' | 'solid' | 'dotted';
   minMaxColor?: string;
@@ -120,8 +121,8 @@ export interface SettingsDialogData {
           </div>
         </div>
         
-        <!-- Sidebar Mode Section -->
-        <div class="settings-card">
+        <!-- Sidebar Mode Section - Only show in multiple device mode -->
+        <div class="settings-card" *ngIf="!data.isSingleDeviceMode">
           <div class="card-header">
             <div class="icon-wrapper sidebar-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -137,9 +138,9 @@ export interface SettingsDialogData {
               <p class="card-subtitle">How the sidebar appears when minimized</p>
             </div>
           </div>
-          
+
           <div class="modern-sidebar-options">
-            <button type="button" 
+            <button type="button"
                     class="sidebar-mode-btn"
                     [class.active]="data.sidebarCollapsedMode === 'hidden'"
                     (click)="data.sidebarCollapsedMode = 'hidden'">
@@ -156,7 +157,7 @@ export interface SettingsDialogData {
               <span class="mode-label">Hidden</span>
               <span class="mode-description">Completely hide sidebar</span>
             </button>
-            
+
             <button type="button"
                     class="sidebar-mode-btn"
                     [class.active]="data.sidebarCollapsedMode === 'colors'"
@@ -178,7 +179,7 @@ export interface SettingsDialogData {
             </button>
           </div>
         </div>
-        
+
         <!-- Min/Max Lines Section -->
         <div class="settings-card" *ngIf="data.showMinMaxInDialog !== false">
           <div class="card-header">
@@ -522,7 +523,7 @@ export interface SettingsDialogData {
       background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
       color: white;
     }
-    
+
     .card-title {
       margin: 0 0 4px 0;
       font-size: 16px;
@@ -1311,7 +1312,7 @@ export interface SettingsDialogData {
       background: #e5e5e7;
       margin: 20px 0;
     }
-    
+
     /* Hide Coloris trigger button that appears on first load */
     button[aria-labelledby="clr-open-label"] {
       display: none !important;

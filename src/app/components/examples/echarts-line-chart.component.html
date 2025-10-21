@@ -67,7 +67,7 @@
   <div fxFlex class="echarts-layout">
     <!-- Sidebar toggle button (always visible) -->
     <button mat-icon-button
-            class="sidebar-toggle-btn" 
+            class="sidebar-toggle-btn"
             [disableRipple]="true"
             (click)="toggleSidebar()"
             [matTooltip]="isSidebarVisible ? 'Hide sidebar' : 'Show sidebar'"
@@ -76,17 +76,17 @@
             [attr.data-sidebar-state]="!isSidebarVisible ? sidebarCollapsedMode : 'visible'"
             [attr.data-sidebar-mode]="isSidebarVisible ? sidebarDisplayMode : sidebarCollapsedMode"
             [style.left.px]="isSidebarVisible && sidebarDisplayMode !== 'colors' ? sidebarWidth : null"
-            *ngIf="ctx.settings.showEntitySidebar !== false">
+            *ngIf="ctx.settings.showEntitySidebar !== false && ctx.settings?.multipleDevices">
       <i class="material-icons">{{ isSidebarVisible ? 'chevron_left' : 'chevron_right' }}</i>
     </button>
-    
+
     <!-- Entity sidebar (left side) -->
-    <aside class="entity-sidebar" 
+    <aside class="entity-sidebar"
            [class.sidebar-hidden]="!isSidebarVisible && sidebarCollapsedMode === 'hidden'"
            [class.sidebar-collapsed-colors]="!isSidebarVisible && sidebarCollapsedMode === 'colors'"
            [attr.data-mode]="isSidebarVisible ? sidebarDisplayMode : sidebarCollapsedMode"
            [style.width.px]="isSidebarVisible && sidebarDisplayMode !== 'colors' ? sidebarWidth : null"
-           *ngIf="ctx.settings.showEntitySidebar !== false">
+           *ngIf="ctx.settings.showEntitySidebar !== false && ctx.settings?.multipleDevices">
       
       <!-- Permanent header (visible in all modes except completely hidden) -->
       <div class="sidebar-header" *ngIf="isSidebarVisible || sidebarCollapsedMode !== 'hidden'">

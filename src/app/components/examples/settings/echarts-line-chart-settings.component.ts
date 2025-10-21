@@ -37,7 +37,8 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   
   // Multiple Devices Mode
   multipleDevices?: boolean;
-  
+  deviceTypeFiltering?: boolean;  // Filter measurements based on device type (3D/6D)
+
   // Pan and Zoom
   showPanZoomTool?: boolean;
   
@@ -180,6 +181,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       lineWidth: 3,
       exportDecimals: 6,
       multipleDevices: false,
+      deviceTypeFiltering: false,
       showPanZoomTool: true,
       grid_layout_right: 40,
       grid_layout_left: 130,
@@ -273,6 +275,7 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       lineWidth: [settings.lineWidth || 3],
       exportDecimals: [settings.exportDecimals || 6],
       multipleDevices: [settings.multipleDevices || false],
+      deviceTypeFiltering: [settings.deviceTypeFiltering || false],
       showPanZoomTool: [settings.showPanZoomTool !== false],
       grid_layout_right: [settings.grid_layout_right || 40],
       grid_layout_left: [settings.grid_layout_left || 130],
