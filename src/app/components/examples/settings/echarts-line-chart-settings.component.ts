@@ -23,12 +23,7 @@ export interface EchartsLineChartSettings extends WidgetSettings {
   
   // Sidebar Settings
   sidebarCollapsedMode?: 'hidden' | 'colors';  // How sidebar appears when collapsed
-  
-  
-  // Data Point Settings
-  showDataPoints?: boolean;
-  symbolSize_data?: number;
-  
+
   // Line Settings
   lineWidth?: number;
   
@@ -176,8 +171,6 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       customEntityAttribute: '',
       sidebarDisplayMode: 'full',  // Default to full table view
       sidebarCollapsedMode: 'hidden',  // Default to hidden when collapsed
-      showDataPoints: false,
-      symbolSize_data: 5,
       lineWidth: 3,
       exportDecimals: 6,
       multipleDevices: false,
@@ -270,8 +263,6 @@ export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
       
       // Graph Settings
       smooth: [settings.smooth],
-      showDataPoints: [settings.showDataPoints],
-      symbolSize_data: [settings.symbolSize_data || 5],
       lineWidth: [settings.lineWidth || 3],
       exportDecimals: [settings.exportDecimals || 6],
       multipleDevices: [settings.multipleDevices || false],

@@ -111,17 +111,6 @@
             </label>
           </div>
           <div class="toggle-row">
-            <label class="toggle-label">Show Data Points</label>
-            <label class="apple-switch">
-              <input type="checkbox" formControlName="showDataPoints">
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="toggle-row" *ngIf="echartsLineChartSettingsForm.get('showDataPoints')?.value">
-            <label class="toggle-label">Point Size: {{echartsLineChartSettingsForm.get('symbolSize_data')?.value}}</label>
-            <input type="range" class="apple-slider" min="1" max="15" step="1" formControlName="symbolSize_data">
-          </div>
-          <div class="toggle-row">
             <label class="toggle-label">Line Thickness: {{echartsLineChartSettingsForm.get('lineWidth')?.value}}</label>
             <input type="range" class="apple-slider" min="1" max="10" step="0.5" formControlName="lineWidth">
           </div>

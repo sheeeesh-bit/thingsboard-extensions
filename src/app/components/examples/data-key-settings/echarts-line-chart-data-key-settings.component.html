@@ -91,13 +91,57 @@
         <div class="setting-group">
           <label class="setting-label">Decimal Places</label>
           <div class="input-group">
-            <input type="number" 
-                   formControlName="numberOfDigits" 
+            <input type="number"
+                   formControlName="numberOfDigits"
                    class="apple-input"
-                   min="0" 
+                   min="0"
                    max="10"
                    placeholder="1">
             <div class="input-hint">Number of decimal places to display</div>
+          </div>
+        </div>
+
+        <!-- Display Options -->
+        <div class="setting-group">
+          <label class="setting-label">Display Options</label>
+
+          <div class="toggle-group">
+            <!-- Show Line Toggle -->
+            <div class="toggle-row">
+              <label class="toggle-label">
+                <span>Show Line</span>
+                <span class="setting-hint">Display connecting line between data points</span>
+              </label>
+              <label class="apple-switch">
+                <input type="checkbox" formControlName="showLine">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <!-- Show Points Toggle -->
+            <div class="toggle-row">
+              <label class="toggle-label">
+                <span>Show Data Points</span>
+                <span class="setting-hint">Display individual data point markers</span>
+              </label>
+              <label class="apple-switch">
+                <input type="checkbox" formControlName="showPoints">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <!-- Point Size Slider (shown only when showPoints is true) -->
+            <div class="toggle-row slider-row" *ngIf="dataKeySettingsForm.get('showPoints')?.value">
+              <div class="slider-container">
+                <label class="toggle-label">Point Size: {{dataKeySettingsForm.get('pointSize')?.value}}</label>
+                <input type="range"
+                       class="apple-slider"
+                       min="1"
+                       max="15"
+                       step="1"
+                       formControlName="pointSize">
+              </div>
+            </div>
           </div>
         </div>
       </div>

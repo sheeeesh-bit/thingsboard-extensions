@@ -1153,11 +1153,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       const seriesColor = this.getColorForSeries(entityName, label, dataKeyColor);
       const seriesKey = this.buildSeriesKey(entityName, label);
 
+      // Get per-series display settings from dataKey settings
+      const dataKeySettings = this.ctx.data[i].dataKey?.settings || {};
+      const showLine = dataKeySettings.showLine !== false; // Default true
+      const showPoints = dataKeySettings.showPoints !== false; // Default true
+      const pointSize = dataKeySettings.pointSize || 5;
 
       // [CLAUDE EDIT] Performance optimizations
       const points = this.ctx.data[i].data?.length || 0;
       const labelSelected = this.legendItems.find(item => item.label === label)?.selected !== false;
-      
+
       const seriesElement = {
         id: `series_${i}_${seriesKey}`,  // Add ID for incremental updates
         name: seriesKey,  // Use unique key instead of just label
@@ -1173,8 +1178,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         },
         lineStyle: {
           color: seriesColor,  // Also set line color to series color
-          width: this.ctx.settings.lineWidth || 3,
-          opacity: labelSelected ? 1 : 0.08,  // [CLAUDE EDIT] Lower opacity when off
+          width: showLine ? (this.ctx.settings.lineWidth || 3) : 0,  // Hide line if showLine is false
+          opacity: labelSelected && showLine ? 1 : 0.08,  // [CLAUDE EDIT] Lower opacity when off or line hidden
           shadowBlur: 0,  // No shadow for flat appearance
           shadowColor: 'transparent',
           shadowOpacity: 0,
@@ -1195,7 +1200,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
             opacity: labelSelected ? 1 : 0.08
           },
           lineStyle: {
-            opacity: labelSelected ? 1 : 0.08
+            opacity: labelSelected && showLine ? 1 : 0.08
           }
         },
         select: {
@@ -1205,10 +1210,10 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         xAxisIndex: gridIndex,
         yAxisIndex: gridIndex,
         data: this.ctx.data[i].data,
-        // Balanced performance settings
-        symbol: this.ctx.settings.showDataPoints ? 'circle' : 'none',
-        symbolSize: (this.ctx.settings.symbolSize_data || 5) * 2.5,
-        showSymbol: this.ctx.settings.showDataPoints,
+        // Per-series symbol settings from dataKey
+        symbol: showPoints ? 'circle' : 'none',
+        symbolSize: pointSize * 2.5,  // Apply 2.5x multiplier for proper sizing
+        showSymbol: showPoints,
         smooth: this.ctx.settings.smooth !== false ? 0.3 : false,  // Subtle smoothing by default
         // Configurable performance optimizations
         ...this.getDataSamplingSettings(points),
@@ -2200,7 +2205,6 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       showEntitySidebar: this.ctx.settings?.showEntitySidebar,
       showCustomLegend: this.ctx.settings?.showCustomLegend,
       showZoomControls: this.ctx.settings?.showZoomControls,
-      symbolSize_data: this.ctx.settings?.symbolSize_data,
       exportDecimals: this.ctx.settings?.exportDecimals,
       useLazyLoading: this.ctx.settings?.useLazyLoading,
       alarmSupportEnabled: this.ctx.settings?.alarmSupportEnabled,

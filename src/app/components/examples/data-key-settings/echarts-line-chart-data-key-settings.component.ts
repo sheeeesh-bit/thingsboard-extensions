@@ -9,6 +9,9 @@ export interface EchartsLineChartDataKeySettings {
   axisAssignment?: string;
   numberOfDigits?: number;
   bottomPlotAssigment?: string;
+  showLine?: boolean;
+  showPoints?: boolean;
+  pointSize?: number;
 }
 
 @Component({
@@ -36,7 +39,10 @@ export class EchartsLineChartDataKeySettingsComponent extends WidgetSettingsComp
       chartType: 'Line',
       axisAssignment: 'Top',
       numberOfDigits: 1,
-      bottomPlotAssigment: 'S-100'
+      bottomPlotAssigment: 'S-100',
+      showLine: true,
+      showPoints: true,
+      pointSize: 5
     };
   }
 
@@ -45,7 +51,10 @@ export class EchartsLineChartDataKeySettingsComponent extends WidgetSettingsComp
       chartType: [settings.chartType || 'Line', [Validators.required]],
       axisAssignment: [settings.axisAssignment || 'Top', [Validators.required]],
       numberOfDigits: [settings.numberOfDigits || 1, [Validators.required]],
-      bottomPlotAssigment: [settings.bottomPlotAssigment || 'S-100', [Validators.required]]
+      bottomPlotAssigment: [settings.bottomPlotAssigment || 'S-100', [Validators.required]],
+      showLine: [settings.showLine !== false, []], // Default true
+      showPoints: [settings.showPoints !== false, []], // Default true
+      pointSize: [settings.pointSize || 5, [Validators.min(1), Validators.max(15)]]
     });
   }
 
