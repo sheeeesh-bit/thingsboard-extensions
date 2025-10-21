@@ -254,12 +254,49 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
         throw new Error('No target element found');
       }
 
+      // DYNAMIC dimension calculation - like Chrome extension!
+      // Take MAX of multiple sources for more accurate measurement
+      const body = document.body;
+      const heights = [
+        document.documentElement.clientHeight,
+        body ? body.scrollHeight : 0,
+        document.documentElement.scrollHeight,
+        body ? body.offsetHeight : 0,
+        document.documentElement.offsetHeight,
+        targetElement.scrollHeight,
+        targetElement.offsetHeight
+      ];
+      const widths = [
+        document.documentElement.clientWidth,
+        body ? body.scrollWidth : 0,
+        document.documentElement.scrollWidth,
+        body ? body.offsetWidth : 0,
+        document.documentElement.offsetWidth,
+        targetElement.scrollWidth,
+        targetElement.offsetWidth
+      ];
+
+      // Filter out null/undefined and get max
+      const maxHeight = Math.max(...heights.filter(x => x));
+      const maxWidth = Math.max(...widths.filter(x => x));
+
       const scrollHeight = targetElement.scrollHeight;
       const clientHeight = targetElement.clientHeight;
       const needsScrolling = scrollHeight > clientHeight + 10;
 
-      console.log('[Screenshot Widget] Target:', {
+      console.log('[Screenshot Widget] Target (single source):', {
         element: targetElement.tagName,
+        scrollHeight,
+        clientHeight
+      });
+      console.log('[Screenshot Widget] Target (dynamic - like Chrome extension):', {
+        allHeights: heights,
+        allWidths: widths,
+        maxHeight,
+        maxWidth,
+        usingMaxForHeight: maxHeight > scrollHeight
+      });
+      console.log('[Screenshot Widget] Will use:', {
         scrollHeight,
         clientHeight,
         needsScrolling
@@ -299,13 +336,23 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       });
 
       // NOW re-measure EVERYTHING AFTER notification appears!
-      // The notification might change layout/dimensions
-      const scrollHeightAfterNotification = targetElement.scrollHeight;
+      // DYNAMIC approach like Chrome extension - take MAX of all sources
+      const heightsAfter = [
+        document.documentElement.clientHeight,
+        body ? body.scrollHeight : 0,
+        document.documentElement.scrollHeight,
+        body ? body.offsetHeight : 0,
+        document.documentElement.offsetHeight,
+        targetElement.scrollHeight,
+        targetElement.offsetHeight
+      ];
+      const scrollHeightAfterNotification = Math.max(...heightsAfter.filter(x => x));
       const clientHeightAfterNotification = targetElement.clientHeight;
 
-      console.log('[Screenshot Widget] Dimensions after notification:', {
+      console.log('[Screenshot Widget] Dimensions after notification (dynamic):', {
         before: { scrollHeight, clientHeight },
         after: { scrollHeight: scrollHeightAfterNotification, clientHeight: clientHeightAfterNotification },
+        allHeightsAfter: heightsAfter,
         changed: scrollHeightAfterNotification !== scrollHeight || clientHeightAfterNotification !== clientHeight
       });
 
