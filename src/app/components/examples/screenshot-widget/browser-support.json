@@ -1,0 +1,115 @@
+{
+  "_comment": "Browser support configuration for screenshot widget. Note: Vivaldi masquerades as Chrome and will be auto-detected as Chrome.",
+  "supportedBrowsers": [
+    {
+      "name": "Chrome",
+      "userAgentPattern": "chrome",
+      "excludePattern": "edg|opr",
+      "features": {
+        "preferCurrentTab": true,
+        "cursorHiding": false,
+        "notificationSize": "medium",
+        "note": "Includes Vivaldi (cannot be distinguished)"
+      }
+    },
+    {
+      "name": "Edge",
+      "userAgentPattern": "edg",
+      "features": {
+        "preferCurrentTab": true,
+        "cursorHiding": false,
+        "notificationSize": "medium"
+      }
+    },
+    {
+      "name": "Brave",
+      "userAgentPattern": "brave",
+      "features": {
+        "preferCurrentTab": true,
+        "cursorHiding": false,
+        "notificationSize": "medium"
+      }
+    },
+    {
+      "name": "Arc",
+      "userAgentPattern": "arc",
+      "features": {
+        "preferCurrentTab": true,
+        "cursorHiding": false,
+        "notificationSize": "medium"
+      }
+    },
+    {
+      "name": "Helium",
+      "userAgentPattern": "helium",
+      "features": {
+        "preferCurrentTab": true,
+        "cursorHiding": false,
+        "notificationSize": "medium"
+      }
+    }
+  ],
+  "unsupportedBrowsers": [
+    {
+      "name": "Firefox",
+      "userAgentPattern": "firefox",
+      "reason": "Firefox requires sharing the entire window instead of individual tabs",
+      "features": {
+        "preferCurrentTab": false,
+        "cursorHiding": true,
+        "notificationSize": "varies",
+        "requiresWindowSharing": true
+      }
+    },
+    {
+      "name": "Opera GX",
+      "userAgentPattern": "opr|opera",
+      "reason": "Opera may have compatibility issues with screen capture",
+      "features": {
+        "preferCurrentTab": false,
+        "cursorHiding": false,
+        "notificationSize": "unknown"
+      }
+    },
+    {
+      "name": "Zen Browser",
+      "userAgentPattern": "zen",
+      "reason": "Zen Browser compatibility not fully tested",
+      "features": {
+        "preferCurrentTab": false,
+        "cursorHiding": false,
+        "notificationSize": "unknown"
+      }
+    }
+  ],
+  "messages": {
+    "supported": {
+      "title": "Ready to Capture",
+      "instructions": [
+        "Move your MOUSE/CURSOR to the edge of the screen or outside the window",
+        "Please don't scroll or use your keyboard during capture",
+        "Disable rotation for 3D widgets (use stop rotation button)",
+        "Make sure all animations are paused",
+        "Position widgets as needed"
+      ],
+      "browserNote": "The current tab should be pre-selected. Just click \"Share\" in the picker.",
+      "action": "Start Capture"
+    },
+    "unsupported": {
+      "title": "⚠️ Browser Not Officially Supported",
+      "warningPrefix": "This browser is not officially supported for screenshots.",
+      "recommendation": "We recommend using Chrome, Edge, or Helium for the best experience.",
+      "instructions": [
+        "Move your MOUSE/CURSOR to the edge of the screen or outside the window",
+        "Please don't scroll or use your keyboard during capture",
+        "Disable rotation for 3D widgets (use stop rotation button)",
+        "Make sure all animations are paused",
+        "Position widgets as needed"
+      ],
+      "action": "Try Anyway"
+    },
+    "firefox": {
+      "specificNote": "In the sharing picker, you must select \"Firefox\" (entire window) or \"Window\". Individual tab selection is not available."
+    }
+  }
+}

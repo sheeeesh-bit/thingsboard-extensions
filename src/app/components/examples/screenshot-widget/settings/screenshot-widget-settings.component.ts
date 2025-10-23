@@ -28,6 +28,7 @@ export class ScreenshotWidgetSettingsComponent extends WidgetSettingsComponent {
     return {
       widgetTitle: 'Screenshot Widget',
       showDebugInfo: false,
+      logContext: false,           // Log widget context on init
       captureMode: 'dashboard',
       customSelector: '',
       scrollIncrement: 1000,
@@ -39,7 +40,8 @@ export class ScreenshotWidgetSettingsComponent extends WidgetSettingsComponent {
       downloadIndividual: false,   // Download each piece separately (debug)
       bottomCompensation: 95,      // Extra pixels to add to bottom piece (video pixels)
       showWarningDialog: true,     // Show warning dialog before capture
-      warningMessage: 'Before capturing:\n\n• Move your MOUSE/CURSOR to the edge of the screen or outside the window\n• Please don\'t scroll or use your keyboard during capture\n• Disable rotation for 3D widgets (use stop rotation button)\n• Make sure all animations are paused\n• Position widgets as needed\n\nClick "Start Capture" when ready, then keep your mouse still at the edge!'
+      useDefaultWarning: true,     // Use browser-specific default message
+      warningMessage: ''           // Custom message (only used if useDefaultWarning is false)
     };
   }
 
@@ -47,6 +49,7 @@ export class ScreenshotWidgetSettingsComponent extends WidgetSettingsComponent {
     this.screenshotWidgetSettingsForm = this.fb.group({
       widgetTitle: [settings.widgetTitle, []],
       showDebugInfo: [settings.showDebugInfo, []],
+      logContext: [settings.logContext, []],
       captureMode: [settings.captureMode, []],
       customSelector: [settings.customSelector, []],
       scrollIncrement: [settings.scrollIncrement, []],
@@ -58,6 +61,7 @@ export class ScreenshotWidgetSettingsComponent extends WidgetSettingsComponent {
       downloadIndividual: [settings.downloadIndividual, []],
       bottomCompensation: [settings.bottomCompensation, []],
       showWarningDialog: [settings.showWarningDialog, []],
+      useDefaultWarning: [settings.useDefaultWarning !== false, []],
       warningMessage: [settings.warningMessage, []]
     });
   }
@@ -65,6 +69,7 @@ export class ScreenshotWidgetSettingsComponent extends WidgetSettingsComponent {
   protected doUpdateSettings(settingsForm: UntypedFormGroup, settings: WidgetSettings) {
     settings.widgetTitle = settingsForm.value.widgetTitle;
     settings.showDebugInfo = settingsForm.value.showDebugInfo;
+    settings.logContext = settingsForm.value.logContext;
     settings.captureMode = settingsForm.value.captureMode;
     settings.customSelector = settingsForm.value.customSelector;
     settings.scrollIncrement = settingsForm.value.scrollIncrement;
@@ -76,6 +81,7 @@ export class ScreenshotWidgetSettingsComponent extends WidgetSettingsComponent {
     settings.downloadIndividual = settingsForm.value.downloadIndividual;
     settings.bottomCompensation = settingsForm.value.bottomCompensation;
     settings.showWarningDialog = settingsForm.value.showWarningDialog;
+    settings.useDefaultWarning = settingsForm.value.useDefaultWarning;
     settings.warningMessage = settingsForm.value.warningMessage;
     return settings;
   }

@@ -14,6 +14,52 @@ interface CaptureOptions {
   format?: 'png' | 'jpeg';
 }
 
+// Browser support configuration
+// Note: Vivaldi masquerades as Chrome and cannot be reliably detected in web pages
+// Since it's Chromium-based, it will be treated as Chrome (which is fine)
+const BrowserSupport = {
+  supportedBrowsers: [
+    { name: 'Chrome', userAgentPattern: 'chrome', excludePattern: 'edg|opr' },
+    { name: 'Edge', userAgentPattern: 'edg' },
+    { name: 'Brave', userAgentPattern: 'brave' },
+    { name: 'Arc', userAgentPattern: 'arc' },
+    { name: 'Helium', userAgentPattern: 'helium' }
+  ],
+  unsupportedBrowsers: [
+    { name: 'Firefox', userAgentPattern: 'firefox', reason: 'Firefox requires sharing the entire window instead of individual tabs' },
+    { name: 'Opera GX', userAgentPattern: 'opr|opera', reason: 'Opera may have compatibility issues with screen capture' },
+    { name: 'Zen Browser', userAgentPattern: 'zen', reason: 'Zen Browser compatibility not fully tested' }
+  ],
+  messages: {
+    supported: {
+      title: 'Ready to Capture',
+      instructions: [
+        'Move your MOUSE/CURSOR to the edge of the screen or outside the window',
+        'Please don\'t scroll or use your keyboard during capture',
+        'Disable rotation for 3D widgets (use stop rotation button)',
+        'Make sure all animations are paused'
+      ],
+      browserNote: 'The current tab should be pre-selected. Just click "Share" in the picker.',
+      action: 'Start Capture'
+    },
+    unsupported: {
+      title: '⚠️ Browser Not Officially Supported',
+      warningPrefix: 'This browser is not officially supported for screenshots.',
+      recommendation: 'We recommend using Chrome, Edge, Brave, Arc, or Helium for the best experience.',
+      instructions: [
+        'Move your MOUSE/CURSOR to the edge of the screen or outside the window',
+        'Please don\'t scroll or use your keyboard during capture',
+        'Disable rotation for 3D widgets (use stop rotation button)',
+        'Make sure all animations are paused'
+      ],
+      action: 'Try Anyway'
+    },
+    firefox: {
+      specificNote: 'In the sharing picker, you must select "Firefox" (entire window) or "Window". Individual tab selection is not available.'
+    }
+  }
+};
+
 @Component({
   selector: 'tb-screenshot-widget',
   templateUrl: './screenshot-widget.component.html',
@@ -27,16 +73,27 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
   public error: string | null = null;
   public statusMessage = '';
   private warningDialogElement: HTMLElement | null = null;
+  private enableDebugLogs = false; // Set to true to enable detailed console logs
+
+  /**
+   * Debug logging helper - only logs if debug is enabled
+   */
+  private debug(...args: any[]): void {
+    if (this.enableDebugLogs || this.ctx?.settings?.showDebugInfo) {
+      console.log('[Screenshot Widget]', ...args);
+    }
+  }
 
   ngOnInit(): void {
-    console.log('[Screenshot Widget] Component initialized');
-    console.log('[Screenshot Widget] Widget context:', this.ctx);
-    console.log('[Screenshot Widget] Settings:', this.ctx.settings);
+    // Log context only if setting is enabled
+    if (this.ctx?.settings?.logContext) {
+      console.log('[Screenshot Widget] Widget Context:', this.ctx);
+    }
     this.ctx.$scope.screenshotWidgetComponent = this;
   }
 
   ngAfterViewInit(): void {
-    console.log('[Screenshot Widget] AfterViewInit');
+    this.debug('AfterViewInit');
     // Initial data load if available
     if (this.ctx.data && this.ctx.data.length > 0) {
       this.onDataUpdated();
@@ -44,17 +101,16 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   ngOnDestroy(): void {
-    console.log('[Screenshot Widget] Component destroyed');
+    this.debug('Component destroyed');
     // Clean up warning dialog if it exists
     this.removeWarningDialog();
   }
 
   public onDataUpdated(): void {
-    console.log('[Screenshot Widget] onDataUpdated called');
-    console.log('[Screenshot Widget] Data received:', this.ctx.data);
+    this.debug('onDataUpdated called');
 
     if (!this.ctx.data || this.ctx.data.length === 0) {
-      console.warn('[Screenshot Widget] No data available');
+      this.debug('No data available');
       if (this.ctx.detectChanges) {
         this.ctx.detectChanges();
       }
@@ -69,7 +125,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   public onResize(): void {
-    console.log('[Screenshot Widget] onResize called');
+    this.debug('onResize called');
   }
 
   /**
@@ -77,37 +133,119 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
    * Shows warning dialog if enabled, otherwise starts capture directly
    */
   public onCaptureClick(): void {
-    console.log('[Screenshot Widget] onCaptureClick called');
-    console.log('[Screenshot Widget] Settings:', this.ctx.settings);
+    this.debug(' onCaptureClick called');
+    this.debug(' Settings:', this.ctx.settings);
 
     const shouldShowWarning = this.ctx.settings.showWarningDialog !== false;
-    console.log('[Screenshot Widget] shouldShowWarning:', shouldShowWarning);
+    this.debug(' shouldShowWarning:', shouldShowWarning);
 
     if (shouldShowWarning) {
-      console.log('[Screenshot Widget] Showing warning dialog...');
+      this.debug(' Showing warning dialog...');
       this.showWarningDialog();
     } else {
-      console.log('[Screenshot Widget] Skipping warning, starting capture directly...');
+      this.debug(' Skipping warning, starting capture directly...');
       this.captureScreenshot();
     }
+  }
+
+  /**
+   * Detects browser support status
+   */
+  private detectBrowserSupport(): { supported: boolean; browserName: string; reason?: string; isFirefox: boolean } {
+    const userAgent = navigator.userAgent.toLowerCase();
+
+    // Check supported browsers first
+    for (const browser of BrowserSupport.supportedBrowsers) {
+      const pattern = new RegExp(browser.userAgentPattern, 'i');
+      if (pattern.test(userAgent)) {
+        // Check exclusion pattern (e.g., Chrome but not Edge/Opera)
+        if (browser.excludePattern) {
+          const excludePattern = new RegExp(browser.excludePattern, 'i');
+          if (excludePattern.test(userAgent)) {
+            continue; // Skip this match
+          }
+        }
+        return { supported: true, browserName: browser.name, isFirefox: false };
+      }
+    }
+
+    // Check unsupported browsers
+    for (const browser of BrowserSupport.unsupportedBrowsers) {
+      const pattern = new RegExp(browser.userAgentPattern, 'i');
+      if (pattern.test(userAgent)) {
+        return {
+          supported: false,
+          browserName: browser.name,
+          reason: browser.reason,
+          isFirefox: browser.name === 'Firefox'
+        };
+      }
+    }
+
+    // Unknown browser - treat as unsupported
+    return {
+      supported: false,
+      browserName: 'Unknown Browser',
+      reason: 'This browser has not been tested with the screenshot widget',
+      isFirefox: false
+    };
   }
 
   /**
    * Shows warning dialog by appending it to document.body (breaks out of widget container)
    */
   private showWarningDialog(): void {
-    console.log('[Screenshot Widget] showWarningDialog() called');
+    this.debug(' showWarningDialog() called');
 
     // Don't create if already exists
     if (this.warningDialogElement) {
-      console.log('[Screenshot Widget] Dialog already exists, skipping');
+      this.debug(' Dialog already exists, skipping');
       return;
     }
 
-    const message = this.ctx.settings.warningMessage ||
-      'Before capturing:\n\n• Move your MOUSE/CURSOR to the edge of the screen or outside the window\n• Please don\'t scroll or use your keyboard during capture\n• Disable rotation for 3D widgets (use stop rotation button)\n• Make sure all animations are paused\n• Position widgets as needed\n\nClick "Start Capture" when ready, then keep your mouse still at the edge!';
+    // Check if using default or custom message
+    const useDefault = this.ctx.settings.useDefaultWarning !== false;
 
-    console.log('[Screenshot Widget] Creating overlay element...');
+    let message: string;
+    let dialogTitle = 'Prepare for Screenshot';
+    let actionButtonText = 'Start Capture';
+
+    if (useDefault) {
+      // Detect browser support
+      const browserInfo = this.detectBrowserSupport();
+      this.debug(' Browser detection:', browserInfo);
+
+      if (browserInfo.supported) {
+        // Supported browser - use positive messaging
+        dialogTitle = BrowserSupport.messages.supported.title;
+        actionButtonText = BrowserSupport.messages.supported.action;
+
+        const instructions = BrowserSupport.messages.supported.instructions.map((i: string) => '• ' + i).join('\n');
+        const browserNote = BrowserSupport.messages.supported.browserNote;
+
+        message = `Before capturing:\n\n${instructions}\n\n✅ ${browserInfo.browserName.toUpperCase()}:\n${browserNote}\n\nClick "${actionButtonText}" when ready, then keep your mouse at the edge!`;
+      } else {
+        // Unsupported browser - show warning but allow trying
+        dialogTitle = BrowserSupport.messages.unsupported.title;
+        actionButtonText = BrowserSupport.messages.unsupported.action;
+
+        const warningPrefix = BrowserSupport.messages.unsupported.warningPrefix;
+        const recommendation = BrowserSupport.messages.unsupported.recommendation;
+        const instructions = BrowserSupport.messages.unsupported.instructions.map((i: string) => '• ' + i).join('\n');
+
+        let browserSpecificNote = '';
+        if (browserInfo.isFirefox) {
+          browserSpecificNote = `\n\n🦊 FIREFOX SPECIFIC:\n${BrowserSupport.messages.firefox.specificNote}`;
+        }
+
+        message = `⚠️ ${warningPrefix}\n\n${recommendation}\n\nIf you want to try anyway:\n\n${instructions}${browserSpecificNote}\n\nClick "${actionButtonText}" to proceed at your own risk.`;
+      }
+    } else {
+      // Use custom message from settings
+      message = this.ctx.settings.warningMessage || 'Please prepare your dashboard before capturing.\n\nClick "Start Capture" when ready.';
+    }
+
+    this.debug(' Creating overlay element...');
 
     // Create overlay with INLINE styles (component styles don't apply to elements outside component)
     const overlay = document.createElement('div');
@@ -144,7 +282,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
           font-weight: 600;
           color: #305680;
           text-align: center;
-        ">Prepare for Screenshot</h3>
+        ">${dialogTitle}</h3>
         <div class="screenshot-warning-message" style="
           margin-bottom: 28px;
           font-size: 15px;
@@ -180,36 +318,36 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
             cursor: pointer;
             background: #305680;
             color: white;
-          ">Start Capture</button>
+          ">${actionButtonText}</button>
         </div>
       </div>
     `;
 
-    console.log('[Screenshot Widget] Overlay created:', overlay);
+    this.debug(' Overlay created:', overlay);
 
     // Add event listeners
     const cancelBtn = overlay.querySelector('.screenshot-btn-cancel') as HTMLElement;
     const startBtn = overlay.querySelector('.screenshot-btn-start') as HTMLElement;
 
-    console.log('[Screenshot Widget] Buttons found:', {cancelBtn, startBtn});
+    this.debug(' Buttons found:', {cancelBtn, startBtn});
 
     cancelBtn.addEventListener('click', () => {
-      console.log('[Screenshot Widget] Cancel clicked');
+      this.debug(' Cancel clicked');
       this.removeWarningDialog();
     });
     startBtn.addEventListener('click', () => {
-      console.log('[Screenshot Widget] Start Capture clicked');
+      this.debug(' Start Capture clicked');
       this.removeWarningDialog();
       this.captureScreenshot();
     });
 
     // Append to body (breaks out of widget container!)
-    console.log('[Screenshot Widget] Appending to document.body...');
+    this.debug(' Appending to document.body...');
     document.body.appendChild(overlay);
     this.warningDialogElement = overlay;
 
-    console.log('[Screenshot Widget] Warning dialog shown (appended to document.body)');
-    console.log('[Screenshot Widget] Dialog element in DOM:', document.body.contains(overlay));
+    this.debug(' Warning dialog shown (appended to document.body)');
+    this.debug(' Dialog element in DOM:', document.body.contains(overlay));
   }
 
   /**
@@ -219,7 +357,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     if (this.warningDialogElement && this.warningDialogElement.parentNode) {
       this.warningDialogElement.parentNode.removeChild(this.warningDialogElement);
       this.warningDialogElement = null;
-      console.log('[Screenshot Widget] Warning dialog removed');
+      this.debug(' Warning dialog removed');
     }
   }
 
@@ -236,10 +374,71 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       return this.scrollPreviewMode();
     }
 
-    console.log('[Screenshot Widget] captureScreenshot called - using Screen Capture API');
+    this.debug('captureScreenshot called - using Screen Capture API');
     this.loading = true;
     this.error = null;
-    this.statusMessage = 'Click "Share" to capture...';
+
+    // Get user info and current date/time for display during capture
+    const now = new Date();
+    const dateStr = now.toLocaleDateString();
+    const timeStr = now.toLocaleTimeString();
+
+    // Try to get user name from userService using userId
+    let userName = 'User';
+    try {
+      console.log('[Screenshot Widget] 🔍 USER INFO DEBUG:');
+      console.log('[Screenshot Widget] ctx.dashboard:', this.ctx?.dashboard);
+      console.log('[Screenshot Widget] ctx.dashboard.authUser:', (this.ctx?.dashboard as any)?.authUser);
+      console.log('[Screenshot Widget] ctx.$scope:', this.ctx?.$scope);
+      console.log('[Screenshot Widget] ctx.$scope.currentUser:', this.ctx?.$scope?.currentUser);
+      console.log('[Screenshot Widget] ctx.userService:', this.ctx?.userService);
+
+      // Try to get userId from various possible locations
+      const userIdOption1 = (this.ctx?.dashboard as any)?.authUser?.userId;
+      const userIdOption2 = this.ctx?.$scope?.currentUser?.userId;
+      const userIdOption3 = this.ctx?.$scope?.currentUser?.id?.id;
+
+      console.log('[Screenshot Widget] userId from dashboard.authUser:', userIdOption1);
+      console.log('[Screenshot Widget] userId from $scope.currentUser:', userIdOption2);
+      console.log('[Screenshot Widget] userId from $scope.currentUser.id:', userIdOption3);
+
+      const userId = userIdOption1 || userIdOption2 || userIdOption3;
+      console.log('[Screenshot Widget] Final userId selected:', userId);
+
+      if (userId && this.ctx?.userService) {
+        console.log('[Screenshot Widget] ✅ Attempting to fetch user from userService...');
+        // Fetch user details asynchronously
+        this.ctx.userService.getUser(userId, {ignoreLoading: true, ignoreErrors: true}).subscribe({
+          next: (user) => {
+            console.log('[Screenshot Widget] ✅ User fetched successfully:', user);
+            if (user) {
+              const fullName = user.firstName && user.lastName
+                ? `${user.firstName} ${user.lastName}`
+                : user.email || 'User';
+              console.log('[Screenshot Widget] User full name:', fullName);
+              this.statusMessage = `${fullName} | ${dateStr} ${timeStr}`;
+              if (this.ctx.detectChanges) {
+                this.ctx.detectChanges();
+              }
+            }
+          },
+          error: (error) => {
+            console.error('[Screenshot Widget] ❌ Failed to load user from userService:', error);
+          }
+        });
+      } else {
+        console.log('[Screenshot Widget] ⚠️ No userId or userService available, using fallback');
+        // Fallback to simpler methods
+        userName = this.ctx?.$scope?.currentUser?.name || this.ctx?.$scope?.currentUser?.email || 'User';
+        console.log('[Screenshot Widget] Fallback username:', userName);
+      }
+    } catch (e) {
+      console.error('[Screenshot Widget] ❌ Error getting user info:', e);
+      userName = 'User';
+    }
+
+    // Set initial status (will be updated if user fetch succeeds)
+    this.statusMessage = `${userName} | ${dateStr} ${timeStr}`;
 
     if (this.ctx.detectChanges) {
       this.ctx.detectChanges();
@@ -284,35 +483,64 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       const clientHeight = targetElement.clientHeight;
       const needsScrolling = scrollHeight > clientHeight + 10;
 
-      console.log('[Screenshot Widget] Target (single source):', {
+      this.debug(' Target (single source):', {
         element: targetElement.tagName,
         scrollHeight,
         clientHeight
       });
-      console.log('[Screenshot Widget] Target (dynamic - like Chrome extension):', {
+      this.debug(' Target (dynamic - like Chrome extension):', {
         allHeights: heights,
         allWidths: widths,
         maxHeight,
         maxWidth,
         usingMaxForHeight: maxHeight > scrollHeight
       });
-      console.log('[Screenshot Widget] Will use:', {
+      this.debug(' Will use:', {
         scrollHeight,
         clientHeight,
         needsScrolling
       });
 
       // Request screen capture permission
-      // preferCurrentTab makes THIS TAB the default selection in the picker
-      stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          displaySurface: 'browser', // Prefer browser tab (not window/monitor)
-          width: { ideal: 4096 },    // Request high resolution
-          height: { ideal: 4096 }
-        } as any,
-        audio: false,                 // Don't capture audio
-        preferCurrentTab: true        // Chrome/Edge: Make current tab the default!
-      } as any);
+      // Different browsers have different options for defaulting to current tab
+      const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+
+      let displayMediaOptions: any;
+
+      if (isFirefox) {
+        // Firefox-specific options
+        // NOTE: Firefox may not show individual tabs, only windows/screens
+        displayMediaOptions = {
+          video: {
+            mediaSource: 'screen',        // Firefox: try 'screen' which includes tabs in some versions
+            width: { ideal: 4096 },
+            height: { ideal: 4096 },
+            cursor: 'never'               // Try to exclude cursor (Firefox-specific)
+          },
+          audio: false
+        };
+
+        this.debug(' ⚠️ Firefox Note: You may need to share the entire window instead of just a tab');
+      } else {
+        // Chrome/Edge options
+        displayMediaOptions = {
+          video: {
+            displaySurface: 'browser',    // Prefer browser tab
+            width: { ideal: 4096 },
+            height: { ideal: 4096 }
+          },
+          audio: false,
+          preferCurrentTab: true,         // Chrome/Edge: Make current tab the default!
+          selfBrowserSurface: 'include',  // Additional Chrome option
+          surfaceSwitching: 'include',
+          systemAudio: 'exclude'
+        };
+      }
+
+      this.debug(' Browser:', isFirefox ? 'Firefox' : 'Chrome/Edge');
+      this.debug(' Display media options:', displayMediaOptions);
+
+      stream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
 
       const [track] = stream.getVideoTracks();
 
@@ -321,21 +549,71 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       video.srcObject = stream;
       await video.play();
 
+      // MEASURE VIEWPORT BEFORE notification fully appears
+      const windowHeightBeforeNotification = window.innerHeight;
+      const clientHeightBeforeNotification = targetElement.clientHeight;
+
       // Get actual video dimensions - THIS includes the notification!
       await this.delay(300);
       const videoWidth = video.videoWidth;
       const videoHeight = video.videoHeight;
 
-      console.log('[Screenshot Widget] Video dimensions:', {
-        videoWidth,
-        videoHeight,
-        windowWidth: window.innerWidth,
-        windowHeight: window.innerHeight,
-        dpr: window.devicePixelRatio,
-        note: 'Video height already accounts for notification!'
+      // MEASURE VIEWPORT AFTER notification appears
+      const windowHeightAfterNotification = window.innerHeight;
+      const clientHeightAfterNotification = targetElement.clientHeight;
+
+      // DYNAMIC DPR calculation FIRST - like Chrome extension!
+      // Calculate ACTUAL scale based on captured video vs window dimensions
+      const windowWidth = window.innerWidth;
+      const reportedDpr = window.devicePixelRatio || 1;
+
+      // Calculate actual DPR from video dimensions (using width as it's most reliable)
+      const actualDprFromWidth = videoWidth / windowWidth;
+      const dpr = actualDprFromWidth;
+
+      // DYNAMIC NOTIFICATION HEIGHT DETECTION!
+      // The difference in window height = notification height in CSS pixels
+      const notificationHeightCSS = windowHeightBeforeNotification - windowHeightAfterNotification;
+      const notificationHeightEstimate = Math.ceil(notificationHeightCSS * dpr);
+
+      // DYNAMIC BROWSER CHROME DETECTION (for Firefox window sharing)!
+      // If video is taller than expected, extra height = browser chrome (tabs, address bar, etc.)
+      const expectedVideoHeight = windowHeightAfterNotification * dpr;
+      const actualVideoHeight = videoHeight;
+      const extraHeightInVideo = actualVideoHeight - expectedVideoHeight;
+      const browserChromeHeight = Math.max(0, extraHeightInVideo); // Browser UI height in video pixels
+
+      const hasBrowserChrome = browserChromeHeight > 50; // If >50px extra, user shared window not tab
+
+      this.debug(' 🔍 NOTIFICATION DETECTION:', {
+        windowHeightBefore: windowHeightBeforeNotification,
+        windowHeightAfter: windowHeightAfterNotification,
+        notificationCSS: notificationHeightCSS,
+        notificationVideoPixels: notificationHeightEstimate,
+        browser: isFirefox ? 'Firefox' : 'Chrome/Edge'
       });
 
-      // NOW re-measure EVERYTHING AFTER notification appears!
+      this.debug(' 🖼️ BROWSER CHROME DETECTION:', {
+        expectedVideoHeight,
+        actualVideoHeight,
+        extraHeight: extraHeightInVideo,
+        browserChromeHeight,
+        hasBrowserChrome,
+        note: hasBrowserChrome ? '⚠️ Window shared (includes browser UI)' : '✅ Tab shared (no browser UI)'
+      });
+
+      this.debug(' Video dimensions:', {
+        videoWidth,
+        videoHeight,
+        windowWidth,
+        windowHeight: windowHeightAfterNotification,
+        reportedDpr,
+        actualDprFromWidth,
+        usingDpr: dpr,
+        note: 'DPR calculated dynamically from actual video dimensions!'
+      });
+
+      // NOW re-measure scrollHeight AFTER notification appears!
       // DYNAMIC approach like Chrome extension - take MAX of all sources
       const heightsAfter = [
         document.documentElement.clientHeight,
@@ -347,9 +625,9 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
         targetElement.offsetHeight
       ];
       const scrollHeightAfterNotification = Math.max(...heightsAfter.filter(x => x));
-      const clientHeightAfterNotification = targetElement.clientHeight;
+      // Note: clientHeightAfterNotification already measured above after notification appeared
 
-      console.log('[Screenshot Widget] Dimensions after notification (dynamic):', {
+      this.debug(' Dimensions after notification (dynamic):', {
         before: { scrollHeight, clientHeight },
         after: { scrollHeight: scrollHeightAfterNotification, clientHeight: clientHeightAfterNotification },
         allHeightsAfter: heightsAfter,
@@ -360,22 +638,15 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       const finalScrollHeight = scrollHeightAfterNotification;
       const finalClientHeight = clientHeightAfterNotification;
 
-      // NOW calculate scroll positions based on ACTUAL video height
-      const dpr = window.devicePixelRatio || 1;
+      // NOW calculate scroll positions based on ACTUAL video height (DPR already calculated above)
       const actualCapturedHeight = videoHeight;
 
-      this.statusMessage = 'Calculating scroll positions...';
-      if (this.ctx.detectChanges) {
-        this.ctx.detectChanges();
-      }
+      // Keep showing user info throughout capture
       await this.delay(200);
 
       if (!needsScrolling) {
         // Single capture - no scrolling needed
-        this.statusMessage = 'Capturing...';
-        if (this.ctx.detectChanges) {
-          this.ctx.detectChanges();
-        }
+        // Status message already shows user/date/time, keep it
 
         const canvas = await this.captureFrame(video);
         track.stop();
@@ -383,10 +654,10 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
         const url = await this.canvasToUrl(canvas);
         this.downloadScreenshotFromUrl(url);
 
-        console.log('[Screenshot Widget] Single capture completed');
+        this.debug(' Single capture completed');
       } else {
         // Multi-capture - scroll and stitch like Chrome extension!
-        console.log('[Screenshot Widget] Full-page capture - scrolling and stitching');
+        this.debug(' Full-page capture - scrolling and stitching');
 
         const captures: HTMLCanvasElement[] = [];
         const originalScrollTop = targetElement.scrollTop;
@@ -406,25 +677,27 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
         const stickyElements = this.findStickyElements();
         const headerHeight = this.getMaxStickyHeight(stickyElements);
 
-        // Chrome's sharing notification reduces the video height
-        const notificationHeightEstimate = Math.ceil(50 * dpr);
+        // Notification height already detected dynamically above!
+        // (notificationHeightEstimate variable is already available from earlier scope)
 
         // Convert gridster scrollHeight from CSS to video pixels
         // USE THE AFTER-NOTIFICATION VALUES!
         const gridsterHeightInPixels = Math.ceil(finalScrollHeight * dpr);
 
-        // Piece 1: Captures full video height
+        // Piece 1: Captures full video height BUT browser chrome takes up space!
         const piece1ContentHeight = actualCapturedHeight;
+        // Actual GRIDSTER content in piece 1 (after removing notification AND browser chrome space)
+        const piece1GridsterContent = piece1ContentHeight - notificationHeightEstimate - browserChromeHeight;
 
-        // Pieces 2+: Crop BOTH header AND notification from middle pieces
+        // Pieces 2+: Crop header + notification + browser chrome (if present) from middle pieces
         const headerOnlyHeight = headerHeight;
-        const piece2PlusContentHeight = actualCapturedHeight - headerOnlyHeight - notificationHeightEstimate;
+        const piece2PlusContentHeight = actualCapturedHeight - headerOnlyHeight - notificationHeightEstimate - browserChromeHeight;
 
         // Calculate notification in CSS pixels (needed for gap check)
         const notificationCSS = Math.floor(notificationHeightEstimate / dpr);
 
-        // Calculate total pieces needed
-        const remainingAfterPiece1 = gridsterHeightInPixels - piece1ContentHeight;
+        // Calculate total pieces needed - USE piece1GridsterContent (not piece1ContentHeight!)
+        const remainingAfterPiece1 = gridsterHeightInPixels - piece1GridsterContent;
         let additionalPieces = Math.ceil(remainingAfterPiece1 / piece2PlusContentHeight);
 
         // Check for gap caused by notification
@@ -432,7 +705,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
         const piece1GridsterEnd = Math.floor(finalClientHeight - notificationCSS);
         const gapBetweenPiece1AndBottom = lastPieceScrollPosition - piece1GridsterEnd;
 
-        console.log('[Screenshot Widget] Gap analysis:', {
+        this.debug(' Gap analysis:', {
           piece1GridsterEnd: piece1GridsterEnd,
           lastPieceScrollPosition: lastPieceScrollPosition,
           gap: gapBetweenPiece1AndBottom,
@@ -442,7 +715,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
         if (additionalPieces === 1 && gapBetweenPiece1AndBottom > 10) {
           // There's a significant gap - need an extra piece in the middle
           additionalPieces = 2;
-          console.log('[Screenshot Widget] ⚠️ Gap detected! Adding extra piece to cover missing content');
+          this.debug(' ⚠️ Gap detected! Adding extra piece to cover missing content');
         }
 
         const totalPieces = 1 + additionalPieces;
@@ -453,7 +726,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
         // Each subsequent piece scrolls by the new content it adds
         const scrollIncrementCSS = Math.floor(piece2PlusContentHeight / dpr);
 
-        console.log('[Screenshot Widget] Scroll positions:', {
+        this.debug(' Scroll positions:', {
           notificationCSS: notificationCSS,
           piece1GridsterEnd: piece1GridsterEnd,
           piece2ScrollStart: piece2ScrollStart,
@@ -461,45 +734,57 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
           explanation: `Piece 1 captures ${piece1GridsterEnd}px of gridster (notification blocks ${notificationCSS}px), piece 2 continues from there`
         });
 
-        console.log('[Screenshot Widget] ═══════════════════════════════');
-        console.log('[Screenshot Widget] CAPTURE PLAN:');
-        console.log('[Screenshot Widget] ═══════════════════════════════');
-        console.log('[Screenshot Widget] Gridster dimensions (CSS - AFTER notification):', {
+        this.debug(' ═══════════════════════════════');
+        this.debug(' CAPTURE PLAN:');
+        this.debug(' ═══════════════════════════════');
+        this.debug(' Gridster dimensions (CSS - AFTER notification):', {
           scrollHeight: finalScrollHeight,
           clientHeight: finalClientHeight
         });
-        console.log('[Screenshot Widget] Gridster in video pixels:', {
+        this.debug(' Gridster in video pixels:', {
           totalHeight: gridsterHeightInPixels,
           calculation: `${scrollHeight} CSS × ${dpr} DPR = ${gridsterHeightInPixels}px`
         });
-        console.log('[Screenshot Widget] Video frame size:', {
+        this.debug(' Video frame size:', {
           width: videoWidth,
           height: videoHeight
         });
-        console.log('[Screenshot Widget] Obstacles:', {
+        this.debug(' Obstacles to crop:', {
+          browserChromeHeight: browserChromeHeight,
           notificationHeight: notificationHeightEstimate,
           headerHeight: headerHeight,
-          notificationNote: 'Cropped from piece 1 AND middle pieces',
-          headerNote: 'Cropped from all pieces'
+          totalTopCrop: browserChromeHeight + notificationHeightEstimate + headerHeight,
+          hasBrowserChrome: hasBrowserChrome,
+          note: hasBrowserChrome ? '⚠️ Firefox window mode' : '✅ Tab mode'
         });
-        console.log('[Screenshot Widget] Piece 1 coverage:', {
-          capturedPixels: piece1ContentHeight,
-          note: 'Full video frame - notification compensation in scroll position'
+        this.debug(' Piece 1 coverage:', {
+          totalCaptured: piece1ContentHeight,
+          browserChromeInCapture: browserChromeHeight,
+          notificationCropped: notificationHeightEstimate,
+          actualGridsterContent: piece1GridsterContent,
+          calculation: `${piece1ContentHeight} - ${notificationHeightEstimate} notification - ${browserChromeHeight} browser = ${piece1GridsterContent} gridster`,
+          note: hasBrowserChrome ? 'Browser chrome takes space but stays in piece 1' : 'Tab mode - no browser chrome'
         });
-        console.log('[Screenshot Widget] Pieces 2+ (middle) coverage:', {
+        this.debug(' Pieces 2+ (middle) coverage:', {
           capturedPixels: actualCapturedHeight,
-          cropTop: headerOnlyHeight + notificationHeightEstimate,
+          cropTop: headerOnlyHeight + notificationHeightEstimate + browserChromeHeight,
+          browserChromeCrop: browserChromeHeight,
           headerCrop: headerOnlyHeight,
           notificationCrop: notificationHeightEstimate,
-          newContentPerPiece: piece2PlusContentHeight
+          newContentPerPiece: piece2PlusContentHeight,
+          note: 'Browser chrome cropped from pieces 2+ (sticky element)'
         });
-        console.log('[Screenshot Widget] Total pieces calculation:', {
+        this.debug(' Total pieces calculation:', {
+          gridsterTotal: gridsterHeightInPixels,
+          piece1GridsterContent: piece1GridsterContent,
           afterPiece1Remaining: remainingAfterPiece1,
+          piece2PlusContentPerPiece: piece2PlusContentHeight,
           additionalPiecesNeeded: additionalPieces,
           totalPieces: totalPieces,
-          scrollIncrementCSS: scrollIncrementCSS
+          scrollIncrementCSS: scrollIncrementCSS,
+          note: hasBrowserChrome ? `Browser chrome (${browserChromeHeight}px) reduces piece 1 gridster content` : 'Normal calculation'
         });
-        console.log('[Screenshot Widget] ═══════════════════════════════');
+        this.debug(' ═══════════════════════════════');
 
         // Scroll through and capture each piece
         let totalCapturedContentHeight = 0; // Track how much we've captured
@@ -515,7 +800,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
           } else if (isLastPiece) {
             // LAST PIECE: Scroll to position where viewport bottom = gridster bottom
             currentScroll = finalScrollHeight - finalClientHeight;
-            console.log(`[Screenshot Widget] Last piece: scrolling to bottom`, {
+            this.debug(` Last piece: scrolling to bottom`, {
               scrollTo: currentScroll,
               viewportStart: currentScroll,
               viewportEnd: currentScroll + finalClientHeight,
@@ -527,7 +812,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
             // Subsequent pieces (i=2+) scroll by the increment
             if (i === 1) {
               currentScroll = piece2ScrollStart;
-              console.log(`[Screenshot Widget] Piece 2: scroll adjusted for notification, scrolling to ${currentScroll}px instead of ${scrollIncrementCSS}px`);
+              this.debug(` Piece 2: scroll adjusted for notification, scrolling to ${currentScroll}px instead of ${scrollIncrementCSS}px`);
             } else {
               currentScroll = piece2ScrollStart + ((i - 1) * scrollIncrementCSS);
             }
@@ -535,31 +820,22 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
 
           targetElement.scrollTop = currentScroll;
 
-          const percentage = Math.round((currentScroll / finalScrollHeight) * 100);
-          this.statusMessage = `Scrolling ${percentage}%... (${pieceIndex}/${totalPieces})`;
-          if (this.ctx.detectChanges) {
-            this.ctx.detectChanges();
-          }
-
-          console.log(`[Screenshot Widget] ╔═══════════════════════════════`);
-          console.log(`[Screenshot Widget] ║ PIECE ${pieceIndex}/${totalPieces}`);
-          console.log(`[Screenshot Widget] ╠═══════════════════════════════`);
-          console.log(`[Screenshot Widget] ║ Scroll position: ${currentScroll}px CSS`);
-          console.log(`[Screenshot Widget] ║ Gridster shows: ${currentScroll}px → ${currentScroll + finalClientHeight}px`);
-          console.log(`[Screenshot Widget] ║ In video pixels: ${Math.floor(currentScroll * dpr)}px → ${Math.floor((currentScroll + finalClientHeight) * dpr)}px`);
-          console.log(`[Screenshot Widget] ╚═══════════════════════════════`);
+          // Keep showing user/date/time info (no progress updates)
+          this.debug(` ╔═══════════════════════════════`);
+          this.debug(` ║ PIECE ${pieceIndex}/${totalPieces}`);
+          this.debug(` ╠═══════════════════════════════`);
+          this.debug(` ║ Scroll position: ${currentScroll}px CSS`);
+          this.debug(` ║ Gridster shows: ${currentScroll}px → ${currentScroll + finalClientHeight}px`);
+          this.debug(` ║ In video pixels: ${Math.floor(currentScroll * dpr)}px → ${Math.floor((currentScroll + finalClientHeight) * dpr)}px`);
+          this.debug(` ╚═══════════════════════════════`);
 
           // Wait for page to render (configurable in settings)
           const renderDelay = this.ctx.settings.renderDelay || 1500;
           await this.delay(renderDelay);
 
-          // Capture this frame
-          this.statusMessage = `Capturing ${percentage}%... (${pieceIndex}/${totalPieces})`;
-          if (this.ctx.detectChanges) {
-            this.ctx.detectChanges();
-          }
+          // Capture this frame (keep showing user info)
 
-          console.log(`[Screenshot Widget] Capturing frame after ${renderDelay}ms wait...`);
+          this.debug(` Capturing frame after ${renderDelay}ms wait...`);
           const canvas = await this.captureFrame(video);
 
           // Calculate how much of this canvas we actually need
@@ -567,21 +843,29 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
           let cropBottom = 0;
 
           if (pieceIndex === 1) {
-            // First piece: CROP the notification from top!
-            // The notification isn't part of gridster, so we remove it
+            // First piece: KEEP browser chrome (it's the top of the page!), only crop notification
             cropTop = notificationHeightEstimate;
             cropBottom = 0;
 
-            const actualGridsterContent = actualCapturedHeight - notificationHeightEstimate;
+            // Browser chrome takes up space in the video but we keep it in piece 1
+            // So actual GRIDSTER content = total - notification - browser chrome
+            const actualGridsterContent = actualCapturedHeight - notificationHeightEstimate - browserChromeHeight;
             totalCapturedContentHeight = actualGridsterContent;
 
-            console.log(`[Screenshot Widget] Piece 1: Cropping ${notificationHeightEstimate}px notification from top, keeping ${actualGridsterContent}px of gridster`);
+            this.debug(` Piece 1 cropping:`, {
+              totalCaptured: actualCapturedHeight,
+              notificationCropped: notificationHeightEstimate,
+              browserChromeSpace: browserChromeHeight,
+              gridsterContentCaptured: actualGridsterContent,
+              calculation: `${actualCapturedHeight} - ${notificationHeightEstimate} notification - ${browserChromeHeight} browser chrome = ${actualGridsterContent}px gridster`,
+              note: hasBrowserChrome ? 'Browser chrome KEPT but reduces gridster space' : 'Tab mode'
+            });
           } else {
             // Pieces 2+: Figure out how much we need
             const pixelsAlreadyCaptured = totalCapturedContentHeight;
             let stillNeeded = gridsterHeightInPixels - pixelsAlreadyCaptured;
 
-            console.log(`[Screenshot Widget] Piece ${pieceIndex} analysis:`, {
+            this.debug(` Piece ${pieceIndex} analysis:`, {
               alreadyCaptured: pixelsAlreadyCaptured,
               gridsterTotal: gridsterHeightInPixels,
               stillNeeded: stillNeeded,
@@ -589,27 +873,34 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
             });
 
             if (isLastPiece) {
-              // LAST PIECE: Add extra pixels to capture more at bottom (compensation for notification + rounding)
+              // LAST PIECE: Add base compensation only (browser chrome already in piece 1!)
               const extraBottomCompensation = this.ctx.settings.bottomCompensation || 95; // Extra pixels in video pixels
               const lastPieceHeight = stillNeeded + extraBottomCompensation;
               cropTop = actualCapturedHeight - lastPieceHeight;
               cropBottom = 0;
 
-              console.log(`[Screenshot Widget] Last piece: cropTop=${cropTop}, keeping bottom ${lastPieceHeight}px (stillNeeded ${stillNeeded}px + compensation ${extraBottomCompensation}px)`);
+              this.debug(` Last piece cropping:`, {
+                stillNeeded,
+                baseCompensation: extraBottomCompensation,
+                lastPieceHeight,
+                cropTop,
+                note: 'Browser chrome already included in piece 1, not compensating here'
+              });
 
               totalCapturedContentHeight += lastPieceHeight;
             } else {
-              // MIDDLE PIECES: Crop header + notification
-              // (Notification appears in middle pieces even though it shouldn't be visible there)
-              cropTop = headerOnlyHeight + notificationHeightEstimate;
+              // MIDDLE PIECES: Crop header + notification + browser chrome (if window shared)
+              // All these elements are sticky and appear in every piece
+              cropTop = headerOnlyHeight + notificationHeightEstimate + browserChromeHeight;
               cropBottom = 0;
               const actualContentAdded = actualCapturedHeight - cropTop;
 
-              console.log(`[Screenshot Widget] Piece ${pieceIndex} middle piece:`, {
+              this.debug(` Piece ${pieceIndex} middle piece:`, {
                 scrollPosition: currentScroll,
-                cropTop: cropTop,
                 headerHeight: headerOnlyHeight,
                 notificationHeight: notificationHeightEstimate,
+                browserChromeHeight: browserChromeHeight,
+                totalCropTop: cropTop,
                 contentAdded: actualContentAdded
               });
 
@@ -625,7 +916,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
             cropBottom: cropBottom
           } as any);
 
-          console.log(`[Screenshot Widget] Captured piece ${pieceIndex}: ${canvas.width}x${canvas.height}, cropTop: ${cropTop}, cropBottom: ${cropBottom}`);
+          this.debug(` Captured piece ${pieceIndex}: ${canvas.width}x${canvas.height}, cropTop: ${cropTop}, cropBottom: ${cropBottom}`);
         }
 
         // Stop capture
@@ -643,12 +934,8 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
         const downloadIndividual = this.ctx.settings.downloadIndividual === true;
 
         if (downloadIndividual) {
-          // DEBUG MODE: Download each piece separately
-          console.log('[Screenshot Widget] 📦 Downloading individual pieces (debug mode)...');
-          this.statusMessage = 'Downloading pieces...';
-          if (this.ctx.detectChanges) {
-            this.ctx.detectChanges();
-          }
+          // DEBUG MODE: Download each piece separately (keep showing user/date/time)
+          this.debug(' 📦 Downloading individual pieces (debug mode)...');
 
           for (let i = 0; i < captures.length; i++) {
             const capture = captures[i] as any;
@@ -672,7 +959,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
             link.href = url;
             link.click();
 
-            console.log(`[Screenshot Widget] ✓ Downloaded piece ${i + 1}/${captures.length}:`, {
+            this.debug(` ✓ Downloaded piece ${i + 1}/${captures.length}:`, {
               size: `${croppedCanvas.width}x${croppedCanvas.height}`,
               cropTop,
               cropBottom
@@ -681,33 +968,28 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
             await this.delay(500); // Small delay between downloads
           }
 
-          console.log('[Screenshot Widget] ✅ All individual pieces downloaded!');
+          this.debug(' ✅ All individual pieces downloaded!');
         } else {
-          // NORMAL MODE: Stitch and download final image
-          this.statusMessage = 'Stitching...';
-          if (this.ctx.detectChanges) {
-            this.ctx.detectChanges();
-          }
-
-          console.log(`[Screenshot Widget] Stitching ${captures.length} pieces...`);
+          // NORMAL MODE: Stitch and download final image (keep showing user/date/time)
+          this.debug(` Stitching ${captures.length} pieces...`);
           const finalCanvas = await this.stitchFrames(captures, finalScrollHeight);
 
           // Final summary
-          console.log('[Screenshot Widget] ═══════════════════════════════');
-          console.log('[Screenshot Widget] FINAL RESULT:');
-          console.log('[Screenshot Widget] ═══════════════════════════════');
-          console.log('[Screenshot Widget] Expected gridster height:', gridsterHeightInPixels, 'px');
-          console.log('[Screenshot Widget] Stitched canvas height:', finalCanvas.height, 'px');
-          console.log('[Screenshot Widget] Match:', finalCanvas.height === gridsterHeightInPixels ? '✅ PERFECT!' : '❌ MISMATCH!');
-          console.log('[Screenshot Widget] Difference:', finalCanvas.height - gridsterHeightInPixels, 'px');
-          console.log('[Screenshot Widget] Total captured:', totalCapturedContentHeight, 'px');
-          console.log('[Screenshot Widget] Pieces used:', captures.length);
-          console.log('[Screenshot Widget] ═══════════════════════════════');
+          this.debug(' ═══════════════════════════════');
+          this.debug(' FINAL RESULT:');
+          this.debug(' ═══════════════════════════════');
+          this.debug(' Expected gridster height:', gridsterHeightInPixels, 'px');
+          this.debug(' Stitched canvas height:', finalCanvas.height, 'px');
+          this.debug(' Match:', finalCanvas.height === gridsterHeightInPixels ? '✅ PERFECT!' : '❌ MISMATCH!');
+          this.debug(' Difference:', finalCanvas.height - gridsterHeightInPixels, 'px');
+          this.debug(' Total captured:', totalCapturedContentHeight, 'px');
+          this.debug(' Pieces used:', captures.length);
+          this.debug(' ═══════════════════════════════');
 
           const url = await this.canvasToUrl(finalCanvas);
           this.downloadScreenshotFromUrl(url);
 
-          console.log('[Screenshot Widget] Full-page capture completed');
+          this.debug(' Full-page capture completed');
         }
       }
 
@@ -735,7 +1017,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
 
       setTimeout(() => {
         this.loading = false;
-        this.statusMessage = '';
+        // Keep showing user/date/time after capture completes
         if (!this.error) {
           this.error = null;
         }
@@ -775,7 +1057,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     const firstCapture = captures[0];
     const width = firstCapture.canvas.width;
 
-    console.log('[Screenshot Widget] Stitching:', {
+    this.debug(' Stitching:', {
       pieces: captures.length,
       width
     });
@@ -809,7 +1091,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       // Calculate final height after cropping
       const finalHeight = sourceCanvas.height - cropTop - cropBottom;
 
-      console.log(`[Screenshot Widget] Drawing piece ${i + 1}/${captures.length}:`, {
+      this.debug(` Drawing piece ${i + 1}/${captures.length}:`, {
         sourceSize: `${sourceCanvas.width}x${sourceCanvas.height}`,
         cropTop,
         cropBottom,
@@ -829,7 +1111,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       yOffset += finalHeight;
     }
 
-    console.log('[Screenshot Widget] Stitched final size:', {
+    this.debug(' Stitched final size:', {
       width: finalCanvas.width,
       height: finalCanvas.height
     });
@@ -850,7 +1132,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     });
 
     const url = URL.createObjectURL(blob);
-    console.log('[Screenshot Widget] Blob created, size:', blob.size);
+    this.debug(' Blob created, size:', blob.size);
     return url;
   }
 
@@ -864,7 +1146,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     const scrollWidth = element.scrollWidth;
     const originalScrollTop = element.scrollTop;
 
-    console.log('[Screenshot Widget] Capture dimensions:', {
+    this.debug(' Capture dimensions:', {
       element: element.tagName,
       scrollHeight,
       clientHeight,
@@ -885,7 +1167,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
 
     // Capture the FULL element height at once
     // This is simpler and more reliable than scrolling and stitching
-    console.log('[Screenshot Widget] Capturing full element at once');
+    this.debug(' Capturing full element at once');
     this.statusMessage = 'Capturing full page...';
     if (this.ctx.detectChanges) {
       this.ctx.detectChanges();
@@ -915,7 +1197,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     // Restore scroll position
     element.scrollTop = originalScrollTop;
 
-    console.log('[Screenshot Widget] Full page captured:', {
+    this.debug(' Full page captured:', {
       canvasWidth: canvas.width,
       canvasHeight: canvas.height
     });
@@ -934,7 +1216,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     });
 
     const dataUrl = URL.createObjectURL(blob);
-    console.log('[Screenshot Widget] Blob created, size:', blob.size);
+    this.debug(' Blob created, size:', blob.size);
 
     return dataUrl;
   }
@@ -943,7 +1225,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
    * Captures a single screen without scrolling
    */
   private async captureSingleScreen(element: HTMLElement): Promise<string> {
-    console.log('[Screenshot Widget] Single screen capture of:', element);
+    this.debug(' Single screen capture of:', element);
 
     // Wait for images to load first
     await this.waitForImages(element);
@@ -968,7 +1250,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       }
     });
 
-    console.log('[Screenshot Widget] Canvas created:', {
+    this.debug(' Canvas created:', {
       width: canvas.width,
       height: canvas.height,
       hasData: canvas.width > 0 && canvas.height > 0
@@ -979,7 +1261,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     }
 
     const dataUrl = canvas.toDataURL('image/png', 1.0);
-    console.log('[Screenshot Widget] Data URL length:', dataUrl.length);
+    this.debug(' Data URL length:', dataUrl.length);
 
     return dataUrl;
   }
@@ -1001,7 +1283,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     let currentScroll = 0;
     const originalScrollTop = element.scrollTop;
 
-    console.log('[Screenshot Widget] Multi-screen capture starting:', {
+    this.debug(' Multi-screen capture starting:', {
       element: element.tagName,
       scrollHeight,
       clientHeight,
@@ -1021,7 +1303,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
 
       // Scroll to position
       element.scrollTop = currentScroll;
-      console.log(`[Screenshot Widget] Scrolling ${element.tagName} to position ${currentScroll}px (piece ${pieceIndex})`);
+      this.debug(` Scrolling ${element.tagName} to position ${currentScroll}px (piece ${pieceIndex})`);
 
       // Wait longer for scroll, images to load, and content to render
       await this.delay(1000);
@@ -1034,7 +1316,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
 
       // Verify scroll position
       const actualScrollTop = element.scrollTop;
-      console.log(`[Screenshot Widget] Expected scroll: ${currentScroll}, Actual: ${actualScrollTop}`);
+      this.debug(` Expected scroll: ${currentScroll}, Actual: ${actualScrollTop}`);
 
       // Wait for images to load in viewport
       await this.waitForImages(element);
@@ -1061,7 +1343,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
         }
       });
 
-      console.log('[Screenshot Widget] Piece captured:', {
+      this.debug(' Piece captured:', {
         pieceIndex,
         canvasWidth: canvas.width,
         canvasHeight: canvas.height,
@@ -1087,7 +1369,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     // Restore original scroll position
     element.scrollTop = originalScrollTop;
 
-    console.log(`[Screenshot Widget] Captured ${captures.length} pieces, stitching together...`);
+    this.debug(` Captured ${captures.length} pieces, stitching together...`);
 
     if (captures.length === 0) {
       throw new Error('No screenshots captured - element may not be scrollable');
@@ -1110,7 +1392,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       throw new Error('No canvases to stitch');
     }
 
-    console.log('[Screenshot Widget] Stitching canvases:', {
+    this.debug(' Stitching canvases:', {
       count: canvases.length,
       targetWidth: width,
       targetHeight: totalHeight
@@ -1132,13 +1414,13 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     let yOffset = 0;
     for (let i = 0; i < canvases.length; i++) {
       const canvas = canvases[i];
-      console.log(`[Screenshot Widget] Drawing canvas ${i + 1}/${canvases.length} at y=${yOffset}`);
+      this.debug(` Drawing canvas ${i + 1}/${canvases.length} at y=${yOffset}`);
       ctx.drawImage(canvas, 0, yOffset);
       yOffset += canvas.height;
     }
 
     const dataUrl = finalCanvas.toDataURL('image/png', 1.0);
-    console.log('[Screenshot Widget] Stitched image size:', dataUrl.length);
+    this.debug(' Stitched image size:', dataUrl.length);
 
     if (dataUrl.length < 100) {
       throw new Error('Stitched image is too small - likely empty');
@@ -1155,7 +1437,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     const captureMode = this.ctx.settings.captureMode || 'dashboard';
     let target: HTMLElement | null = null;
 
-    console.log('[Screenshot Widget] Finding target for mode:', captureMode);
+    this.debug(' Finding target for mode:', captureMode);
 
     if (captureMode === 'dashboard') {
       // ThingsBoard uses gridster for dashboard layout
@@ -1164,8 +1446,8 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
 
       if (gridster) {
         target = gridster;
-        console.log('[Screenshot Widget] Found gridster element - this is the scrollable container');
-        console.log('[Screenshot Widget] Gridster dimensions:', {
+        this.debug(' Found gridster element - this is the scrollable container');
+        this.debug(' Gridster dimensions:', {
           scrollHeight: gridster.scrollHeight,
           clientHeight: gridster.clientHeight,
           offsetHeight: gridster.offsetHeight
@@ -1173,7 +1455,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       } else {
         // Fallback to body if gridster not found
         target = document.body;
-        console.log('[Screenshot Widget] Gridster not found, using document.body');
+        this.debug(' Gridster not found, using document.body');
       }
 
     } else if (captureMode === 'widget') {
@@ -1181,11 +1463,11 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       const containerEl = (this.ctx as any).$containerElement;
       if (containerEl && containerEl.length > 0) {
         target = containerEl[0] as HTMLElement;
-        console.log('[Screenshot Widget] Found widget container via ctx');
+        this.debug(' Found widget container via ctx');
       } else {
         // Fallback to finding the widget container
         target = document.querySelector('tb-screenshot-widget')?.parentElement as HTMLElement;
-        console.log('[Screenshot Widget] Found widget via DOM query');
+        this.debug(' Found widget via DOM query');
       }
 
       if (!target) {
@@ -1194,14 +1476,14 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     } else if (captureMode === 'custom' && this.ctx.settings.customSelector) {
       // Capture custom selector
       target = document.querySelector(this.ctx.settings.customSelector) as HTMLElement;
-      console.log('[Screenshot Widget] Custom selector target:', target);
+      this.debug(' Custom selector target:', target);
     }
 
     if (!target) {
       target = document.body;
     }
 
-    console.log('[Screenshot Widget] Final target:', {
+    this.debug(' Final target:', {
       tagName: target.tagName,
       className: target.className,
       scrollHeight: target.scrollHeight,
@@ -1241,7 +1523,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       return;
     }
 
-    console.log('[Screenshot Widget] Downloading screenshot, URL type:', isBlob ? 'blob' : 'data', 'length:', url.length);
+    this.debug(' Downloading screenshot, URL type:', isBlob ? 'blob' : 'data', 'length:', url.length);
 
     const link = document.createElement('a');
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
@@ -1255,13 +1537,13 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     // Trigger download
     try {
       link.click();
-      console.log('[Screenshot Widget] Screenshot downloaded successfully:', link.download);
+      this.debug(' Screenshot downloaded successfully:', link.download);
 
       // Clean up blob URL after download
       if (isBlob) {
         setTimeout(() => {
           URL.revokeObjectURL(url);
-          console.log('[Screenshot Widget] Blob URL cleaned up');
+          this.debug(' Blob URL cleaned up');
         }, 1000);
       }
     } catch (err) {
@@ -1304,7 +1586,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
           if (computed.position === 'fixed' || computed.position === 'sticky') {
             if (!stickyElements.includes(el)) {
               stickyElements.push(el);
-              console.log('[Screenshot Widget] Found sticky element:', el.tagName, el.className);
+              this.debug(' Found sticky element:', el.tagName, el.className);
             }
           }
         });
@@ -1339,7 +1621,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       const rect = (el as HTMLElement).getBoundingClientRect();
       const computed = window.getComputedStyle(el as HTMLElement);
 
-      console.log('[Screenshot Widget] Checking element:', {
+      this.debug(' Checking element:', {
         tag: el.tagName,
         className: el.className.substring(0, 50),
         top: rect.top,
@@ -1362,7 +1644,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       if (isVisible && isAtTop && isWide && isShort) {
         if (rect.bottom > maxBottom) {
           maxBottom = rect.bottom;
-          console.log('[Screenshot Widget] ✓ Found top header:', {
+          this.debug(' ✓ Found top header:', {
             tag: el.tagName,
             top: rect.top,
             height: rect.height,
@@ -1378,7 +1660,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     const dpr = window.devicePixelRatio || 1;
     const finalHeight = Math.ceil(maxBottom * dpr);
 
-    console.log('[Screenshot Widget] Header crop height:', {
+    this.debug(' Header crop height:', {
       maxBottomCSS: maxBottom,
       dpr,
       finalHeightPixels: finalHeight
@@ -1411,7 +1693,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
    * Perfect for debugging scroll calculation!
    */
   private async scrollPreviewMode(): Promise<void> {
-    console.log('[Screenshot Widget] 🔍 SCROLL PREVIEW MODE - No screenshots, just scrolling!');
+    this.debug(' 🔍 SCROLL PREVIEW MODE - No screenshots, just scrolling!');
     this.loading = true;
     this.error = null;
     this.statusMessage = 'Preview: Analyzing...';
@@ -1456,7 +1738,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       const piece2ScrollStart = piece1GridsterEnd;
       const scrollIncrementCSS = Math.floor(piece2PlusContentHeight / dpr);
 
-      console.log('[Screenshot Widget] 📊 PREVIEW - Will scroll to these positions:');
+      this.debug(' 📊 PREVIEW - Will scroll to these positions:');
 
       // Scroll through each position
       for (let i = 0; i < totalPieces; i++) {
@@ -1482,7 +1764,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
           this.ctx.detectChanges();
         }
 
-        console.log(`[Screenshot Widget] 📍 Piece ${pieceIndex}/${totalPieces}:`, {
+        this.debug(` 📍 Piece ${pieceIndex}/${totalPieces}:`, {
           scrollTo: currentScroll,
           gridsterRange: `${currentScroll}px → ${currentScroll + clientHeight}px`,
           videoRange: `${Math.floor(currentScroll * dpr)}px → ${Math.floor((currentScroll + clientHeight) * dpr)}px`
@@ -1494,7 +1776,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       // Restore original position
       targetElement.scrollTop = originalScrollTop;
 
-      console.log('[Screenshot Widget] ✅ Preview complete - would capture', totalPieces, 'pieces');
+      this.debug(' ✅ Preview complete - would capture', totalPieces, 'pieces');
       this.statusMessage = `Preview done: ${totalPieces} pieces`;
 
     } catch (err) {
@@ -1565,7 +1847,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
 
         // GLOBAL keyboard blocker - catches Page Up/Down, arrow keys, etc.
         const globalKeyBlocker = (e: KeyboardEvent) => {
-          console.log('[Screenshot Widget] 🚫 Blocked key:', e.key, e.code, e.type);
+          this.debug(' 🚫 Blocked key:', e.key, e.code, e.type);
           e.preventDefault();
           e.stopPropagation();
           e.stopImmediatePropagation();
@@ -1629,7 +1911,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
         document.documentElement.style.cursor = `url('${transparentCursor}'), none`;
         document.body.style.cursor = `url('${transparentCursor}'), none`;
 
-        console.log('[Screenshot Widget] 📝 Added global CSS with transparent cursor and hidden tooltips');
+        this.debug(' 📝 Added global CSS with transparent cursor and hidden tooltips');
 
         // Also prevent scrolling on target element
         if (targetElement) {
@@ -1637,7 +1919,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
           targetElement.style.overflow = 'hidden';
         }
 
-        console.log('[Screenshot Widget] 🚫 User input BLOCKED - keyboard, tooltips, and all interaction disabled');
+        this.debug(' 🚫 User input BLOCKED - keyboard, tooltips, and all interaction disabled');
       }
     } else {
       // Remove blocking overlay
@@ -1663,7 +1945,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
         const tooltipStyle = document.getElementById(tooltipStyleId);
         if (tooltipStyle) {
           tooltipStyle.remove();
-          console.log('[Screenshot Widget] 📝 Removed global CSS (cursor and tooltips restored)');
+          this.debug(' 📝 Removed global CSS (cursor and tooltips restored)');
         }
 
         // Restore target element overflow
@@ -1671,7 +1953,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
           targetElement.style.overflow = (targetElement as any)._originalOverflow;
         }
 
-        console.log('[Screenshot Widget] ✅ User input UNBLOCKED - cursor, keyboard and tooltips restored');
+        this.debug(' ✅ User input UNBLOCKED - cursor, keyboard and tooltips restored');
       }
     }
   }
@@ -1704,9 +1986,9 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     });
 
     if (imagePromises.length > 0) {
-      console.log(`[Screenshot Widget] Waiting for ${imagePromises.length} images to load...`);
+      this.debug(` Waiting for ${imagePromises.length} images to load...`);
       await Promise.all(imagePromises);
-      console.log('[Screenshot Widget] All images loaded');
+      this.debug(' All images loaded');
     }
 
     // Extra delay for rendering

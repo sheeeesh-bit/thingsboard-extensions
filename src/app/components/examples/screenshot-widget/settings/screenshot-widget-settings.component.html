@@ -64,12 +64,21 @@
       <div class="tb-hint">Display instructions before starting the screen capture</div>
     </section>
 
-    <mat-form-field class="mat-block" *ngIf="screenshotWidgetSettingsForm.get('showWarningDialog').value">
-      <mat-label>Warning Message</mat-label>
+    <section class="tb-form-panel stroked" *ngIf="screenshotWidgetSettingsForm.get('showWarningDialog').value">
+      <div class="tb-form-row">
+        <mat-slide-toggle formControlName="useDefaultWarning">
+          Use Default Browser-Specific Instructions
+        </mat-slide-toggle>
+      </div>
+      <div class="tb-hint">Show automatic instructions based on detected browser (recommended)</div>
+    </section>
+
+    <mat-form-field class="mat-block" *ngIf="screenshotWidgetSettingsForm.get('showWarningDialog').value && !screenshotWidgetSettingsForm.get('useDefaultWarning').value">
+      <mat-label>Custom Warning Message</mat-label>
       <textarea matInput formControlName="warningMessage"
                 rows="8"
                 placeholder="Enter custom warning message..."></textarea>
-      <mat-hint>Instructions shown to user before capture (supports line breaks)</mat-hint>
+      <mat-hint>Custom instructions shown to user before capture (supports line breaks)</mat-hint>
     </mat-form-field>
   </fieldset>
 
@@ -119,6 +128,24 @@
         </mat-slide-toggle>
       </div>
       <div class="tb-hint">Download each cropped piece separately instead of stitching - useful for debugging alignment</div>
+    </section>
+
+    <section class="tb-form-panel stroked">
+      <div class="tb-form-row">
+        <mat-slide-toggle formControlName="logContext">
+          Log Widget Context on Init
+        </mat-slide-toggle>
+      </div>
+      <div class="tb-hint">Show widget context object in console when widget initializes</div>
+    </section>
+
+    <section class="tb-form-panel stroked">
+      <div class="tb-form-row">
+        <mat-slide-toggle formControlName="showDebugInfo">
+          Show Detailed Debug Logs
+        </mat-slide-toggle>
+      </div>
+      <div class="tb-hint">Show detailed logging for dimensions, cropping, stitching, etc. (verbose)</div>
     </section>
   </fieldset>
 </form>
