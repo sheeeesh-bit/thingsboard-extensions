@@ -673,9 +673,9 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
         targetElement.scrollTop = 0;
         await this.delay(500);
 
-        // Find sticky/fixed headers
+        // Find sticky/fixed headers - use ACTUAL DPR from video, not window.devicePixelRatio!
         const stickyElements = this.findStickyElements();
-        const headerHeight = this.getMaxStickyHeight(stickyElements);
+        const headerHeight = this.getMaxStickyHeight(stickyElements, dpr);
 
         // Notification height already detected dynamically above!
         // (notificationHeightEstimate variable is already available from earlier scope)
@@ -700,31 +700,38 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
         const remainingAfterPiece1 = gridsterHeightInPixels - piece1GridsterContent;
         let additionalPieces = Math.ceil(remainingAfterPiece1 / piece2PlusContentHeight);
 
-        // Check for gap caused by notification
+        // Calculate scroll increment early (needed for gap detection)
+        const scrollIncrementCSS = Math.floor(piece2PlusContentHeight / dpr);
+
+        // Check for gap - calculate where the last middle piece will end
         const lastPieceScrollPosition = finalScrollHeight - finalClientHeight;
         const piece1GridsterEnd = Math.floor(finalClientHeight - notificationCSS);
-        const gapBetweenPiece1AndBottom = lastPieceScrollPosition - piece1GridsterEnd;
+        const piece2ScrollStart = piece1GridsterEnd;
+
+        // Calculate where the second-to-last MIDDLE piece ends
+        // Second-to-last middle piece has loop index i = (additionalPieces - 1)
+        // Its scroll position formula: piece2ScrollStart + ((i - 1) * scrollIncrementCSS)
+        // So: piece2ScrollStart + (((additionalPieces - 1) - 1) * scrollIncrementCSS)
+        const secondToLastPieceScroll = piece2ScrollStart + ((additionalPieces - 2) * scrollIncrementCSS);
+        const secondToLastPieceEnd = secondToLastPieceScroll + finalClientHeight;
+        const gapBeforeLastPiece = lastPieceScrollPosition - secondToLastPieceEnd;
 
         this.debug(' Gap analysis:', {
-          piece1GridsterEnd: piece1GridsterEnd,
-          lastPieceScrollPosition: lastPieceScrollPosition,
-          gap: gapBetweenPiece1AndBottom,
-          notificationCSS: notificationCSS
+          piece1GridsterEnd,
+          lastPieceScrollPosition,
+          secondToLastPieceScroll,
+          secondToLastPieceEnd,
+          gapBeforeLastPiece,
+          gapInVideoPixels: gapBeforeLastPiece * dpr
         });
 
-        if (additionalPieces === 1 && gapBetweenPiece1AndBottom > 10) {
-          // There's a significant gap - need an extra piece in the middle
-          additionalPieces = 2;
-          this.debug(' ⚠️ Gap detected! Adding extra piece to cover missing content');
+        // If there's a significant gap before the last piece, add another middle piece
+        if (gapBeforeLastPiece > 10) {
+          additionalPieces++;
+          this.debug(' ⚠️ Gap detected before last piece! Adding extra middle piece. Gap:', gapBeforeLastPiece, 'px CSS,', (gapBeforeLastPiece * dpr), 'px video');
         }
 
         const totalPieces = 1 + additionalPieces;
-
-        // Piece 2 scroll start = where piece 1's gridster content ends
-        const piece2ScrollStart = piece1GridsterEnd;
-
-        // Each subsequent piece scrolls by the new content it adds
-        const scrollIncrementCSS = Math.floor(piece2PlusContentHeight / dpr);
 
         this.debug(' Scroll positions:', {
           notificationCSS: notificationCSS,
@@ -873,18 +880,30 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
             });
 
             if (isLastPiece) {
-              // LAST PIECE: Add base compensation only (browser chrome already in piece 1!)
+              // LAST PIECE: Sticky header is at top, we want bottom portion
+              // Crop: header from top + extra to get to bottom portion we need
               const extraBottomCompensation = this.ctx.settings.bottomCompensation || 95; // Extra pixels in video pixels
               const lastPieceHeight = stillNeeded + extraBottomCompensation;
-              cropTop = actualCapturedHeight - lastPieceHeight;
+
+              // The frame has: [Header 93px][Content 661px]
+              // We want to keep: lastPieceHeight from the bottom
+              // So crop: total - lastPieceHeight, but that includes the header!
+              // Correct: crop (header + top content we don't need)
+              const contentAvailable = actualCapturedHeight - headerOnlyHeight; // Content after header
+              const topContentToSkip = contentAvailable - lastPieceHeight; // How much top content to skip
+              cropTop = headerOnlyHeight + Math.max(0, topContentToSkip); // Header + skip amount
               cropBottom = 0;
 
               this.debug(` Last piece cropping:`, {
+                frameTotal: actualCapturedHeight,
+                headerHeight: headerOnlyHeight,
+                contentAvailable,
                 stillNeeded,
                 baseCompensation: extraBottomCompensation,
                 lastPieceHeight,
+                topContentToSkip,
                 cropTop,
-                note: 'Browser chrome already included in piece 1, not compensating here'
+                note: 'Cropping header + top content to keep bottom portion'
               });
 
               totalCapturedContentHeight += lastPieceHeight;
@@ -1602,7 +1621,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
    * Gets the maximum height of sticky TOP header (not sidebar)
    * Only detects horizontal headers at top of page
    */
-  private getMaxStickyHeight(elements: Element[]): number {
+  private getMaxStickyHeight(elements: Element[], actualDpr: number): number {
     if (elements.length === 0) {
       return 0;
     }
@@ -1655,15 +1674,16 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       }
     });
 
-    // The video stream already captures at physical pixel resolution,
-    // so we need to account for DPR to convert CSS pixels to video pixels
-    const dpr = window.devicePixelRatio || 1;
-    const finalHeight = Math.ceil(maxBottom * dpr);
+    // Use the ACTUAL DPR from video capture (not window.devicePixelRatio)
+    // This is critical when browser is zoomed or DPR < 1
+    const finalHeight = Math.ceil(maxBottom * actualDpr);
 
     this.debug(' Header crop height:', {
       maxBottomCSS: maxBottom,
-      dpr,
-      finalHeightPixels: finalHeight
+      windowDpr: window.devicePixelRatio,
+      actualDprUsed: actualDpr,
+      finalHeightPixels: finalHeight,
+      note: actualDpr !== window.devicePixelRatio ? '⚠️ Using actual DPR from video, not window DPR!' : 'DPR matches'
     });
 
     return finalHeight;
@@ -1715,7 +1735,7 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       // Calculate all the same values as real capture
       const dpr = window.devicePixelRatio || 1;
       const stickyElements = this.findStickyElements();
-      const headerHeight = this.getMaxStickyHeight(stickyElements);
+      const headerHeight = this.getMaxStickyHeight(stickyElements, dpr);
       const notificationHeightEstimate = Math.ceil(50 * dpr);
       const notificationCSS = Math.floor(notificationHeightEstimate / dpr);
 
