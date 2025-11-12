@@ -1,0 +1,1782 @@
+.graph-container {
+    flex: 1; 
+  min-width: 400px; 
+  /* Removed min-height to allow dynamic height scaling */
+  overflow-x: auto;
+  /* overflow-y handled dynamically in TypeScript based on subplot count */
+  position: relative;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-x: scroll;
+  overflow-y: scroll;
+}
+.tb-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-top: 0px;
+}
+
+.material-icons {
+  vertical-align: middle;
+  font-size: 24px; /* Adjust the icon size */
+  color: #2196f3; /* Customize the icon color */
+}
+
+.tooltip-container {
+  position: relative;
+  display: inline-block;
+}
+
+button[mat-icon-button] {
+  background-color: #e0f7fa; /* Light cyan background */
+  color: #00796b; /* Dark cyan text color */
+  border-radius: 10%;
+  transition: background-color 0.3s ease;
+  display: flex;           /* Use Flexbox for alignment */
+  align-items: center;     /* Center items vertically */
+  justify-content: center; /* Center items horizontally */
+  padding: 12px;           /* Ensure proper spacing */
+}
+
+button[mat-icon-button]:hover {
+  background-color: #b2dfdb; /* Slightly darker cyan on hover */
+  border-radius: 90%;
+  transition: background-color 0.3s ease;
+}
+
+// Modern Apple-style button container
+.tb-button-container {
+  margin: 12px 16px 24px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px; // Space between individual buttons
+}
+
+// Glossy Apple-style buttons (like macOS Big Sur)
+button[mat-icon-button].tb-button {
+  // Remove Material Design state layer (gray circle on hover)
+  --mat-icon-button-hover-state-layer-opacity: 0;
+  --mat-icon-button-focus-state-layer-opacity: 0;
+  --mat-icon-button-pressed-state-layer-opacity: 0;
+  
+  // Hard kill the persistent ripple element
+  .mat-mdc-button-persistent-ripple::before {
+    opacity: 0 !important;
+    background: transparent !important;
+  }
+  
+  border-radius: 11px !important;
+  background: linear-gradient(180deg, 
+    rgba(255, 255, 255, 0.9) 0%, 
+    rgba(255, 255, 255, 0.7) 50%,
+    rgba(255, 255, 255, 0.6) 100%) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  color: #1d1d1f !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  width: 42px !important;
+  height: 42px !important;
+  position: relative !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  overflow: hidden !important;
+  box-shadow: 
+    0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    0 2px 4px rgba(0, 0, 0, 0.08),
+    0 8px 16px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.04) !important;
+  
+  &:hover:not(:active) {
+    background: linear-gradient(180deg, 
+      rgba(255, 255, 255, 0.95) 0%, 
+      rgba(255, 255, 255, 0.8) 50%,
+      rgba(255, 255, 255, 0.7) 100%) !important;
+    transform: translateY(-0.5px) scale(1.02);
+    box-shadow: 
+      0 0 0 0.5px rgba(0, 0, 0, 0.15),
+      0 4px 8px rgba(0, 0, 0, 0.12),
+      0 12px 20px rgba(0, 0, 0, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 1),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.8) !important;
+  }
+  
+  &:active {
+    transform: scale(0.96) translateY(0);
+    background: linear-gradient(180deg, 
+      #f5f5f7 0%, 
+      #ececef 100%) !important;
+    box-shadow: 
+      0 1px 2px rgba(0, 0, 0, 0.05),
+      inset 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+  }
+  
+  .material-icons {
+    font-size: 22px;
+    color: #2c2c2e;
+    font-weight: 400;
+    transition: all 0.2s ease;
+    position: relative;
+    z-index: 1;
+  }
+  
+  &:hover .material-icons {
+    color: #1d1d1f;
+    transform: translateY(-1px);
+  }
+  
+  // Ripple effect removed - no ::after pseudo-element needed
+
+  // Marker count badge
+  .marker-count-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #ff3b30;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 8px;
+    min-width: 16px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    z-index: 2;
+  }
+}
+
+// Active/selected button state
+button[mat-icon-button].tb-button-active {
+  background: linear-gradient(180deg, #007aff 0%, #0056cc 100%) !important;
+  border-color: rgba(0, 86, 204, 0.3) !important;
+  box-shadow: 
+    0 2px 6px rgba(0, 122, 255, 0.3),
+    0 1px 3px rgba(0, 122, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  
+  .material-icons {
+    color: white;
+    font-weight: 500;
+  }
+  
+  &:hover:not(:active) {
+    background: linear-gradient(180deg, #1a86ff 0%, #0066dd 100%) !important;
+    transform: translateY(-1px);
+    box-shadow: 
+      0 4px 10px rgba(0, 122, 255, 0.35),
+      0 2px 4px rgba(0, 122, 255, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  }
+  
+  &:active {
+    transform: scale(0.96) translateY(0);
+    background: linear-gradient(180deg, #0056cc 0%, #004bb3 100%) !important;
+  }
+}
+
+// ===============================
+// Standard Material Design Tooltip Styling
+// ===============================
+
+// Apply standard Angular Material tooltip styling - Compact size
+::ng-deep .mat-mdc-tooltip {
+  // Standard Material Design colors
+  --mdc-plain-tooltip-container-color: #616161 !important;
+  --mdc-plain-tooltip-supporting-text-color: white !important;
+  
+  // Standard Material Design typography
+  --mdc-plain-tooltip-supporting-text-font: Roboto, sans-serif !important;
+  --mdc-plain-tooltip-supporting-text-size: 12px !important;
+  --mdc-plain-tooltip-supporting-text-weight: 400 !important;
+  
+  // Standard Material Design shape
+  --mdc-plain-tooltip-container-shape: 4px !important;
+  
+  // Apply the compact styling
+  background: #616161 !important;
+  color: white !important;
+  font-size: 12px !important;
+  font-family: Roboto, sans-serif !important;
+  font-weight: 400 !important;
+  line-height: 12px !important;
+  border-radius: 4px !important;
+  padding: 2px 4px !important; // Even smaller box padding
+  
+  // Remove any custom styling that might interfere
+  border: none !important;
+  outline: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+// Also apply to fallback classes
+::ng-deep .mat-tooltip,
+::ng-deep .modern-tooltip {
+  background: #616161 !important;
+  color: white !important;
+  font-size: 12px !important;
+  font-family: Roboto, sans-serif !important;
+  font-weight: 400 !important;
+  line-height: 12px !important;
+  border-radius: 4px !important;
+  padding: 2px 4px !important; // Even smaller box padding
+  border: none !important;
+  outline: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+// Ensure only one tooltip shows at a time by hiding others
+::ng-deep .cdk-overlay-container {
+  .cdk-overlay-pane:not(:last-child) {
+    .mat-mdc-tooltip {
+      display: none !important;
+    }
+    .mat-tooltip {
+      display: none !important;
+    }
+  }
+}
+
+.top-part {
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  background-color: #f1f1f1;
+}
+
+.split-container {
+  display: flex;
+  flex: 1;
+  height: 100%;
+}
+
+.left-side, .right-side {
+  flex: 1;
+  padding: 20px;
+}
+
+.left-side {
+  background-color: #e0e0e0;
+}
+
+.right-side {
+  background-color: #c0c0c0;
+}
+
+/* Collapsed state */
+.collapsed {
+  width: 0;  /* Collapse to 0 width */
+  opacity: 0;  /* Hide with opacity */
+  overflow: hidden;
+  transition: width 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+
+/* Expanded state (default) */
+div[fxFlex] {
+  transition: width 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+
+.graph-container {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 600px;
+  /* Removed min-height to allow dynamic height scaling */
+
+  overflow-x: scroll;  /* Force scrollbars to show */
+  overflow-y: scroll;
+}
+
+// Entity sidebar layout
+.echarts-layout {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  width: 100%;
+  position: relative;
+  overflow: visible; // Allow the button to extend outside
+}
+
+// Sidebar toggle button - now using mat-icon-button
+button[mat-icon-button].sidebar-toggle-btn {
+  // Remove Material Design state layer (gray circle on hover)
+  --mat-icon-button-hover-state-layer-opacity: 0;
+  --mat-icon-button-focus-state-layer-opacity: 0;
+  --mat-icon-button-pressed-state-layer-opacity: 0;
+  
+  // Hard kill the persistent ripple element
+  .mat-mdc-button-persistent-ripple::before {
+    opacity: 0 !important;
+    background: transparent !important;
+  }
+  
+  position: absolute !important;
+  left: 240px; // Default for full mode
+  top: 50%;
+  transform: translateY(-50%) !important;
+  z-index: 100;
+  background: white !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-left: none !important;
+  border-radius: 0 6px 6px 0 !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 16px 3px !important;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 1px 0 3px rgba(0, 0, 0, 0.05) !important;
+  
+  &:hover:not(:disabled) {
+    background: #f8f9fa !important;
+    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.08) !important;
+    padding-right: 5px !important;
+    transform: translateY(-50%) scale(1.05) !important;
+  }
+  
+  .material-icons {
+    font-size: 16px;
+    color: #5f6368;
+    display: block;
+    transition: transform 0.3s ease;
+  }
+  
+  &:hover .material-icons {
+    transform: scale(1.1);
+  }
+}
+
+// Button positioning based on sidebar state and mode
+button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="visible"] {
+  // Position is set dynamically via [style.left.px] binding for full/compact modes
+  // Only colors mode has fixed position
+  &[data-sidebar-mode="colors"] { left: 60px !important; }
+}
+
+button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="hidden"] {
+  // Completely hidden - button at edge
+  left: 0 !important;
+  border-left: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
+  // Collapsed to colors mode
+  left: 60px !important;
+  border-left: none !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: saturate(180%) blur(12px) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(12px) !important;
+}
+
+
+
+.entity-sidebar {
+  // Width is set dynamically via [style.width.px] binding
+  flex-shrink: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  overflow: hidden; // Changed from overflow-y: auto
+  max-height: 100%;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  
+  // Sidebar header - always visible except when completely hidden
+  .sidebar-header {
+    position: sticky;
+    top: 0;
+    // Use the same height as legend overlay from CSS custom property
+    height: var(--legend-height, 48px);
+    min-height: var(--legend-height, 48px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    z-index: 10;
+    flex-shrink: 0;
+
+    .header-text {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #6e6e73;
+      flex: 1;
+
+      .device-count {
+        font-weight: 400;
+        color: rgba(0, 0, 0, 0.4);
+        margin-left: 4px;
+        font-size: 10px;
+      }
+    }
+
+    .header-icon {
+      color: #6e6e73;
+
+      .material-icons {
+        font-size: 18px;
+      }
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 2px;
+
+      .header-action-btn {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        min-height: 28px;
+        padding: 0;
+        border-radius: 6px;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        color: #6e6e73;
+
+        .material-icons {
+          font-size: 16px;
+        }
+
+        &:hover {
+          background: rgba(0, 0, 0, 0.05);
+          color: #1d1d1f;
+        }
+
+        &:active {
+          transform: scale(0.95);
+        }
+      }
+    }
+  }
+  
+  &.sidebar-hidden {
+    width: 0;
+    opacity: 0;
+    transform: translateX(-240px);
+    pointer-events: none;
+    border-right: none;
+  }
+  
+  // Collapsed with colors mode
+  &.sidebar-collapsed-colors {
+    width: 60px;
+    
+    .entity-table,
+    .entity-table-compact {
+      display: none;
+    }
+    
+    // Ensure consistent spacing when collapsed
+    .colors-container {
+      gap: 10px; // Match the open mode spacing
+      padding: 12px 12px;
+      align-items: center;
+    }
+  }
+  
+  
+  // Adjust width for colors mode (other modes use dynamic width)
+  &[data-mode="colors"] {
+    width: 60px !important; // Override dynamic width for colors mode
+  }
+  
+  // Scrollable container for tables
+  .table-scroll-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0; // Important for flexbox scrolling
+  }
+  
+  // Compact table styles
+  .entity-table-compact {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    display: table; // Ensure proper table display
+    
+    .entity-row-compact {
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      
+      &:hover {
+        background: rgba(0, 122, 255, 0.06);
+        
+        .swatch-box {
+          transform: scale(1.15);
+        }
+      }
+      
+      &.entity-row--disabled {
+        opacity: 0.4;
+        
+        .swatch-box {
+          filter: grayscale(0.5);
+        }
+      }
+      
+      td {
+        padding: 8px 6px;
+      }
+      
+      .swatch-cell {
+        width: 24px;
+      }
+      
+      .entity-name-compact {
+        font-size: 11px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+  }
+  
+  // Colors only container
+  .colors-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px; // Consistent spacing
+    padding: 12px;
+    flex: 1; // Take remaining space in flex container
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0; // Important for flex scrolling
+    
+    // Use swatch-box style for colors mode (both expanded and collapsed)
+    &.swatch-style {
+      align-items: center;
+      gap: 8px; // Spacing between larger swatches
+      padding: 8px 12px;
+      
+      .swatch-box {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        cursor: pointer;
+        box-shadow: 
+          inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+          0 1px 3px rgba(0, 0, 0, 0.12),
+          0 1px 2px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        position: relative;
+        overflow: hidden;
+        transform-origin: center;
+        will-change: transform, box-shadow;
+        
+        // Glossy/shiny effect like in full mode
+        &::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 40%;
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent);
+          pointer-events: none;
+          transition: opacity 0.3s ease;
+        }
+        
+        &:hover {
+          animation: swatchPulse 0.4s ease-in-out;
+          transform: scale(1.2);
+          box-shadow: 
+            0 6px 20px rgba(0, 0, 0, 0.15),
+            0 2px 8px rgba(0, 0, 0, 0.1),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+          
+          &::before {
+            opacity: 0.5; // Enhance glossy effect on hover
+          }
+        }
+        
+        &:active {
+          transform: scale(1.1);
+          transition-duration: 0.1s;
+        }
+        
+        &.swatch-disabled {
+          opacity: 0.3;
+          filter: grayscale(0.5);
+          background: linear-gradient(135deg, #e0e0e0, #bdbdbd) !important;
+        }
+      }
+    }
+  }
+  
+  
+  
+  .sidebar-toggle {
+    position: absolute;
+    top: 10px;
+    right: 5px;
+    z-index: 10;
+    width: 30px;
+    height: 30px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    
+    &:hover {
+      background: #f5f5f5;
+      border-color: rgba(0, 0, 0, 0.2);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    }
+    
+    &:active {
+      transform: scale(0.95);
+    }
+    
+    .material-icons {
+      font-size: 20px;
+      color: #495057;
+    }
+  }
+  
+  &.sidebar-collapsed .sidebar-toggle {
+    right: 5px;
+    left: auto;
+  }
+}
+
+// No data message overlay
+.no-data-message {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 100;
+  
+  .no-data-content {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    
+    .material-icons {
+      font-size: 64px;
+      color: #999;
+      margin-bottom: 20px;
+    }
+    
+    h3 {
+      margin: 0 0 16px 0;
+      font-size: 24px;
+      font-weight: 500;
+      color: #333;
+    }
+    
+    p {
+      margin: 8px 0;
+      color: #666;
+      font-size: 14px;
+    }
+  }
+}
+
+.entity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  font-size: 13px;
+  display: table; // Ensure proper table display
+  
+  tbody {
+    
+    tr.entity-row {
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      display: flex;
+      align-items: center;
+      
+      &::after {
+        content: '';
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        bottom: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.06) 10%, rgba(0, 0, 0, 0.06) 90%, transparent);
+      }
+      
+      &:hover {
+        background: linear-gradient(90deg, rgba(0, 122, 255, 0.04), rgba(0, 122, 255, 0.08), rgba(0, 122, 255, 0.04));
+        transform: translateX(2px);
+        
+        .swatch-box {
+          transform: scale(1.15);
+          box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .entity-name {
+          color: #007aff;
+          font-weight: 500;
+        }
+      }
+      
+      &.entity-row--disabled {
+        opacity: 0.4;
+        
+        .swatch-box {
+          background: linear-gradient(135deg, #e0e0e0, #bdbdbd) !important;
+          filter: grayscale(1);
+        }
+        
+        .entity-name {
+          text-decoration: line-through;
+          color: #999;
+        }
+        
+        &:hover {
+          transform: none;
+          background: rgba(0, 0, 0, 0.02);
+        }
+      }
+      
+      td {
+        padding: 10px 12px;
+        border-bottom: none;
+        vertical-align: middle;
+      }
+      
+      .swatch-cell {
+        flex-shrink: 0;
+        width: auto;
+        padding: 10px 6px 10px 12px;
+      }
+      
+      .swatch-box {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        background: currentColor;
+        box-shadow: 
+          inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+          0 1px 3px rgba(0, 0, 0, 0.12),
+          0 1px 2px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+        
+        &::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 40%;
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent);
+          pointer-events: none;
+        }
+      }
+      
+      .entity-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1; // Take available space
+        min-width: 0; // Allow shrinking
+        font-weight: 450;
+        color: #1d1d1f;
+        letter-spacing: -0.01em;
+        transition: all 0.2s;
+        padding-right: 8px; // Small padding before counts
+      }
+      
+      .entity-count {
+        text-align: right;
+        padding-right: 12px;
+        font-weight: 600;
+        font-size: 12px;
+        color: #007aff;
+        flex-shrink: 0; // Don't shrink
+        white-space: nowrap; // Keep on one line
+        position: relative;
+        
+        .data-points {
+          font-size: 10px;
+          color: rgba(0, 0, 0, 0.38);
+          font-weight: 400;
+          margin-left: 2px;
+        }
+        
+        &::before {
+          content: '';
+          position: absolute;
+          left: -8px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 4px;
+          height: 4px;
+          border-radius: 50%;
+          background: currentColor;
+          opacity: 0.5;
+        }
+      }
+    }
+  }
+}
+
+// CSS custom properties for plot margins
+:root {
+  --plot-left: 12%;   // Default, will be updated dynamically
+  --plot-right: 1%;   // Default, will be updated dynamically
+}
+
+// New wrapper for floating overlays
+.chart-container-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  height: 100%;
+  min-height: 0; // Important for flexbox
+}
+
+// Fixed legend at top with Apple design
+.legend-overlay {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  padding: 8px var(--plot-right, 1%) 6px var(--plot-left, 10%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08); // Keep the bottom line
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent; // Remove background
+  flex-shrink: 0; // Prevent shrinking
+
+  // Consolidated status indicator (positioned right)
+  .legend-status-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto; // Push to the right
+    padding-left: 12px; // Add spacing from legend items
+    flex-shrink: 0;
+
+    // Clean Apple-style without background
+    .status-badge-clean {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: help;
+      position: relative;
+      padding: 2px;
+
+      .warning-icon-clean {
+        color: #ff9500; // iOS orange
+        opacity: 0.9;
+        transition: opacity 0.2s ease;
+      }
+
+      .status-count-clean {
+        font-size: 11px;
+        font-weight: 600;
+        color: #ff9500;
+        background: rgba(255, 149, 0, 0.1);
+        padding: 1px 5px;
+        border-radius: 8px;
+        line-height: 1.4;
+      }
+
+      &:hover {
+        .warning-icon-clean {
+          opacity: 1;
+        }
+
+        .status-count-clean {
+          background: rgba(255, 149, 0, 0.15);
+        }
+      }
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 10px;
+      background: rgba(0, 122, 255, 0.08); // iOS blue background
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: help;
+      position: relative;
+
+      &--warning {
+        background: rgba(255, 149, 0, 0.08); // iOS orange background
+
+        .warning-emoji {
+          color: #ff9500;
+        }
+
+        .status-count {
+          background: #ff9500;
+        }
+      }
+
+      .warning-emoji {
+        font-size: 16px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+      }
+
+      .status-count {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        border-radius: 8px;
+        background: #007aff;
+        color: white;
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 1;
+      }
+
+      &:hover {
+        transform: scale(1.05);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+        &.status-badge--warning {
+          background: rgba(255, 149, 0, 0.12);
+        }
+
+        &:not(.status-badge--warning) {
+          background: rgba(0, 122, 255, 0.12);
+        }
+      }
+    }
+  }
+}
+
+// Custom tooltip for status messages
+::ng-deep .status-tooltip {
+  .mat-mdc-tooltip-surface {
+    background: rgba(30, 30, 30, 0.95) !important;
+    backdrop-filter: blur(10px);
+    border-radius: 8px !important;
+    padding: 10px 14px !important;
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+    max-width: 300px !important;
+    white-space: pre-line !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  }
+}
+
+// Zoom overlay at bottom
+.zoom-overlay {
+  position: sticky;
+  bottom: 0;
+  z-index: 100;
+  background: linear-gradient(180deg, 
+    rgba(252, 252, 254, 0.98) 0%, 
+    rgba(255, 255, 255, 0.95) 100%);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  box-shadow: 
+    0 -1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 1px 0 rgba(0, 0, 0, 0.04) inset,
+    0 -2px 8px rgba(0, 0, 0, 0.04);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 8px var(--plot-right, 1%) 8px var(--plot-left, 10%);
+  flex-shrink: 0; // Prevent shrinking
+}
+
+// Scrollable chart container
+.chart-outer {
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  flex: 1;
+  min-height: 0; // Important for flexbox scrolling
+}
+
+#echartContainer {
+  position: relative;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  padding-left: 30px; // Shift chart area to avoid sidebar toggle overlap
+  box-sizing: border-box; // Prevent width overflow with padding
+  min-width: 600px;
+}
+
+// Legend viewport - constrained view window
+.legend-viewport {
+  overflow: hidden;
+  flex: 1;
+  position: relative;
+}
+
+// Legend track - actual container for chips
+.legend-track {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  white-space: nowrap;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+// Pagination buttons - Glossy Apple design
+.legend-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: linear-gradient(180deg, 
+    rgba(255, 255, 255, 0.9) 0%, 
+    rgba(255, 255, 255, 0.7) 100%);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  border-radius: 10px;
+  color: #333;
+  box-shadow: 
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+  
+  svg {
+    display: block;
+    opacity: 0.7;
+  }
+  
+  &:hover:not(:disabled) {
+    background: rgba(243, 243, 243, 1);
+    border-color: rgba(0, 0, 0, 0.12);
+    
+    svg {
+      opacity: 1;
+    }
+  }
+  
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+  
+  &:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+  
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.3);
+  }
+}
+
+// Legend chip buttons - Apple-like pills
+button[mat-button].legend-chip {
+  // Remove Material Design state layer
+  --mat-button-hover-state-layer-opacity: 0;
+  --mat-button-focus-state-layer-opacity: 0;
+  --mat-button-pressed-state-layer-opacity: 0;
+
+  // Hard kill the persistent ripple element
+  .mat-mdc-button-persistent-ripple::before {
+    opacity: 0 !important;
+    background: transparent !important;
+  }
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px;
+  height: 30px !important;
+  min-width: auto !important;
+  padding: 0 12px !important;
+  margin: 1px 0 !important; // Add 1px margin top and bottom to each chip
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  background: linear-gradient(180deg, 
+    rgba(255, 255, 255, 0.9) 0%, 
+    rgba(255, 255, 255, 0.7) 100%) !important;
+  backdrop-filter: blur(10px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(180%) !important;
+  color: #1d1d1f !important;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif !important;
+  box-shadow: 
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  white-space: nowrap;
+  
+  // Plot number indicator
+  .plot-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: #007aff;
+    color: white;
+    font-weight: 600;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  
+  // Label text
+  .label-text {
+    letter-spacing: -0.01em;
+    margin-left: 2px;
+  }
+  
+  // Inactive state
+  &.is-off {
+    opacity: 0.45;
+    font-weight: 400;
+    
+    .plot-number {
+      background: #999;
+      opacity: 0.7;
+    }
+  }
+  
+  // Hover state
+  &:hover:not(.is-off) {
+    background: rgba(243, 243, 243, 1);
+    border-color: rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+  }
+  
+  // Active/pressed state
+  &:active {
+    transform: scale(0.97) translateY(0);
+  }
+  
+  // Focus state for accessibility
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.3);
+  }
+  
+  // Pulse animation when action is blocked
+  &.pulse {
+    animation: chipPulse 0.25s cubic-bezier(0.4, 0, 0.6, 1);
+  }
+}
+
+@keyframes chipPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.96); background: rgba(255, 69, 58, 0.1); }
+}
+// ECharts-style zoom overlay
+.zoom-overlay {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-left: var(--plot-left, 10%);
+  padding-right: var(--plot-right, 1%);
+  background: transparent;
+
+  // The slider track
+  .zoom-track {
+    position: relative;
+    flex: 1 1 auto;
+    height: 28px;  // Same visual height as ECharts default
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.04);  // Light gray like ECharts' track
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+
+    // Selected window (filler)
+    .zoom-window {
+      position: absolute;
+      top: 6px;
+      bottom: 6px;
+      left: 0%;
+      right: 0%;
+      border-radius: 4px;
+      background: rgba(0, 122, 255, 0.15);  // Blue-ish like ECharts
+      box-shadow: inset 0 0 0 1px rgba(0, 122, 255, 0.45);
+      pointer-events: none;
+    }
+
+    // Handles
+    .zoom-handle {
+      position: absolute;
+      top: 2px;
+      width: 14px;
+      bottom: 2px;
+      border-radius: 6px;
+      background: #8e8e93;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+      cursor: ew-resize;
+      transition: background-color 0.2s;
+      
+      &:hover {
+        background: #636366;
+      }
+      
+      &.left {
+        left: calc(0% - 7px);
+      }
+      &.right {
+        right: calc(0% - 7px);
+      }
+    }
+  }
+
+  .zoom-reset {
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 12px;
+    padding: 6px 10px;
+    font-size: 12px;
+    background: #fff;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #007aff;
+    transition: all 0.2s;
+    
+    &:hover {
+      background: #f5f5f7;
+      border-color: rgba(0, 0, 0, 0.2);
+    }
+    
+    &:active {
+      transform: scale(0.95);
+    }
+  }
+}
+
+// ===============================
+// Entity Pulse Animation
+// ===============================
+.entity-row {
+  &.pulse-effect {
+    animation: entityPulse 0.6s ease-in-out;
+  }
+}
+
+@keyframes entityPulse {
+  0% { 
+    background-color: rgba(255, 152, 0, 0.1);
+    transform: scale(1);
+  }
+  50% { 
+    background-color: rgba(255, 152, 0, 0.3);
+    transform: scale(1.02);
+  }
+  100% { 
+    background-color: rgba(255, 152, 0, 0.1);
+    transform: scale(1);
+  }
+}
+
+// Swatch hover animation
+@keyframes swatchPulse {
+  0% { 
+    transform: scale(1);
+  }
+  25% { 
+    transform: scale(1.15);
+  }
+  40% {
+    transform: scale(1.22);
+  }
+  60% {
+    transform: scale(1.18);
+  }
+  100% { 
+    transform: scale(1.2);
+  }
+}
+
+// ===============================
+// Export Loading Animation
+// ===============================
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.rotating {
+  animation: rotate 1s linear infinite;
+}
+
+.tb-button.loading {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+// ===============================
+// Apple Style Pull-down Export Button
+// ===============================
+.export-pulldown {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  
+  .pulldown-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 0 10px;
+    height: 42px;
+    min-width: 42px;
+    border-radius: 11px;
+    background: linear-gradient(180deg, 
+      rgba(255, 255, 255, 0.9) 0%, 
+      rgba(255, 255, 255, 0.7) 50%,
+      rgba(255, 255, 255, 0.6) 100%);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 
+      0 0 0 0.5px rgba(0, 0, 0, 0.12),
+      0 2px 4px rgba(0, 0, 0, 0.08),
+      0 8px 16px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                background 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1d1d1f;
+    overflow: hidden;
+    position: relative;
+    
+    // Create overlay for smooth color transitions
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 122, 255, 0);
+      transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+    }
+    
+    &:hover:not(:disabled):not(.active) {
+      background: linear-gradient(180deg, 
+        rgba(255, 255, 255, 0.95) 0%, 
+        rgba(255, 255, 255, 0.8) 50%,
+        rgba(255, 255, 255, 0.7) 100%);
+      transform: translateY(-0.5px) scale(1.02);
+      box-shadow: 
+        0 0 0 0.5px rgba(0, 0, 0, 0.15),
+        0 4px 8px rgba(0, 0, 0, 0.12),
+        0 12px 24px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+    }
+    
+    &:active:not(:disabled) {
+      transform: scale(0.96) translateY(0);
+      background: linear-gradient(180deg, 
+        #f5f5f7 0%, 
+        #ececef 100%);
+      box-shadow: 
+        0 1px 2px rgba(0, 0, 0, 0.05),
+        inset 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+    
+    &.active {
+      border-color: rgba(0, 122, 255, 0.3);
+      color: white;
+      box-shadow: 
+        0 0 0 0.5px rgba(0, 122, 255, 0.4),
+        0 2px 8px rgba(0, 122, 255, 0.25),
+        0 8px 20px rgba(0, 122, 255, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      
+      // Use overlay for smooth blue transition
+      &::before {
+        background: rgba(0, 122, 255, 0.85);
+      }
+      
+      .material-icons {
+        color: white;
+        transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      .pulldown-arrow {
+        transform: rotate(180deg);
+        color: white;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                   color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+    }
+    
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .material-icons {
+      font-size: 22px;
+      color: #2c2c2e;
+      font-weight: 400;
+      position: relative;
+      z-index: 1;
+      transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      
+      &.rotating {
+        animation: rotate 1s linear infinite;
+      }
+    }
+    
+    .pulldown-label {
+      font-weight: 500;
+      margin: 0 1px;
+      letter-spacing: -0.01em;
+      position: relative;
+      z-index: 1;
+      transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .pulldown-arrow {
+      font-size: 18px;
+      position: relative;
+      z-index: 1;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                 color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      margin-left: -2px;
+    }
+  }
+  
+  .pulldown-options {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 100px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 12px;
+    box-shadow: 
+      0 0 0 0.5px rgba(0, 0, 0, 0.04),
+      0 4px 12px rgba(0, 0, 0, 0.12),
+      0 12px 32px rgba(0, 0, 0, 0.08);
+    padding: 6px;
+    z-index: 1000;
+    animation: pulldownSlide 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    transform-origin: top center;
+    overflow: hidden;
+    
+    .option-button {
+      display: block;
+      width: 100%;
+      padding: 9px 14px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      font-weight: 450;
+      letter-spacing: -0.01em;
+      color: #1d1d1f;
+      cursor: pointer;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      text-align: center;
+      position: relative;
+      
+      &:hover {
+        background: linear-gradient(180deg, 
+          rgba(0, 122, 255, 0.04) 0%, 
+          rgba(0, 122, 255, 0.08) 100%);
+        color: #007aff;
+      }
+      
+      &:active {
+        background: rgba(0, 122, 255, 0.12);
+        transform: scale(0.97);
+      }
+      
+      &:not(:last-child) {
+        margin-bottom: 2px;
+      }
+    }
+  }
+  
+  &.loading {
+    .pulldown-trigger {
+      opacity: 0.7;
+    }
+  }
+}
+
+@keyframes pulldownSlide {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+// ===============================
+// Apple Style Dropdown Menu - Minimal Design (Keep for other menus if needed)
+// ===============================
+::ng-deep .apple-style-menu {
+  .mat-mdc-menu-panel {
+    // Clean minimal border radius
+    border-radius: 14px !important;
+    
+    // Subtle shadow for depth - more refined than before
+    box-shadow: 
+      0 0 0 0.5px rgba(0, 0, 0, 0.04),
+      0 3px 8px rgba(0, 0, 0, 0.12),
+      0 8px 30px rgba(0, 0, 0, 0.08) !important;
+    
+    // Clean white background with subtle glass effect
+    border: 0.5px solid rgba(0, 0, 0, 0.06) !important;
+    backdrop-filter: blur(30px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(30px) saturate(180%) !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    
+    // Refined padding
+    padding: 6px !important;
+    min-width: 200px !important;
+    overflow: hidden !important;
+  }
+
+  .apple-menu-item {
+    // Smooth rounded corners
+    border-radius: 10px !important;
+    margin: 1px 0 !important;
+    padding: 10px 14px !important;
+    
+    // Clean typography
+    font-size: 13.5px !important;
+    font-weight: 400 !important;
+    letter-spacing: -0.01em !important;
+    color: #1d1d1f !important;
+    
+    // Smooth transitions
+    transition: all 0.15s cubic-bezier(0.4, 0.0, 0.2, 1) !important;
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    min-height: 36px !important;
+    
+    // Remove default Material ripple effect
+    &::before {
+      display: none !important;
+    }
+
+    &:hover:not([disabled]) {
+      // Subtle blue hover state
+      background: linear-gradient(180deg, 
+        rgba(0, 122, 255, 0.04) 0%, 
+        rgba(0, 122, 255, 0.08) 100%) !important;
+      color: #007aff !important;
+      
+      .material-icons {
+        color: #007aff !important;
+        transform: scale(1.05) !important;
+      }
+    }
+
+    &:active:not([disabled]) {
+      transform: scale(0.97) !important;
+      background: rgba(0, 122, 255, 0.12) !important;
+    }
+
+    &[disabled] {
+      opacity: 0.35 !important;
+      cursor: not-allowed !important;
+      color: #8e8e93 !important;
+    }
+
+    .material-icons {
+      font-size: 18px !important;
+      color: #6e6e73 !important;
+      margin-right: 0 !important;
+      transition: all 0.15s ease !important;
+    }
+
+    span:first-of-type:not(.material-icons) {
+      flex: 1 !important;
+      text-align: left !important;
+      font-weight: 450 !important;
+    }
+
+    // Multi-device badge - more subtle
+    .device-mode-badge {
+      background: linear-gradient(135deg, 
+        rgba(0, 122, 255, 0.9) 0%, 
+        rgba(90, 200, 250, 0.9) 100%) !important;
+      color: white !important;
+      font-size: 9px !important;
+      font-weight: 600 !important;
+      padding: 2px 6px !important;
+      border-radius: 10px !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.3px !important;
+      box-shadow: 0 1px 3px rgba(0, 122, 255, 0.2) !important;
+      flex: none !important;
+    }
+  }
+
+  // Add subtle divider between menu items (optional)
+  .apple-menu-item + .apple-menu-item {
+    position: relative;
+    
+    &::before {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: 14px;
+      right: 14px;
+      height: 0.5px;
+      background: rgba(0, 0, 0, 0.05);
+      display: none; // Hidden by default for cleaner look
+    }
+  }
+
+  .mat-mdc-menu-item-text {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    gap: 10px !important;
+  }
+  
+  // Smooth menu animation
+  &.mat-mdc-menu-panel {
+    animation: appleMenuSlide 0.2s cubic-bezier(0.4, 0.0, 0.2, 1) !important;
+  }
+}
+
+@keyframes appleMenuSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Context Menu for Markers
+// ════════════════════════════════════════════════════════════════════════════
+
+.context-menu {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 10px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+  min-width: 200px;
+  z-index: 10000;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.9) translateY(-10px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.visible {
+    opacity: 1;
+    pointer-events: all;
+    transform: scale(1) translateY(0);
+  }
+
+  .context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1d1d1f;
+    user-select: none;
+
+    .material-icons {
+      font-size: 20px;
+      color: #007aff;
+    }
+
+    &:hover {
+      background: #f5f5f7;
+    }
+
+    &:active {
+      background: #e5e5e7;
+      transform: scale(0.98);
+    }
+  }
+}
+
+// Close context menu on click outside
+.chart-container-wrapper {
+  position: relative;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Marker Dialog Global Styles
+// ════════════════════════════════════════════════════════════════════════════
+
+:host ::ng-deep .marker-dialog-panel {
+  .mat-mdc-dialog-container {
+    padding: 0;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+
+  .mdc-dialog__surface {
+    border-radius: 16px;
+  }
+}

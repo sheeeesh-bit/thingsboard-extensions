@@ -1,0 +1,295 @@
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<!-- Main container: Layout as column, stretching across height -->
+<div fxFlex fxLayout="column" style="height: 100%; width: 100%;" fxLayoutAlign="start stretch">
+
+    <!-- Buttons at the top -->
+    <div class="tb-button-container" *ngIf="ctx.settings.showImageButton !== false || ctx.settings.showExportButton !== false || ctx.settings.showResetZoomButton !== false">
+        <button *ngIf="ctx.settings.showImageButton !== false" 
+                mat-icon-button 
+                [disableRipple]="true"
+                (click)="menuButtons('genImage')" 
+                class="tb-button"  
+                matTooltipPosition="above" 
+                matTooltip="Download Image"
+                matTooltipClass="modern-tooltip">
+            <i class="material-icons">photo_camera</i>
+        </button>
+        
+        <!-- Export pull-down button group -->
+        <div *ngIf="ctx.settings.showExportButton !== false" 
+             class="export-pulldown"
+             [class.loading]="isExporting">
+            <button class="pulldown-trigger"
+                    [class.active]="showExportOptions"
+                    (click)="showExportOptions = !showExportOptions"
+                    [disabled]="isExporting"
+                    matTooltipPosition="above"
+                    matTooltip="Export Data"
+                    matTooltipClass="modern-tooltip">
+                <i class="material-icons" *ngIf="!isExporting">save_alt</i>
+                <i class="material-icons rotating" *ngIf="isExporting">sync</i>
+                <span class="pulldown-label">Export</span>
+                <i class="material-icons pulldown-arrow">expand_more</i>
+            </button>
+            <div class="pulldown-options" *ngIf="showExportOptions && !isExporting">
+                <button class="option-button" (click)="exportData('csv'); showExportOptions = false">CSV</button>
+                <button class="option-button" (click)="exportData('xls'); showExportOptions = false">XLS</button>
+                <button class="option-button" (click)="exportData('xlsx'); showExportOptions = false">XLSX</button>
+            </div>
+        </div>
+        
+        <button *ngIf="ctx.settings.showResetZoomButton !== false"
+                mat-icon-button 
+                [disableRipple]="true"
+                (click)="menuButtons('reset')" 
+                class="tb-button" 
+                matTooltipPosition="above" 
+                matTooltip="Reset Zoom" 
+                matTooltipClass="modern-tooltip">
+            <i class="material-icons">restore_page</i>
+        </button>
+        
+        <!-- Marker Management Button -->
+        <button *ngIf="ctx.settings.enableMarkers !== false"
+                mat-icon-button
+                [disableRipple]="true"
+                (click)="showMarkersList()"
+                class="tb-button"
+                matTooltipPosition="above"
+                [matTooltip]="'Manage Markers' + (markers.length > 0 ? ' (' + markers.length + ')' : '')"
+                matTooltipClass="modern-tooltip">
+            <i class="material-icons">location_on</i>
+            <span class="marker-count-badge" *ngIf="markers.length > 0">{{markers.length}}</span>
+        </button>
+
+        <!-- Settings Dialog Button -->
+        <button mat-icon-button
+                [disableRipple]="true"
+                (click)="openSettingsDialog()"
+                class="tb-button"
+                matTooltipPosition="above"
+                matTooltip="Widget Settings"
+                matTooltipClass="modern-tooltip">
+            <i class="material-icons">settings</i>
+        </button>
+
+    </div>
+  
+  <!-- Chart and sidebar container -->
+  <div fxFlex class="echarts-layout">
+    <!-- Sidebar toggle button (always visible) -->
+    <button mat-icon-button
+            class="sidebar-toggle-btn"
+            [disableRipple]="true"
+            (click)="toggleSidebar()"
+            [matTooltip]="isSidebarVisible ? 'Hide sidebar' : 'Show sidebar'"
+            matTooltipPosition="right"
+            matTooltipClass="modern-tooltip"
+            [attr.data-sidebar-state]="!isSidebarVisible ? sidebarCollapsedMode : 'visible'"
+            [attr.data-sidebar-mode]="isSidebarVisible ? sidebarDisplayMode : sidebarCollapsedMode"
+            [style.left.px]="isSidebarVisible && sidebarDisplayMode !== 'colors' ? sidebarWidth : null"
+            *ngIf="ctx.settings.showEntitySidebar !== false && ctx.settings?.multipleDevices">
+      <i class="material-icons">{{ isSidebarVisible ? 'chevron_left' : 'chevron_right' }}</i>
+    </button>
+
+    <!-- Entity sidebar (left side) -->
+    <aside class="entity-sidebar"
+           [class.sidebar-hidden]="!isSidebarVisible && sidebarCollapsedMode === 'hidden'"
+           [class.sidebar-collapsed-colors]="!isSidebarVisible && sidebarCollapsedMode === 'colors'"
+           [attr.data-mode]="isSidebarVisible ? sidebarDisplayMode : sidebarCollapsedMode"
+           [style.width.px]="isSidebarVisible && sidebarDisplayMode !== 'colors' ? sidebarWidth : null"
+           *ngIf="ctx.settings.showEntitySidebar !== false && ctx.settings?.multipleDevices">
+      
+      <!-- Permanent header (visible in all modes except completely hidden) -->
+      <div class="sidebar-header" *ngIf="isSidebarVisible || sidebarCollapsedMode !== 'hidden'">
+        <span class="header-text" *ngIf="isSidebarVisible">
+          Devices
+          <span class="device-count">({{ getSelectedDeviceCount() }}/{{ entityList.length }})</span>
+        </span>
+        <span class="header-icon" *ngIf="!isSidebarVisible && sidebarCollapsedMode !== 'hidden'">
+          <i class="material-icons">devices</i>
+        </span>
+        <!-- Hide All / Show All buttons -->
+        <div class="header-actions" *ngIf="isSidebarVisible && entityList.length > 0">
+          <button mat-icon-button
+                  class="header-action-btn"
+                  [disableRipple]="true"
+                  (click)="showAllDevices()"
+                  matTooltip="Show all devices"
+                  matTooltipPosition="below"
+                  matTooltipClass="modern-tooltip">
+            <i class="material-icons">visibility</i>
+          </button>
+          <button mat-icon-button
+                  class="header-action-btn"
+                  [disableRipple]="true"
+                  (click)="hideAllDevices()"
+                  matTooltip="Hide all devices"
+                  matTooltipPosition="below"
+                  matTooltipClass="modern-tooltip">
+            <i class="material-icons">visibility_off</i>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Full table mode (only when visible) -->
+      <div class="table-scroll-container" *ngIf="isSidebarVisible && sidebarDisplayMode === 'full'">
+        <table class="entity-table">
+          <tbody>
+            <tr *ngFor="let entity of entityList" 
+                class="entity-row" 
+                [class.entity-row--disabled]="!entity.visible"
+                [class.pulse-effect]="lastPulsedEntity === entity.name"
+                (click)="toggleEntityVisibility(entity.name)">
+              <td class="swatch-cell">
+                <div class="swatch-box" [style.background-color]="entity.color"></div>
+              </td>
+              <td class="entity-name" 
+                  [matTooltip]="entity.label + (entity.deviceName ? ' (' + entity.deviceName + ')' : '')"
+                  matTooltipClass="modern-tooltip">{{ entity.displayName }}</td>
+              <td class="entity-count" 
+                  [matTooltip]="'Series: ' + entity.count + ', Points: ' + entity.dataPoints"
+                  matTooltipClass="modern-tooltip">
+                {{ entity.count }}<span class="data-points"> ({{ entity.dataPoints }})</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Compact mode (only when visible) -->
+      <div class="table-scroll-container" *ngIf="isSidebarVisible && sidebarDisplayMode === 'compact'">
+        <table class="entity-table-compact">
+          <tbody>
+            <tr *ngFor="let entity of entityList" 
+                class="entity-row-compact" 
+                [class.entity-row--disabled]="!entity.visible"
+                (click)="toggleEntityVisibility(entity.name)">
+              <td class="swatch-cell">
+                <div class="swatch-box" [style.background-color]="entity.color"></div>
+              </td>
+              <td class="entity-name-compact" 
+                  [matTooltip]="entity.label + (entity.deviceName ? ' (' + entity.deviceName + ')' : '')"
+                  matTooltipClass="modern-tooltip">
+                {{ entity.displayName }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Colors mode - use swatch-box style for both expanded and collapsed -->
+      <div class="colors-container swatch-style" *ngIf="(isSidebarVisible && sidebarDisplayMode === 'colors') || (!isSidebarVisible && sidebarCollapsedMode === 'colors')">
+        <div *ngFor="let entity of entityList" 
+             class="swatch-box"
+             [class.swatch-disabled]="!entity.visible"
+             [style.background-color]="entity.color"
+             [matTooltip]="entity.label + (entity.deviceName ? ' (' + entity.deviceName + ')' : '')"
+             matTooltipClass="modern-tooltip"
+             (click)="toggleEntityVisibility(entity.name)">
+        </div>
+      </div>
+      
+    </aside>
+    
+    <!-- Chart area with floating overlays -->
+    <div class="chart-container-wrapper">
+      <!-- Top floating legend overlay -->
+      <nav class="legend-overlay" #legendOverlay aria-label="Series legend" *ngIf="ctx.settings.showCustomLegend !== false">
+        <!-- Previous page button - only show when pagination needed -->
+        <button *ngIf="legendNeedsPagination"
+                type="button"
+                class="legend-pager legend-pager--prev"
+                [disabled]="legendCurrentPage === 0"
+                (click)="legendPrevPage()"
+                aria-label="Previous legend items">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+
+        <!-- Legend viewport (constrained view) -->
+        <div class="legend-viewport" #legendViewport>
+          <div class="legend-track" #legendTrack>
+            <button *ngFor="let item of legendPageItems"
+                    mat-button
+                    type="button"
+                    class="legend-chip"
+                    [disableRipple]="true"
+                    [class.is-off]="!item.selected"
+                    [class.pulse]="lastPulsedLabel === item.label"
+                    (click)="toggleLabel(item)"
+                    [attr.aria-pressed]="item.selected"
+                    [matTooltip]="!canTurnOff(item.label) ? 'At least one series must remain visible' : item.label"
+                    matTooltipClass="modern-tooltip">
+              <span class="plot-number">{{ item.plotNumber }}</span>
+              <span class="label-text">{{ item.label }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Next page button - only show when pagination needed -->
+        <button *ngIf="legendNeedsPagination"
+                type="button"
+                class="legend-pager legend-pager--next"
+                [disabled]="!legendHasMorePages"
+                (click)="legendNextPage()"
+                aria-label="Next legend items">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+
+      </nav>
+
+      <!-- Scrollable chart container -->
+      <div #chartContainer class="chart-outer">
+        <div id="echartContainer"></div>
+        <!-- No Data Message -->
+        <div *ngIf="hasNoVisibleData" class="no-data-message">
+          <div class="no-data-content">
+            <i class="material-icons">{{ getSelectedDeviceCount() === 0 ? 'visibility_off' : (hasOnlyEmptyDevicesSelected() ? 'warning' : (getAllDevicesEmpty() ? 'error_outline' : 'info_outline')) }}</i>
+            <h3>{{ getSelectedDeviceCount() === 0 ? 'No Devices Selected' : (hasOnlyEmptyDevicesSelected() ? 'Selected Devices Have No Data' : (getAllDevicesEmpty() ? 'No Data Available' : 'No Data to Display')) }}</h3>
+            <p *ngIf="getSelectedDeviceCount() === 0">Please select at least one device from the sidebar to view data.</p>
+            <p *ngIf="getSelectedDeviceCount() > 0 && hasOnlyEmptyDevicesSelected()">The selected devices have no data. Please select devices with data or adjust the time range.</p>
+            <p *ngIf="getSelectedDeviceCount() > 0 && getAllDevicesEmpty() && !hasOnlyEmptyDevicesSelected()">None of the configured devices have data in the current time range.</p>
+            <p *ngIf="getSelectedDeviceCount() > 0 && !getAllDevicesEmpty() && !hasOnlyEmptyDevicesSelected()">Please select devices with data from the sidebar or adjust the time range.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom floating zoom overlay -->
+      <div class="zoom-overlay" #zoomOverlay *ngIf="ctx.settings.showZoomControls !== false">
+        <div class="zoom-track">
+          <div class="zoom-window"></div>
+          <div class="zoom-handle left"
+               (mousedown)="startDragHandle($event, 'start')"
+               (touchstart)="startDragHandle($event, 'start')"></div>
+          <div class="zoom-handle right"
+               (mousedown)="startDragHandle($event, 'end')"
+               (touchstart)="startDragHandle($event, 'end')"></div>
+        </div>
+        <button class="zoom-reset" (click)="resetZoom()">Reset</button>
+      </div>
+
+      <!-- Context Menu for Markers -->
+      <div *ngIf="ctx.settings.enableMarkers !== false"
+           class="context-menu"
+           #contextMenu
+           [class.visible]="contextMenuVisible"
+           [style.left.px]="contextMenuPosition.x"
+           [style.top.px]="contextMenuPosition.y">
+        <div class="context-menu-item" (click)="addMarkerAtPosition()">
+          <i class="material-icons">add_location</i>
+          <span>Add Marker</span>
+        </div>
+        <div class="context-menu-item" (click)="showMarkersList()" *ngIf="markers.length > 0">
+          <i class="material-icons">list</i>
+          <span>Manage Markers ({{markers.length}})</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

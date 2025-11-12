@@ -84,3 +84,6 @@ style.comp.scss
 
 
 *.zip
+
+# Archive directory (old/temporary files)
+/archive

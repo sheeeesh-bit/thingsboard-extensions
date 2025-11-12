@@ -1,0 +1,498 @@
+import { Component } from '@angular/core';
+import { FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
+import { AppState } from '@core/public-api';
+import { Store } from '@ngrx/store';
+import { WidgetSettings, WidgetSettingsComponent } from '@shared/public-api';
+import { MatDialog } from '@angular/material/dialog';
+import { DebugLoggingDialogComponent, DebugLoggingDialogData } from '../debug-dialog/debug-logging-dialog.component';
+
+export interface EchartsLineChartSettings extends WidgetSettings {
+  // General Settings
+  smooth?: boolean;
+  showlegend?: boolean;
+  legendcolortext?: string;
+  
+  // Design Settings
+  yAxisLabelLines?: 1 | 2 | 3;  // Number of lines for Y-axis labels
+  colorScheme?: 'default' | 'dark' | 'vibrant' | 'pastel' | 'monochrome';
+  
+  // Entity Display Settings
+  entityDisplayAttribute?: 'label' | 'deviceName' | 'name' | 'custom';  // Which attribute to show for entities
+  customEntityAttribute?: string;  // Custom attribute name if 'custom' is selected
+  sidebarDisplayMode?: 'full' | 'compact' | 'colors';  // How to display the sidebar
+  
+  // Sidebar Settings
+  sidebarCollapsedMode?: 'hidden' | 'colors';  // How sidebar appears when collapsed
+
+  // Line Settings
+  lineWidth?: number;
+  
+  // Export Settings
+  exportDecimals?: number;
+  
+  // Multiple Devices Mode
+  multipleDevices?: boolean;
+  deviceTypeFiltering?: boolean;  // Filter measurements based on device type (3D/6D)
+
+  // Pan and Zoom
+  showPanZoomTool?: boolean;
+  
+  // Grid Layout
+  grid_layout_right?: number;
+  grid_layout_left?: number;
+  grid_layout_top?: number;
+  grid_layout_bottom?: number;
+  markline_layout_left_or_right?: number;
+  scrollingStartsAfter?: number;  // Number of plots after which scrolling starts (default: 3)
+  
+  // Annotations
+  annotations?: Array<{
+    annotationsType: 'Fixed' | 'Attribute';
+    fixedNumber?: number;
+    attribute?: string;
+    description?: string;
+    color: 'Red' | 'Green' | 'Blue' | 'Yellow';
+    attributeType: 'Client' | 'Server';
+    axisAssignment: 'Left' | 'Right';
+  }>;
+  
+  // Tooltip Settings
+  tooltipOnlyHoveredGrid?: boolean;
+  tooltipMaxItems?: number;
+  tooltipShowAllIfSeriesCountLTE?: number;
+  tooltipLabelFormat?: string;  // Custom format for tooltip labels
+  tooltipLabelPreset?: 'default' | 'compact' | 'detailed' | 'custom';  // Preset formats
+  
+  // Features - UI Element Visibility
+  showImageButton?: boolean;
+  showExportButton?: boolean;
+  showResetZoomButton?: boolean;
+  showEntitySidebar?: boolean;
+  showCustomLegend?: boolean;
+  showZoomControls?: boolean;
+  enableMarkers?: boolean;  // Enable/disable marker system
+
+  // Default Visibility States
+  defaultPlotsVisible?: boolean;  // Whether plots are visible by default (default: true)
+  defaultDevicesVisible?: boolean;  // Whether devices are visible by default (default: false)
+  
+  // Min/Max Reference Lines
+  minMaxVisible?: boolean;
+  minMaxStyle?: 'dashed' | 'solid' | 'dotted';
+  minMaxColor?: string;
+  minColor?: string;
+  maxColor?: string;
+  minMaxLineWidth?: number;
+  showMinMaxInDialog?: boolean;
+  
+  // Alarm Support
+  alarmSupportEnabled?: boolean;  // Main toggle for all alarm features
+  
+  // Alarm Overlays
+  alarmStatusVisible?: boolean;
+  alarmOpacity?: number;
+  alarmShowCritical?: boolean;
+  alarmShowWarning?: boolean;
+  alarmShowInfo?: boolean;
+  showAlarmOverlayInDialog?: boolean;
+  showAlarmLinesInDialog?: boolean;
+  
+  // Alarm Lines
+  alarmLinesVisible?: boolean;
+  alarmLineStyle?: 'dashed' | 'solid' | 'dotted';
+  alarmLineWidth?: number;
+  alarmMinColor?: string;
+  alarmMaxColor?: string;
+  
+  // Debug & Performance
+  debugOutput?: boolean;
+  useLazyLoading?: boolean;
+  enableAnimations?: boolean;
+  useCanvasRenderer?: boolean;
+  enableDataSampling?: boolean;
+  maxDataPoints?: number;
+  enableProgressiveRendering?: boolean;
+  optimizeClickHandling?: boolean;
+  deferredUIUpdates?: boolean;
+  clickDebounceMs?: number;
+  batchEChartsUpdates?: boolean;
+  echartsUpdateDelay?: number;
+  disableChartAnimationsDuringInteraction?: boolean;
+  
+  // Debug Logging Settings
+  debugNormalLogs?: boolean;
+  debugPerformanceLogs?: boolean;
+  debugMinMaxLogs?: boolean;
+  debugAlarmLogs?: boolean;
+}
+
+@Component({
+  selector: 'tb-echarts-line-chart-settings',
+  templateUrl: './echarts-line-chart-settings.component.html',
+  styleUrls: ['./echarts-line-chart-settings.component.scss']
+})
+export class EchartsLineChartSettingsComponent extends WidgetSettingsComponent {
+
+  public echartsLineChartSettingsForm: FormGroup;
+  public Math = Math; // Make Math available in template
+  
+  // Track which sections are expanded
+  public expandedSections: { [key: string]: boolean } = {
+    design: true,      // Default expanded
+    sidebar: false,
+    grid: false,
+    tooltip: false,
+    export: false,
+    ui: false,
+    performance: false
+  };
+  
+  // Track which subsections are expanded
+  public expandedSubsections: { [key: string]: boolean } = {
+    alarmLines: false,
+    alarmOverlays: false
+  };
+
+  // Settings search
+  public settingsSearchText = '';
+  public visibleSections: Set<string> = new Set();
+  private sectionKeywords: { [key: string]: string[] } = {
+    design: ['design', 'appearance', 'color', 'scheme', 'visual', 'style', 'smooth', 'line', 'legend'],
+    sidebar: ['sidebar', 'entity', 'device', 'display', 'attribute', 'table', 'compact', 'colors'],
+    grid: ['grid', 'layout', 'spacing', 'margin', 'top', 'bottom', 'left', 'right', 'scrolling'],
+    tooltip: ['tooltip', 'hover', 'info', 'label', 'format', 'preset', 'items', 'max'],
+    export: ['export', 'csv', 'excel', 'xls', 'xlsx', 'download', 'decimal', 'precision'],
+    minmax: ['min', 'max', 'reference', 'line', 'threshold', 'limit'],
+    alarm: ['alarm', 'alert', 'warning', 'critical', 'status', 'overlay', 'notification'],
+    ui: ['ui', 'button', 'image', 'zoom', 'reset', 'controls', 'marker', 'features'],
+    performance: ['performance', 'debug', 'output', 'logging', 'optimize']
+  };
+
+  constructor(
+    protected store: Store<AppState>,
+    private fb: FormBuilder,
+    private dialog: MatDialog
+  ) {
+    super(store);
+  }
+
+  protected defaultSettings(): WidgetSettings {
+    return {
+      smooth: false,
+      showlegend: false,
+      legendcolortext: '#000000',
+      yAxisLabelLines: 3,  // Default to 3 lines
+      colorScheme: 'default',
+      entityDisplayAttribute: 'label',  // Default to label attribute
+      customEntityAttribute: '',
+      sidebarDisplayMode: 'full',  // Default to full table view
+      sidebarCollapsedMode: 'hidden',  // Default to hidden when collapsed
+      lineWidth: 3,
+      exportDecimals: 6,
+      multipleDevices: false,
+      deviceTypeFiltering: false,
+      showPanZoomTool: true,
+      grid_layout_right: 40,
+      grid_layout_left: 130,
+      grid_layout_top: 40,
+      grid_layout_bottom: 240,
+      markline_layout_left_or_right: 285,
+      scrollingStartsAfter: 3,
+      annotations: [],
+      tooltipOnlyHoveredGrid: false,
+      tooltipMaxItems: 10,
+      tooltipShowAllIfSeriesCountLTE: 0,
+      tooltipLabelPreset: 'default',
+      tooltipLabelFormat: '{device} | {label}: {value}',
+      // Features - default all to true (visible)
+      showImageButton: true,
+      showExportButton: true,
+      showResetZoomButton: true,
+      showEntitySidebar: true,
+      showCustomLegend: true,
+      showZoomControls: true,
+      enableMarkers: true,  // Enable marker system by default
+
+      // Default Visibility States
+      defaultPlotsVisible: true,  // All plots visible by default
+      defaultDevicesVisible: false,  // All devices hidden by default
+      // Min/Max Reference Lines
+      minMaxVisible: false,
+      minMaxStyle: 'dashed',
+      minMaxColor: 'rgba(128, 128, 128, 0.5)',
+      minColor: '#ff4757',
+      maxColor: '#5352ed',
+      minMaxLineWidth: 2,
+      showMinMaxInDialog: true,
+      // Alarm Support
+      alarmSupportEnabled: false,
+      // Alarm Overlays
+      alarmStatusVisible: false,
+      alarmOpacity: 0.12,
+      alarmShowCritical: true,
+      alarmShowWarning: true,
+      alarmShowInfo: false,
+      showAlarmOverlayInDialog: true,
+      showAlarmLinesInDialog: true,
+      // Alarm Lines - default to false
+      alarmLinesVisible: false,
+      alarmLineStyle: 'dashed',
+      alarmLineWidth: 2,
+      alarmMinColor: '#ff9500',
+      alarmMaxColor: '#ff3b30',
+      debugOutput: false,
+      useLazyLoading: true,
+      enableAnimations: true,
+      useCanvasRenderer: false,
+      enableDataSampling: true,
+      maxDataPoints: 10000,
+      enableProgressiveRendering: false,
+      optimizeClickHandling: true,
+      deferredUIUpdates: true,
+      clickDebounceMs: 100,
+      batchEChartsUpdates: true,
+      echartsUpdateDelay: 50,
+      disableChartAnimationsDuringInteraction: true,
+      debugNormalLogs: false,
+      debugPerformanceLogs: false,
+      debugMinMaxLogs: false,
+      debugAlarmLogs: false
+    };
+  }
+
+  protected onSettingsSet(settings: EchartsLineChartSettings): void {
+    this.echartsLineChartSettingsForm = this.fb.group({
+      // Legend Settings
+      showlegend: [settings.showlegend],
+      legendcolortext: [settings.legendcolortext || '#000000'],
+      
+      // Design Settings
+      yAxisLabelLines: [settings.yAxisLabelLines || 3],
+      colorScheme: [settings.colorScheme || 'default'],
+      
+      // Entity Display Settings
+      entityDisplayAttribute: [settings.entityDisplayAttribute || 'label'],
+      customEntityAttribute: [settings.customEntityAttribute || ''],
+      sidebarDisplayMode: [settings.sidebarDisplayMode || 'full'],
+      
+      // Sidebar Settings
+      sidebarCollapsedMode: [settings.sidebarCollapsedMode || 'hidden'],
+      
+      // Graph Settings
+      smooth: [settings.smooth],
+      lineWidth: [settings.lineWidth || 3],
+      exportDecimals: [settings.exportDecimals || 6],
+      multipleDevices: [settings.multipleDevices || false],
+      deviceTypeFiltering: [settings.deviceTypeFiltering || false],
+      showPanZoomTool: [settings.showPanZoomTool !== false],
+      grid_layout_right: [settings.grid_layout_right || 40],
+      grid_layout_left: [settings.grid_layout_left || 130],
+      grid_layout_top: [settings.grid_layout_top || 40],
+      grid_layout_bottom: [settings.grid_layout_bottom || 240],
+      markline_layout_left_or_right: [settings.markline_layout_left_or_right || 285],
+      scrollingStartsAfter: [settings.scrollingStartsAfter || 3],
+      
+      // Annotations
+      annotations: this.fb.array(this.createAnnotations(settings.annotations || [])),
+      
+      // Tooltip Settings
+      tooltipOnlyHoveredGrid: [settings.tooltipOnlyHoveredGrid || false],
+      tooltipMaxItems: [settings.tooltipMaxItems || 10],
+      tooltipShowAllIfSeriesCountLTE: [settings.tooltipShowAllIfSeriesCountLTE || 0],
+      tooltipLabelPreset: [settings.tooltipLabelPreset || 'default'],
+      tooltipLabelFormat: [settings.tooltipLabelFormat || '{device} | {label}: {value}'],
+      
+      // Features - UI Element Visibility
+      showImageButton: [settings.showImageButton !== false],
+      showExportButton: [settings.showExportButton !== false],
+      showResetZoomButton: [settings.showResetZoomButton !== false],
+      showEntitySidebar: [settings.showEntitySidebar !== false],
+      showCustomLegend: [settings.showCustomLegend !== false],
+      showZoomControls: [settings.showZoomControls !== false],
+      enableMarkers: [settings.enableMarkers !== false],  // Enable markers by default
+
+      // Default Visibility States
+      defaultPlotsVisible: [settings.defaultPlotsVisible !== false],  // Default true
+      defaultDevicesVisible: [settings.defaultDevicesVisible === true],  // Default false
+      
+      // Min/Max Reference Lines
+      minMaxVisible: [settings.minMaxVisible || false],
+      minMaxStyle: [settings.minMaxStyle || 'dashed'],
+      minMaxColor: [settings.minMaxColor || 'rgba(128, 128, 128, 0.5)'],
+      minColor: [settings.minColor || '#ff4757'],
+      maxColor: [settings.maxColor || '#5352ed'],
+      minMaxLineWidth: [settings.minMaxLineWidth || 2],
+      showMinMaxInDialog: [settings.showMinMaxInDialog !== false],
+      
+      // Alarm Support
+      alarmSupportEnabled: [settings.alarmSupportEnabled || false],
+      
+      // Alarm Overlays
+      alarmStatusVisible: [settings.alarmStatusVisible || false],
+      alarmOpacity: [settings.alarmOpacity || 0.12],
+      alarmShowCritical: [settings.alarmShowCritical !== false],
+      alarmShowWarning: [settings.alarmShowWarning !== false],
+      alarmShowInfo: [settings.alarmShowInfo || false],
+      showAlarmOverlayInDialog: [settings.showAlarmOverlayInDialog !== false],
+      showAlarmLinesInDialog: [settings.showAlarmLinesInDialog !== false],
+      
+      // Alarm Lines
+      alarmLinesVisible: [settings.alarmLinesVisible || false],
+      alarmLineStyle: [settings.alarmLineStyle || 'dashed'],
+      alarmLineWidth: [settings.alarmLineWidth || 2],
+      alarmMinColor: [settings.alarmMinColor || '#ff9500'],
+      alarmMaxColor: [settings.alarmMaxColor || '#ff3b30'],
+      
+      // Debug & Performance
+      debugOutput: [settings.debugOutput],
+      useLazyLoading: [settings.useLazyLoading !== false],
+      enableAnimations: [settings.enableAnimations !== false],
+      useCanvasRenderer: [settings.useCanvasRenderer || false],
+      enableDataSampling: [settings.enableDataSampling !== false],
+      maxDataPoints: [settings.maxDataPoints || 10000],
+      enableProgressiveRendering: [settings.enableProgressiveRendering || false],
+      optimizeClickHandling: [settings.optimizeClickHandling !== false],
+      deferredUIUpdates: [settings.deferredUIUpdates !== false],
+      clickDebounceMs: [settings.clickDebounceMs || 100],
+      batchEChartsUpdates: [settings.batchEChartsUpdates !== false],
+      echartsUpdateDelay: [settings.echartsUpdateDelay || 50],
+      disableChartAnimationsDuringInteraction: [settings.disableChartAnimationsDuringInteraction !== false],
+      
+      // Debug Logging Settings
+      debugNormalLogs: [settings.debugNormalLogs || false],
+      debugPerformanceLogs: [settings.debugPerformanceLogs || false],
+      debugMinMaxLogs: [settings.debugMinMaxLogs || false],
+      debugAlarmLogs: [settings.debugAlarmLogs || false]
+    });
+  }
+
+  protected settingsForm(): FormGroup {
+    return this.echartsLineChartSettingsForm;
+  }
+
+  private createAnnotations(annotations: any[]): FormGroup[] {
+    return annotations.map(annotation => this.createAnnotation(annotation));
+  }
+
+  private createAnnotation(annotation?: any): FormGroup {
+    return this.fb.group({
+      annotationsType: [annotation?.annotationsType || 'Fixed', [Validators.required]],
+      fixedNumber: [annotation?.fixedNumber || 10],
+      attribute: [annotation?.attribute || ''],
+      description: [annotation?.description || ''],
+      color: [annotation?.color || 'Green', [Validators.required]],
+      attributeType: [annotation?.attributeType || 'Client'],
+      axisAssignment: [annotation?.axisAssignment || 'Left']
+    });
+  }
+
+  get annotationsFormArray(): FormArray {
+    return this.echartsLineChartSettingsForm.get('annotations') as FormArray;
+  }
+
+  addAnnotation(): void {
+    this.annotationsFormArray.push(this.createAnnotation());
+  }
+
+  removeAnnotation(index: number): void {
+    this.annotationsFormArray.removeAt(index);
+  }
+  
+  toggleSection(section: string): void {
+    this.expandedSections[section] = !this.expandedSections[section];
+  }
+
+  toggleSubsection(subsection: string): void {
+    this.expandedSubsections[subsection] = !this.expandedSubsections[subsection];
+  }
+
+  /**
+   * Filter settings sections based on search text
+   */
+  public filterSettings(): void {
+    const search = this.settingsSearchText.toLowerCase().trim();
+
+    if (!search) {
+      // No search - show all sections
+      this.visibleSections = new Set(Object.keys(this.sectionKeywords));
+      return;
+    }
+
+    // Filter sections by keywords
+    this.visibleSections.clear();
+
+    for (const [section, keywords] of Object.entries(this.sectionKeywords)) {
+      // Check if search matches any keyword for this section
+      const matches = keywords.some(keyword => keyword.includes(search) || search.includes(keyword));
+
+      if (matches) {
+        this.visibleSections.add(section);
+        // Auto-expand matching sections
+        this.expandedSections[section] = true;
+      }
+    }
+  }
+
+  /**
+   * Check if a section should be visible based on search
+   */
+  public isSectionVisible(section: string): boolean {
+    // If no search, show all
+    if (!this.settingsSearchText) {
+      return true;
+    }
+
+    return this.visibleSections.has(section);
+  }
+
+  /**
+   * Get count of visible sections
+   */
+  public getVisibleSectionsCount(): number {
+    if (!this.settingsSearchText) {
+      return Object.keys(this.sectionKeywords).length;
+    }
+
+    return this.visibleSections.size;
+  }
+
+  getTooltipPresetFormat(): string {
+    const preset = this.echartsLineChartSettingsForm.get('tooltipLabelPreset')?.value;
+    switch (preset) {
+      case 'default':
+        return '{device} | {label}: {value}';
+      case 'compact':
+        return '{label}: {value}';
+      case 'detailed':
+        return '[{device}] {label}: {value} {unit}';
+      default:
+        return this.echartsLineChartSettingsForm.get('tooltipLabelFormat')?.value || '{device} | {label}: {value}';
+    }
+  }
+  
+  openDebugLoggingDialog(): void {
+    const dialogData: DebugLoggingDialogData = {
+      normalLogs: this.echartsLineChartSettingsForm.get('debugNormalLogs')?.value || false,
+      performanceLogs: this.echartsLineChartSettingsForm.get('debugPerformanceLogs')?.value || false,
+      minMaxLogs: this.echartsLineChartSettingsForm.get('debugMinMaxLogs')?.value || false,
+      alarmLogs: this.echartsLineChartSettingsForm.get('debugAlarmLogs')?.value || false
+    };
+
+    const dialogRef = this.dialog.open(DebugLoggingDialogComponent, {
+      width: '500px',
+      data: dialogData,
+      panelClass: 'debug-dialog-panel'
+    });
+
+    dialogRef.afterClosed().subscribe((result: DebugLoggingDialogData) => {
+      if (result) {
+        this.echartsLineChartSettingsForm.patchValue({
+          debugNormalLogs: result.normalLogs,
+          debugPerformanceLogs: result.performanceLogs,
+          debugMinMaxLogs: result.minMaxLogs,
+          debugAlarmLogs: result.alarmLogs
+        });
+      }
+    });
+  }
+}

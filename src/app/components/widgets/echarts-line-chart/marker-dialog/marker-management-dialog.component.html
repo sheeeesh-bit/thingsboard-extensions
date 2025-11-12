@@ -1,0 +1,106 @@
+<div class="marker-dialog">
+  <!-- Dialog Header -->
+  <div class="dialog-header">
+    <div class="header-content">
+      <div class="header-icon">
+        <i class="material-icons">location_on</i>
+      </div>
+      <div class="header-text">
+        <h2>Manage Markers</h2>
+        <p class="header-subtitle">{{data.markers.length}} marker(s) total</p>
+      </div>
+    </div>
+    <button mat-icon-button class="close-btn" (click)="close()">
+      <i class="material-icons">close</i>
+    </button>
+  </div>
+
+  <!-- Search Bar -->
+  <div class="search-container">
+    <div class="search-box">
+      <i class="material-icons search-icon">search</i>
+      <input type="text"
+             class="search-input"
+             placeholder="Search markers by name, plot, or time..."
+             [(ngModel)]="searchText"
+             (input)="filterMarkers()">
+      <button *ngIf="searchText"
+              class="clear-search"
+              (click)="searchText = ''; filterMarkers()">
+        <i class="material-icons">close</i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Markers List -->
+  <div class="markers-list">
+    <div *ngIf="filteredMarkers.length === 0" class="no-markers">
+      <i class="material-icons">search_off</i>
+      <p *ngIf="searchText">No markers match your search</p>
+      <p *ngIf="!searchText">No markers yet. Right-click on the chart to add one.</p>
+    </div>
+
+    <div *ngFor="let marker of filteredMarkers"
+         class="marker-item"
+         [class.marked-for-deletion]="isMarkedForDeletion(marker.id)">
+      <!-- Marker Color Indicator -->
+      <div class="marker-color" [style.background-color]="marker.color"></div>
+
+      <!-- Marker Info -->
+      <div class="marker-info">
+        <div class="marker-name">{{ marker.name }}</div>
+        <div class="marker-details">
+          <span class="plot-badge">{{ marker.plotName }}</span>
+          <span class="timestamp">{{ formatTimestamp(marker.timestamp) }}</span>
+        </div>
+      </div>
+
+      <!-- Marker Actions -->
+      <div class="marker-actions">
+        <button mat-icon-button
+                class="action-btn select-btn"
+                [class.selected]="isMarkedForDeletion(marker.id)"
+                (click)="toggleMarkerForDeletion(marker.id)"
+                [matTooltip]="isMarkedForDeletion(marker.id) ? 'Unselect' : 'Select for deletion'"
+                matTooltipClass="modern-tooltip">
+          <i class="material-icons">{{ isMarkedForDeletion(marker.id) ? 'check_circle' : 'radio_button_unchecked' }}</i>
+        </button>
+        <button mat-icon-button
+                class="action-btn delete-btn"
+                (click)="deleteMarker(marker.id)"
+                matTooltip="Delete marker"
+                matTooltipClass="modern-tooltip">
+          <i class="material-icons">delete</i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dialog Footer -->
+  <div class="dialog-footer">
+    <div class="footer-actions">
+      <!-- Clear All Button -->
+      <button mat-button
+              class="footer-btn clear-all-btn"
+              (click)="clearAllMarkers()"
+              *ngIf="data.markers.length > 0">
+        <i class="material-icons">delete_sweep</i>
+        Clear All
+      </button>
+
+      <!-- Delete Selected Button -->
+      <button mat-button
+              class="footer-btn delete-selected-btn"
+              [disabled]="markersToDelete.size === 0"
+              (click)="deleteSelectedMarkers()"
+              *ngIf="markersToDelete.size > 0">
+        <i class="material-icons">delete</i>
+        Delete Selected ({{markersToDelete.size}})
+      </button>
+    </div>
+
+    <button mat-raised-button class="footer-btn close-footer-btn" (click)="close()">
+      Close
+    </button>
+  </div>
+</div>
