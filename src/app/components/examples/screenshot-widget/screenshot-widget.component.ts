@@ -6,13 +6,6 @@ import {
   OnDestroy
 } from '@angular/core';
 import { WidgetContext } from '@home/models/widget-component.models';
-import html2canvas from 'html2canvas';
-
-interface CaptureOptions {
-  scrollIncrement?: number;
-  quality?: number;
-  format?: 'png' | 'jpeg';
-}
 
 // Browser support configuration
 // Note: Vivaldi masquerades as Chrome and cannot be reliably detected in web pages
@@ -130,10 +123,27 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
 
   /**
    * Called when user clicks the capture button
-   * Shows warning dialog if enabled, otherwise starts capture directly
+   * Shows beta disclaimer first time, then warning dialog if enabled
    */
   public onCaptureClick(): void {
     this.debug(' onCaptureClick called');
+
+    // Check if user has accepted beta disclaimer
+    const hasAcceptedBeta = localStorage.getItem('screenshot-widget-beta-accepted') === 'true';
+
+    if (!hasAcceptedBeta) {
+      this.showBetaDisclaimer();
+      return;
+    }
+
+    // Proceed with normal flow
+    this.proceedAfterBetaAcceptance();
+  }
+
+  /**
+   * Proceeds after beta acceptance - shows warning dialog or starts capture
+   */
+  private proceedAfterBetaAcceptance(): void {
     this.debug(' Settings:', this.ctx.settings);
 
     const shouldShowWarning = this.ctx.settings.showWarningDialog !== false;
@@ -146,6 +156,108 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
       this.debug(' Skipping warning, starting capture directly...');
       this.captureScreenshot();
     }
+  }
+
+  /**
+   * Shows beta disclaimer dialog (first time only)
+   */
+  private showBetaDisclaimer(): void {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      background-color: rgba(0, 0, 0, 0.7) !important;
+      backdrop-filter: blur(10px);
+      z-index: 999999 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      margin: 0 !important;
+      padding: 20px;
+      box-sizing: border-box;
+    `;
+
+    overlay.innerHTML = `
+      <div style="
+        position: relative;
+        background: white;
+        border-radius: 12px;
+        padding: 40px;
+        max-width: 600px;
+        min-width: 400px;
+        box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+      ">
+        <h2 style="
+          margin: 0 0 20px 0;
+          font-size: 24px;
+          font-weight: 600;
+          color: #305680;
+          text-align: center;
+        ">⚠️ Beta Feature Notice</h2>
+        <div style="
+          margin-bottom: 28px;
+          font-size: 15px;
+          line-height: 1.6;
+          color: #333;
+          background: #f5f5f5;
+          padding: 20px;
+          border-radius: 8px;
+          border-left: 4px solid #305680;
+        ">
+          <p style="margin: 0 0 12px 0;">This screenshot feature is currently in beta testing.</p>
+          <p style="margin: 0 0 12px 0;">Please note that results may vary depending on your browser, screen resolution, and dashboard configuration.</p>
+          <p style="margin: 0 0 12px 0;">The feature works best on Chrome, Edge, Brave, and Arc browsers.</p>
+          <p style="margin: 0;">By continuing, you understand this is a beta feature and we cannot guarantee perfect results in all scenarios.</p>
+        </div>
+        <div style="
+          display: flex;
+          gap: 12px;
+          justify-content: flex-end;
+        ">
+          <button class="btn-beta-cancel" style="
+            padding: 12px 28px;
+            border: none;
+            background: #e0e0e0;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #666;
+          ">Cancel</button>
+          <button class="btn-beta-accept" style="
+            padding: 12px 28px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            background: #305680;
+            color: white;
+          ">I Understand</button>
+        </div>
+      </div>
+    `;
+
+    const cancelBtn = overlay.querySelector('.btn-beta-cancel') as HTMLElement;
+    const acceptBtn = overlay.querySelector('.btn-beta-accept') as HTMLElement;
+
+    cancelBtn.addEventListener('click', () => {
+      document.body.removeChild(overlay);
+    });
+
+    acceptBtn.addEventListener('click', () => {
+      // Save acceptance to localStorage
+      localStorage.setItem('screenshot-widget-beta-accepted', 'true');
+      document.body.removeChild(overlay);
+
+      // Proceed with capture flow
+      this.proceedAfterBetaAcceptance();
+    });
+
+    document.body.appendChild(overlay);
   }
 
   /**
@@ -1155,298 +1267,9 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     return url;
   }
 
-  /**
-   * Captures the full page - for gridster, we capture everything at once
-   * Similar to the mrcoles Chrome extension but adapted for web
-   */
-  private async captureFullPage(element: HTMLElement, options: CaptureOptions): Promise<string> {
-    const scrollHeight = element.scrollHeight;
-    const clientHeight = element.clientHeight;
-    const scrollWidth = element.scrollWidth;
-    const originalScrollTop = element.scrollTop;
 
-    this.debug(' Capture dimensions:', {
-      element: element.tagName,
-      scrollHeight,
-      clientHeight,
-      scrollWidth,
-      hasScroll: scrollHeight > clientHeight
-    });
 
-    // Scroll to top first
-    element.scrollTop = 0;
-    await this.delay(500);
 
-    // Wait for all images to load
-    this.statusMessage = 'Loading images...';
-    if (this.ctx.detectChanges) {
-      this.ctx.detectChanges();
-    }
-    await this.waitForImages(element);
-
-    // Capture the FULL element height at once
-    // This is simpler and more reliable than scrolling and stitching
-    this.debug(' Capturing full element at once');
-    this.statusMessage = 'Capturing full page...';
-    if (this.ctx.detectChanges) {
-      this.ctx.detectChanges();
-    }
-
-    const canvas = await html2canvas(element, {
-      allowTaint: true,     // ALLOW cross-origin images (like Chrome extension)
-      useCORS: true,
-      logging: true,
-      backgroundColor: '#ffffff',
-      scale: 1,
-      scrollY: 0,
-      scrollX: 0,
-      width: scrollWidth,
-      height: scrollHeight,  // Capture FULL height
-      windowWidth: scrollWidth,
-      windowHeight: scrollHeight,  // Tell it the full height
-      imageTimeout: 15000,
-      removeContainer: true,
-      foreignObjectRendering: false,  // Better compatibility
-      ignoreElements: (el) => {
-        const tagName = el.tagName?.toLowerCase();
-        return tagName === 'iframe' || tagName === 'script';
-      }
-    });
-
-    // Restore scroll position
-    element.scrollTop = originalScrollTop;
-
-    this.debug(' Full page captured:', {
-      canvasWidth: canvas.width,
-      canvasHeight: canvas.height
-    });
-
-    if (canvas.width === 0 || canvas.height === 0) {
-      throw new Error('Canvas is empty - no content captured');
-    }
-
-    // Convert to blob instead of dataURL to bypass tainted canvas restriction
-    const blob = await new Promise<Blob>((resolve) => {
-      canvas.toBlob((blob) => {
-        if (blob) {
-          resolve(blob);
-        }
-      }, 'image/png', 1.0);
-    });
-
-    const dataUrl = URL.createObjectURL(blob);
-    this.debug(' Blob created, size:', blob.size);
-
-    return dataUrl;
-  }
-
-  /**
-   * Captures a single screen without scrolling
-   */
-  private async captureSingleScreen(element: HTMLElement): Promise<string> {
-    this.debug(' Single screen capture of:', element);
-
-    // Wait for images to load first
-    await this.waitForImages(element);
-
-    const canvas = await html2canvas(element, {
-      allowTaint: false,
-      useCORS: true,
-      logging: true,
-      backgroundColor: '#ffffff',
-      scale: window.devicePixelRatio || 1,
-      width: element.scrollWidth,
-      height: element.scrollHeight,
-      windowWidth: element.scrollWidth,
-      windowHeight: element.scrollHeight,
-      x: 0,
-      y: 0,
-      imageTimeout: 15000,
-      removeContainer: true,
-      ignoreElements: (el) => {
-        const tagName = el.tagName?.toLowerCase();
-        return tagName === 'iframe' || tagName === 'script';
-      }
-    });
-
-    this.debug(' Canvas created:', {
-      width: canvas.width,
-      height: canvas.height,
-      hasData: canvas.width > 0 && canvas.height > 0
-    });
-
-    if (canvas.width === 0 || canvas.height === 0) {
-      throw new Error('Canvas is empty - no content captured');
-    }
-
-    const dataUrl = canvas.toDataURL('image/png', 1.0);
-    this.debug(' Data URL length:', dataUrl.length);
-
-    return dataUrl;
-  }
-
-  /**
-   * Captures multiple screens by scrolling and stitches them together
-   * Uses the same approach as the Chrome extension - scrolls window for body element
-   */
-  private async captureMultiScreen(element: HTMLElement, options: CaptureOptions): Promise<string> {
-    const scrollHeight = element.scrollHeight;
-    const clientHeight = element.clientHeight;
-    const scrollWidth = element.scrollWidth;
-
-    // Use viewport height as scroll increment for smooth stitching
-    const viewportHeight = clientHeight;
-    const scrollIncrement = viewportHeight;
-
-    const captures: HTMLCanvasElement[] = [];
-    let currentScroll = 0;
-    const originalScrollTop = element.scrollTop;
-
-    this.debug(' Multi-screen capture starting:', {
-      element: element.tagName,
-      scrollHeight,
-      clientHeight,
-      viewportHeight,
-      scrollIncrement,
-      totalPieces: Math.ceil(scrollHeight / scrollIncrement)
-    });
-
-    // Force scroll to top first
-    element.scrollTop = 0;
-    await this.delay(500);
-
-    // Scroll through and capture each piece - like Chrome extension
-    let pieceIndex = 0;
-    while (currentScroll < scrollHeight) {
-      pieceIndex++;
-
-      // Scroll to position
-      element.scrollTop = currentScroll;
-      this.debug(` Scrolling ${element.tagName} to position ${currentScroll}px (piece ${pieceIndex})`);
-
-      // Wait longer for scroll, images to load, and content to render
-      await this.delay(1000);
-
-      const percentage = Math.round((currentScroll / scrollHeight) * 100);
-      this.statusMessage = `Capturing ${percentage}%... (${pieceIndex})`;
-      if (this.ctx.detectChanges) {
-        this.ctx.detectChanges();
-      }
-
-      // Verify scroll position
-      const actualScrollTop = element.scrollTop;
-      this.debug(` Expected scroll: ${currentScroll}, Actual: ${actualScrollTop}`);
-
-      // Wait for images to load in viewport
-      await this.waitForImages(element);
-
-      // Capture this viewport with better options
-      const canvas = await html2canvas(element, {
-        allowTaint: false,        // Don't allow tainted canvas
-        useCORS: true,             // Use CORS for images
-        logging: true,             // Enable logging to see what's happening
-        backgroundColor: '#ffffff',
-        scale: window.devicePixelRatio || 1,  // Better quality on high-DPI screens
-        scrollY: -element.scrollTop,
-        scrollX: 0,
-        width: scrollWidth,
-        height: Math.min(viewportHeight, scrollHeight - currentScroll),
-        windowWidth: scrollWidth,
-        windowHeight: viewportHeight,
-        imageTimeout: 15000,       // Wait up to 15s for images to load
-        removeContainer: true,
-        ignoreElements: (element) => {
-          // Skip elements that might cause issues
-          const tagName = element.tagName?.toLowerCase();
-          return tagName === 'iframe' || tagName === 'script';
-        }
-      });
-
-      this.debug(' Piece captured:', {
-        pieceIndex,
-        canvasWidth: canvas.width,
-        canvasHeight: canvas.height,
-        scrollPosition: currentScroll,
-        actualScroll: actualScrollTop
-      });
-
-      if (canvas.width > 0 && canvas.height > 0) {
-        captures.push(canvas);
-      } else {
-        console.warn('[Screenshot Widget] Empty canvas at position:', currentScroll);
-      }
-
-      currentScroll += scrollIncrement;
-
-      // Safety check - don't loop forever
-      if (pieceIndex > 50) {
-        console.warn('[Screenshot Widget] Stopped after 50 pieces - possible infinite loop');
-        break;
-      }
-    }
-
-    // Restore original scroll position
-    element.scrollTop = originalScrollTop;
-
-    this.debug(` Captured ${captures.length} pieces, stitching together...`);
-
-    if (captures.length === 0) {
-      throw new Error('No screenshots captured - element may not be scrollable');
-    }
-
-    // Stitch all captures together
-    this.statusMessage = 'Stitching...';
-    if (this.ctx.detectChanges) {
-      this.ctx.detectChanges();
-    }
-
-    return this.stitchCanvases(captures, scrollWidth, scrollHeight);
-  }
-
-  /**
-   * Stitches multiple canvas captures into a single image
-   */
-  private stitchCanvases(canvases: HTMLCanvasElement[], width: number, totalHeight: number): string {
-    if (canvases.length === 0) {
-      throw new Error('No canvases to stitch');
-    }
-
-    this.debug(' Stitching canvases:', {
-      count: canvases.length,
-      targetWidth: width,
-      targetHeight: totalHeight
-    });
-
-    const finalCanvas = document.createElement('canvas');
-    finalCanvas.width = width;
-    finalCanvas.height = totalHeight;
-
-    const ctx = finalCanvas.getContext('2d');
-    if (!ctx) {
-      throw new Error('Failed to get canvas context');
-    }
-
-    // Fill with white background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, width, totalHeight);
-
-    let yOffset = 0;
-    for (let i = 0; i < canvases.length; i++) {
-      const canvas = canvases[i];
-      this.debug(` Drawing canvas ${i + 1}/${canvases.length} at y=${yOffset}`);
-      ctx.drawImage(canvas, 0, yOffset);
-      yOffset += canvas.height;
-    }
-
-    const dataUrl = finalCanvas.toDataURL('image/png', 1.0);
-    this.debug(' Stitched image size:', dataUrl.length);
-
-    if (dataUrl.length < 100) {
-      throw new Error('Stitched image is too small - likely empty');
-    }
-
-    return dataUrl;
-  }
 
   /**
    * Determines what element to capture based on widget settings
@@ -1985,33 +1808,4 @@ export class ScreenshotWidgetComponent implements OnInit, AfterViewInit, OnDestr
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  /**
-   * Wait for all images in element to load
-   */
-  private async waitForImages(element: HTMLElement): Promise<void> {
-    const images = element.querySelectorAll('img');
-    const imagePromises: Promise<void>[] = [];
-
-    images.forEach(img => {
-      if (!img.complete) {
-        imagePromises.push(
-          new Promise((resolve) => {
-            img.onload = () => resolve();
-            img.onerror = () => resolve(); // Resolve even on error to not block
-            // Timeout after 5 seconds
-            setTimeout(() => resolve(), 5000);
-          })
-        );
-      }
-    });
-
-    if (imagePromises.length > 0) {
-      this.debug(` Waiting for ${imagePromises.length} images to load...`);
-      await Promise.all(imagePromises);
-      this.debug(' All images loaded');
-    }
-
-    // Extra delay for rendering
-    await this.delay(500);
-  }
 }
