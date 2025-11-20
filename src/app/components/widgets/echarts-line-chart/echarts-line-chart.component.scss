@@ -1,10 +1,13 @@
 .graph-container {
-    flex: 1; 
-  min-width: 400px; 
-  /* Removed min-height to allow dynamic height scaling */
+  flex: 1;
+  min-width: 100%; // Fluid on mobile
   overflow-x: auto;
-  /* overflow-y handled dynamically in TypeScript based on subplot count */
   position: relative;
+
+  // Desktop min-width
+  @media (min-width: 768px) {
+    min-width: 400px;
+  }
 }
 
 .container {
@@ -301,11 +304,27 @@ div[fxFlex] {
 // Entity sidebar layout
 .echarts-layout {
   display: flex;
-  flex-direction: row;
+  flex-direction: column; /* Stack main-area and zoom vertically */
   height: 100%;
   width: 100%;
+  max-width: 100%; /* Never exceed parent */
   position: relative;
-  overflow: visible; // Allow the button to extend outside
+  box-sizing: border-box;
+
+  &.overlay-active {
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
+// Main area contains sidebar (if any) and chart horizontally
+.echarts-main-area {
+  display: flex;
+  flex-direction: row; /* Sidebar left, chart right */
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  overflow: visible; /* Allow sidebar toggle button to extend */
 }
 
 // Sidebar toggle button - now using mat-icon-button
@@ -857,14 +876,19 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
   flex-direction: column;
   position: relative;
   height: 100%;
-  min-height: 0; // Important for flexbox
+  width: 100%; /* Explicit width */
+  max-width: 100%; /* Never exceed parent */
+  min-height: 0; /* Important for flexbox */
+  min-width: 0; /* Allow shrinking */
+  box-sizing: border-box;
+  overflow: visible; /* Allow zoom-overlay to use position:sticky */
 }
 
 // Fixed legend at top with Apple design
 .legend-overlay {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 450; // keep above zoom overlay and chart content for dropdown overlap
   padding: 8px var(--plot-right, 1%) 6px var(--plot-left, 10%);
   border-bottom: 1px solid rgba(0, 0, 0, 0.08); // Keep the bottom line
   display: flex;
@@ -999,13 +1023,16 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
 .zoom-overlay {
   position: sticky;
   bottom: 0;
-  z-index: 100;
-  background: linear-gradient(180deg, 
-    rgba(252, 252, 254, 0.98) 0%, 
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(180deg,
+    rgba(252, 252, 254, 0.98) 0%,
     rgba(255, 255, 255, 0.95) 100%);
   backdrop-filter: saturate(180%) blur(12px);
   -webkit-backdrop-filter: saturate(180%) blur(12px);
-  box-shadow: 
+  box-shadow:
     0 -1px 0 rgba(255, 255, 255, 0.9) inset,
     0 1px 0 rgba(0, 0, 0, 0.04) inset,
     0 -2px 8px rgba(0, 0, 0, 0.04);
@@ -1017,21 +1044,29 @@ button[mat-icon-button].sidebar-toggle-btn[data-sidebar-state="colors"] {
 // Scrollable chart container
 .chart-outer {
   position: relative;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow-y: auto; /* Will be controlled by TypeScript (auto for >3 grids, hidden otherwise) */
+  overflow-x: hidden !important; /* Strict: never allow horizontal scroll */
   width: 100%;
+  max-width: 100%; /* Never exceed parent width */
   flex: 1;
-  min-height: 0; // Important for flexbox scrolling
+  min-height: 0; /* Important for flexbox scrolling */
+  min-width: 0; /* Allow shrinking in flex container */
 }
 
 #echartContainer {
   position: relative;
   width: 100%;
+  max-width: 100%; /* Never exceed container */
   margin: 0;
   padding: 0;
-  padding-left: 30px; // Shift chart area to avoid sidebar toggle overlap
-  box-sizing: border-box; // Prevent width overflow with padding
-  min-width: 600px;
+  padding-left: 6px; /* Minimal inset to avoid touching the edge */
+  box-sizing: border-box; /* Prevent width overflow with padding */
+  min-width: 0; /* Allow shrinking - don't force width */
+
+  // Desktop min-width
+  @media (min-width: 768px) {
+    min-width: 600px;
+  }
 }
 
 // Legend viewport - constrained view window
@@ -1205,81 +1240,77 @@ button[mat-button].legend-chip {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(0.96); background: rgba(255, 69, 58, 0.1); }
 }
-// ECharts-style zoom overlay
-.zoom-overlay {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-left: var(--plot-left, 10%);
-  padding-right: var(--plot-right, 1%);
-  background: transparent;
 
-  // The slider track
-  .zoom-track {
-    position: relative;
-    flex: 1 1 auto;
-    height: 28px;  // Same visual height as ECharts default
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.04);  // Light gray like ECharts' track
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+// NOTE: Main .zoom-overlay styles merged above at line 1019
+// This section adds the nested child element styles
 
-    // Selected window (filler)
-    .zoom-window {
-      position: absolute;
-      top: 6px;
-      bottom: 6px;
-      left: 0%;
-      right: 0%;
-      border-radius: 4px;
-      background: rgba(0, 122, 255, 0.15);  // Blue-ish like ECharts
-      box-shadow: inset 0 0 0 1px rgba(0, 122, 255, 0.45);
-      pointer-events: none;
-    }
+// Zoom track (child of .zoom-overlay)
+.zoom-track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 28px;  /* Same visual height as ECharts default */
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.04);  /* Light gray like ECharts' track */
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
 
-    // Handles
-    .zoom-handle {
-      position: absolute;
-      top: 2px;
-      width: 14px;
-      bottom: 2px;
-      border-radius: 6px;
-      background: #8e8e93;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-      cursor: ew-resize;
-      transition: background-color 0.2s;
-      
-      &:hover {
-        background: #636366;
-      }
-      
-      &.left {
-        left: calc(0% - 7px);
-      }
-      &.right {
-        right: calc(0% - 7px);
-      }
-    }
+// Selected window (child of .zoom-track)
+.zoom-window {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0%;
+  right: 0%;
+  border-radius: 4px;
+  background: rgba(0, 122, 255, 0.15);  /* Blue-ish like ECharts */
+  box-shadow: inset 0 0 0 1px rgba(0, 122, 255, 0.45);
+  pointer-events: none;
+}
+
+// Zoom handles (children of .zoom-track)
+.zoom-handle {
+  position: absolute;
+  top: 2px;
+  width: 14px;
+  bottom: 2px;
+  border-radius: 6px;
+  background: #8e8e93;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  cursor: ew-resize;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background: #636366;
   }
 
-  .zoom-reset {
-    border: 1px solid rgba(0, 0, 0, 0.12);
-    border-radius: 12px;
-    padding: 6px 10px;
-    font-size: 12px;
-    background: #fff;
-    cursor: pointer;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: #007aff;
-    transition: all 0.2s;
-    
-    &:hover {
-      background: #f5f5f7;
-      border-color: rgba(0, 0, 0, 0.2);
-    }
-    
-    &:active {
-      transform: scale(0.95);
-    }
+  &.left {
+    left: calc(0% - 7px);
+  }
+
+  &.right {
+    right: calc(0% - 7px);
+  }
+}
+
+// Zoom reset button (child of .zoom-overlay)
+.zoom-reset {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  padding: 6px 10px;
+  font-size: 12px;
+  background: #fff;
+  cursor: pointer;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #007aff;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #f5f5f7;
+    border-color: rgba(0, 0, 0, 0.2);
+  }
+
+  &:active {
+    transform: scale(0.95);
   }
 }
 
@@ -1778,5 +1809,933 @@ button[mat-button].legend-chip {
 
   .mdc-dialog__surface {
     border-radius: 16px;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Mobile Responsive Styles
+// ════════════════════════════════════════════════════════════════════════════
+
+// Mobile breakpoints
+$mobile-small: 375px;   // iPhone SE
+$mobile-medium: 428px;  // iPhone 14 Pro Max
+$tablet: 768px;         // iPad
+$desktop: 1024px;       // Desktop
+
+// ────────────────────────────────────────────────────────────────────────────
+// Mobile (< 768px)
+// ────────────────────────────────────────────────────────────────────────────
+
+@media (max-width: 767px) {
+
+  // Hide desktop toolbar completely on mobile
+  .tb-button-container {
+    display: none !important;
+  }
+
+  // Remove fixed widths
+  .echarts-layout {
+    min-width: 100% !important;
+  }
+
+  // Remove min-width on mobile to prevent horizontal scroll
+  #echartContainer {
+    min-width: 0 !important; /* Allow shrinking to fit container */
+    max-width: 100% !important; /* Never exceed container width */
+    width: 100% !important; /* Fill container width */
+    padding-left: 10px; /* Reduce padding on mobile */
+  }
+
+  // Ensure chart-outer uses flex properly
+  .chart-outer {
+    flex: 1;
+    min-height: 0;
+    min-width: 0; /* Allow shrinking */
+    max-width: 100%; /* Never exceed parent */
+    overflow-y: auto; /* Allow scrolling when needed (controlled by TypeScript) */
+    overflow-x: hidden; /* Never scroll horizontally */
+  }
+
+  // Touch-friendly buttons (minimum 44x44px per Apple HIG)
+  .tb-button {
+    width: 48px !important;
+    height: 48px !important;
+
+    .material-icons {
+      font-size: 24px !important;
+    }
+  }
+
+  // Legend hamburger button - integrate seamlessly
+  .legend-menu {
+    position: relative;
+    z-index: 150; // Above legend itself
+
+    .legend-hamburger {
+      width: 40px !important;
+      height: 40px !important;
+      position: relative;
+      z-index: 150;
+
+      .material-icons {
+        font-size: 20px !important;
+      }
+    }
+
+    .mobile-dropdown {
+      // Position dropdown to align with right edge
+      right: 0;
+      left: auto;
+      // max-height calculated dynamically in TypeScript via [style.max-height]
+      // based on actual space between legend and zoom controls
+      z-index: 250 !important; // CRITICAL: Above everything except portrait overlay
+    }
+  }
+
+  // Legend chips - reduce size slightly on mobile for more space
+  .legend-chip {
+    padding: 8px 14px;
+    font-size: 14px;
+    min-width: 90px;
+  }
+
+  // Mobile sidebar backdrop
+  .sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 999;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  // Sidebar becomes full-screen overlay
+  .entity-sidebar {
+    position: fixed !important;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 85vw !important;
+    max-width: 320px;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+    box-shadow: 2px 0 16px rgba(0, 0, 0, 0.2);
+
+    &:not(.sidebar-hidden) {
+      transform: translateX(0);
+    }
+  }
+
+  // Sidebar toggle button - always on left edge
+  .sidebar-toggle-btn {
+    position: fixed !important;
+    left: 8px !important;
+    top: 50% !important;
+    transform: translateY(-50%);
+    z-index: 999;
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  // Context menu - larger touch targets
+  .context-menu {
+    min-width: 240px;
+    padding: 8px;
+
+    .context-menu-item {
+      padding: 14px 18px;
+      font-size: 16px;
+
+      .material-icons {
+        font-size: 24px;
+      }
+    }
+  }
+
+  // Legend - larger touch targets
+  .legend-overlay {
+    bottom: 70px !important; // More space for mobile controls
+
+    .legend-chip {
+      padding: 10px 18px;
+      font-size: 15px;
+      min-width: 110px;
+    }
+
+    .legend-pager {
+      width: 48px;
+      height: 48px;
+
+      svg {
+        width: 20px;
+        height: 20px;
+      }
+    }
+  }
+
+  // Toolbar buttons - stack or compact
+  .tb-button-container {
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 12px 16px;
+  }
+
+  // Export pulldown - larger
+  .export-pulldown {
+    .pulldown-trigger {
+      padding: 12px 16px;
+      font-size: 15px;
+    }
+
+    .pulldown-options {
+      min-width: 140px;
+
+      .option-button {
+        padding: 14px 18px;
+        font-size: 15px;
+      }
+    }
+  }
+
+  // Zoom overlay - larger handles, minimal padding
+  .zoom-overlay {
+    padding: 4px; // Minimal padding
+    padding-bottom: 4px; // Minimal bottom padding
+
+    .zoom-handle {
+      width: 36px;
+      height: 36px;
+
+      &::after {
+        width: 4px;
+        height: 18px;
+      }
+    }
+
+    .zoom-reset {
+      padding: 8px 16px; // Reduced padding
+      font-size: 14px;
+    }
+  }
+
+  // No data message - adjust for mobile
+  .no-data-message {
+    padding: 32px 20px;
+
+    .material-icons {
+      font-size: 56px;
+    }
+
+    h3 {
+      font-size: 18px;
+    }
+
+    p {
+      font-size: 14px;
+    }
+  }
+
+  // Marker count badge - slightly larger
+  .marker-count-badge {
+    top: -6px;
+    right: -6px;
+    font-size: 11px;
+    padding: 3px 6px;
+    min-width: 18px;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tablet (768px - 1023px)
+// ────────────────────────────────────────────────────────────────────────────
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .entity-sidebar {
+    width: 240px !important;
+  }
+
+  .legend-chip {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Safe Area Insets (iPhone X+, notch devices)
+// ────────────────────────────────────────────────────────────────────────────
+
+@supports (padding: env(safe-area-inset-top)) {
+  .tb-button-container {
+    padding-left: calc(16px + env(safe-area-inset-left));
+    padding-right: calc(16px + env(safe-area-inset-right));
+    padding-top: calc(12px + env(safe-area-inset-top));
+  }
+
+  .entity-sidebar {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .zoom-overlay {
+    // Minimal padding - only safe area inset
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Mobile Dialog Optimizations
+// ────────────────────────────────────────────────────────────────────────────
+
+@media (max-width: 767px) {
+  // Settings dialog - full screen on mobile
+  :host ::ng-deep .settings-dialog-panel {
+    .mat-mdc-dialog-container {
+      max-width: 100vw !important;
+      max-height: 100vh !important;
+      max-height: 100dvh !important; // Dynamic viewport height (accounts for URL bar)
+      width: 100vw !important;
+      // Height cascade: fallback → Safari fallback → modern dynamic
+      height: 100vh !important;
+      height: -webkit-fill-available !important; // iOS Safari fallback
+      height: 100dvh !important; // Modern browsers (adapts to URL bar)
+      border-radius: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      transform: none !important;
+    }
+
+    .mdc-dialog__surface {
+      max-width: 100vw !important;
+      max-height: 100vh !important;
+      max-height: 100dvh !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      height: -webkit-fill-available !important;
+      height: 100dvh !important;
+      border-radius: 0 !important;
+    }
+
+    .mat-mdc-dialog-surface {
+      max-width: 100vw !important;
+      max-height: 100vh !important;
+      max-height: 100dvh !important;
+      height: -webkit-fill-available !important;
+      height: 100dvh !important;
+    }
+  }
+
+  // Marker dialog - bottom sheet on mobile
+  :host ::ng-deep .marker-dialog-panel {
+    .mat-mdc-dialog-container {
+      position: fixed !important;
+      bottom: 0 !important;
+      left: 0;
+      right: 0;
+      top: auto !important;
+      // Use dynamic viewport height (adapts to URL bar)
+      max-height: 85vh; // Fallback
+      max-height: 85dvh; // Modern browsers - accounts for URL bar
+      border-radius: 20px 20px 0 0;
+      box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.2);
+      animation: slideUpFromBottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+  }
+
+  @keyframes slideUpFromBottom {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Landscape Orientation Optimizations
+// ────────────────────────────────────────────────────────────────────────────
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .tb-button-container {
+    margin: 8px 12px 12px;
+  }
+
+  .legend-overlay {
+    bottom: 50px !important;
+  }
+
+  .zoom-overlay {
+    padding: 8px;
+  }
+
+  .entity-sidebar {
+    width: 35vw !important;
+    max-width: 280px;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Portrait Orientation - Hide Sidebar
+// ────────────────────────────────────────────────────────────────────────────
+
+@media (orientation: portrait) and (max-width: 767px) {
+  // Hide sidebar completely in mobile portrait view
+  .entity-sidebar {
+    display: none !important;
+  }
+
+  // Hide sidebar toggle button
+  .sidebar-toggle-btn {
+    display: none !important;
+  }
+
+  // Hide sidebar backdrop
+  .sidebar-backdrop {
+    display: none !important;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Touch-specific interactions
+// ────────────────────────────────────────────────────────────────────────────
+
+@media (hover: none) and (pointer: coarse) {
+  // Touch devices - larger hit areas
+  .legend-chip,
+  .entity-row,
+  .context-menu-item,
+  .zoom-handle {
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  // Remove hover effects on touch devices
+  .tb-button:hover,
+  .legend-chip:hover {
+    transform: none;
+  }
+
+  // Active (pressed) states instead
+  .tb-button:active {
+    transform: scale(0.95);
+    transition: transform 0.1s;
+  }
+
+  .legend-chip:active {
+    transform: scale(0.98);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Mobile Hamburger Menu
+// ════════════════════════════════════════════════════════════════════════════
+
+.mobile-menu-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  // When inside legend, position to the right
+  &.legend-menu {
+    margin-left: auto; // Push to right side
+    flex-shrink: 0;
+  }
+}
+
+.hamburger-btn {
+  position: relative;
+
+  &.active {
+    background: rgba(0, 122, 255, 0.1) !important;
+
+    .material-icons {
+      color: #007aff !important;
+    }
+  }
+
+  // Legend hamburger - match legend pager style
+  &.legend-hamburger {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px;
+
+    .material-icons {
+      font-size: 22px !important;
+    }
+  }
+}
+
+.mobile-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 240px;
+  // max-height set dynamically via [style.max-height] in template
+  // Calculated to fit between hamburger button and zoom controls
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.1);
+  padding: 8px;
+  z-index: 400; // Ensure it stays above zoom overlay and other floating UI
+  animation: mobileMenuSlideIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-y: auto; // Allow vertical scrolling when content exceeds max-height
+  overflow-x: hidden;
+
+  // Custom scrollbar for mobile menu
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.3);
+    }
+  }
+
+  .mobile-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 14px 16px;
+    border: none;
+    background: transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    color: #1d1d1f;
+    text-align: left;
+    position: relative;
+
+    .material-icons {
+      font-size: 22px;
+      color: #007aff;
+      flex-shrink: 0;
+    }
+
+    span {
+      flex: 1;
+    }
+
+    .submenu-arrow {
+      font-size: 20px;
+      color: #86868b;
+      margin-left: auto;
+    }
+
+    &.submenu-trigger.expanded {
+      background: #f5f5f7;
+    }
+
+    .menu-badge {
+      background: #ff3b30;
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 10px;
+      min-width: 20px;
+      text-align: center;
+    }
+
+    &:hover:not(:disabled) {
+      background: #f5f5f7;
+    }
+
+    &:active:not(:disabled) {
+      background: #e5e5e7;
+      transform: scale(0.98);
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+
+  .mobile-submenu {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobile-submenu-items {
+    display: flex;
+    flex-direction: column;
+    padding-left: 36px; // Indent submenu items
+    margin-top: 4px;
+    animation: slideDown 0.2s ease;
+  }
+
+  .mobile-submenu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 16px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1d1d1f;
+    text-align: left;
+
+    .material-icons {
+      font-size: 18px;
+      color: #86868b;
+    }
+
+    &:hover {
+      background: #f5f5f7;
+    }
+
+    &:active {
+      background: #e5e5e7;
+      transform: scale(0.98);
+    }
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .menu-divider {
+    height: 1px;
+    background: #e5e5e7;
+    margin: 8px 0;
+  }
+}
+
+@keyframes mobileMenuSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+// Click outside to close mobile menu
+@media (max-width: 767px) {
+  .mobile-menu-container {
+    // Backdrop when menu is open (optional)
+    &::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: transparent;
+      z-index: 999;
+      pointer-events: none;
+    }
+  }
+
+  .mobile-dropdown {
+    z-index: 1001;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Portrait Mode Overlay (Mobile)
+// ════════════════════════════════════════════════════════════════════════════
+
+.portrait-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2000;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+  .portrait-content {
+    max-width: 360px;
+    text-align: center;
+    animation: slideUpFadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+
+    .rotate-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 24px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: rotateIcon 2s ease-in-out infinite;
+
+      .material-icons {
+        font-size: 48px;
+        color: white;
+      }
+    }
+
+    h3 {
+      margin: 0 0 12px 0;
+      font-size: 22px;
+      font-weight: 700;
+      color: #1d1d1f;
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      margin: 0 0 24px 0;
+      font-size: 15px;
+      line-height: 1.5;
+      color: #86868b;
+    }
+
+    .portrait-hint {
+      margin: 0 0 28px 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      .hint-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px;
+        background: #f5f5f7;
+        border-radius: 10px;
+        transition: all 0.2s ease;
+
+        &.primary {
+          background: linear-gradient(135deg, rgba(0, 122, 255, 0.08) 0%, rgba(0, 122, 255, 0.04) 100%);
+          border: 1.5px solid rgba(0, 122, 255, 0.2);
+        }
+
+        .hint-icon {
+          font-size: 22px;
+          color: #007aff;
+          flex-shrink: 0;
+          margin-top: 2px;
+        }
+
+        .hint-text {
+          flex: 1;
+          text-align: left;
+
+          strong {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 4px;
+          }
+
+          span {
+            font-size: 13px;
+            color: #1d1d1f;
+            line-height: 1.4;
+            display: block;
+          }
+        }
+      }
+    }
+
+    .portrait-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .dismiss-btn {
+      background: transparent;
+      color: #86868b;
+      font-size: 15px;
+      font-weight: 500;
+      padding: 12px 24px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      text-transform: none;
+      transition: all 0.2s ease;
+      width: 100%;
+      cursor: pointer;
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.04);
+        border-color: rgba(0, 0, 0, 0.15);
+        color: #1d1d1f;
+      }
+
+      &:active {
+        transform: scale(0.98);
+      }
+    }
+
+    .dismiss-btn-primary {
+      background: #007aff;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 14px 24px;
+      border-radius: 12px;
+      text-transform: none;
+      box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3);
+      transition: all 0.2s ease;
+      width: 100%;
+
+      .material-icons {
+        margin-right: 8px;
+        font-size: 20px;
+        vertical-align: middle;
+      }
+
+      &:hover {
+        background: #0051d5;
+        box-shadow: 0 6px 20px rgba(0, 122, 255, 0.4);
+        transform: translateY(-2px);
+      }
+
+      &:active {
+        transform: scale(0.98);
+      }
+    }
+
+    .portrait-footer {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e5e7;
+
+      small {
+        font-size: 11px;
+        color: #a1a1a6;
+        line-height: 1.4;
+        display: block;
+      }
+    }
+  }
+}
+
+// Ensure overlay helpers can anchor within the widget shell
+:host {
+  position: relative;
+  display: block;
+  height: 100%;
+}
+
+.widget-shell {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+// Arrow pointing to top-right corner (fullscreen button)
+// Using SVG for guaranteed visibility
+.fullscreen-arrow {
+  position: absolute; // scoped to widget container
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 9999; // Very high to ensure visibility
+  animation: arrowPointToCorner 1.2s ease-in-out infinite;
+
+  .arrow-svg {
+    display: block;
+    width: 40px;
+    height: 40px;
+  }
+
+  .arrow-label {
+    display: inline-block;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    background: #007aff;
+    padding: 8px 16px;
+    border-radius: 10px;
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+    text-align: center;
+  }
+}
+
+@keyframes arrowPointToCorner {
+  0%, 100% {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(8px, -8px);
+    opacity: 0.85;
+  }
+}
+
+@keyframes rotateIcon {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-15deg);
+  }
+  75% {
+    transform: rotate(15deg);
+  }
+}
+
+@keyframes slideUpFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

@@ -138,6 +138,23 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   private deviceForbiddenMeasurements: Map<string, string[]> = new Map(); // entityName → forbidden measurement keywords
   private isDeviceTypesFetched = false;
 
+  // Device detection
+  public isMobileDevice = false;
+  public isTabletDevice = false;
+  public isTouchDevice = false;
+  public isPortraitMode = false;
+  public showPortraitOverlay = false;
+  public portraitOverlayDismissed = false;
+  public hasCheckedDeviceOrientation = false; // gate overlay rendering until detection runs
+  public forceLandscapeMode = false;  // CSS-based landscape rotation
+  private resizeListener: any;
+  private orientationListener: any;
+
+  // Mobile menu
+  public showMobileMenu = false;
+  public showMobileExportSubmenu = false;
+  public mobileMenuMaxHeight = '400px'; // Dynamic max-height based on available space
+
   // Marker system
   public markers: Array<{
     id: string;
@@ -154,6 +171,8 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     gridIndex: number;
     plotName: string;
   } | null = null;
+  private longPressTimer: any;
+  private touchStartPos: { x: number, y: number } | null = null;
 
   @ViewChild('contextMenu', { static: false }) contextMenu: ElementRef<HTMLDivElement>;
 
@@ -352,6 +371,29 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public getSelectedDeviceCount(): number {
     if (!this.entityList) return 0;
     return this.entityList.filter(entity => entity.visible).length;
+  }
+
+  public formatDataPoints(value: number | null | undefined): string {
+    if (value === null || value === undefined) {
+      return '0';
+    }
+
+    const absValue = Math.abs(value);
+    if (absValue < 1000) {
+      return value.toString();
+    }
+
+    const units = ['K', 'M', 'B', 'T'];
+    let unitIndex = -1;
+    let scaled = absValue;
+
+    while (scaled >= 1000 && unitIndex < units.length - 1) {
+      scaled /= 1000;
+      unitIndex++;
+    }
+
+    const formatted = scaled >= 10 ? Math.round(scaled).toString() : scaled.toFixed(1);
+    return `${value < 0 ? '-' : ''}${formatted}${units[unitIndex]}`;
   }
 
   // Check if all devices are hidden (for warning indicator)
@@ -602,20 +644,24 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   ngOnInit(): void {
 
+    // Detect device type and setup responsive listeners
+    this.detectDevice();
+    this.setupResponsiveListeners();
+
     // Initialize sidebar settings
     this.sidebarDisplayMode = this.ctx.settings?.sidebarDisplayMode || 'full';
     this.sidebarCollapsedMode = this.ctx.settings?.sidebarCollapsedMode || 'hidden';
 
     // Initialize default visibility settings
     // Default: all plots visible
-    this.defaultPlotsVisible = this.ctx.settings?.defaultPlotsVisible !== false; // true by default
+    this.defaultPlotsVisible = this.getBooleanSetting('defaultPlotsVisible', true);
 
     // Device visibility: in single device mode, always show device by default
     // In multiple devices mode, respect the setting (default hidden)
-    const isMultipleDevicesMode = this.ctx.settings?.multipleDevices === true;
+    const isMultipleDevicesMode = this.getBooleanSetting('multipleDevices', false);
     if (isMultipleDevicesMode) {
       // Multiple devices mode: use setting (default false)
-      this.defaultDevicesVisible = this.ctx.settings?.defaultDevicesVisible === true;
+      this.defaultDevicesVisible = this.getBooleanSetting('defaultDevicesVisible', false);
     } else {
       // Single device mode: always show the device by default
       this.defaultDevicesVisible = true;
@@ -623,29 +669,29 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
     // Initialize color scheme
     this.currentColorScheme = this.ctx.settings?.colorScheme || 'default';
-    
+
     // Initialize min/max settings from widget configuration
-    this.minMaxVisible = this.ctx.settings?.minMaxVisible === true;
+    this.minMaxVisible = this.getBooleanSetting('minMaxVisible', false);
     this.minMaxStyle = this.ctx.settings?.minMaxStyle || 'dashed';
     this.minMaxColor = this.ctx.settings?.minMaxColor || 'rgba(128, 128, 128, 0.5)';
     this.minColor = this.ctx.settings?.minColor || '#ff4757';
     this.maxColor = this.ctx.settings?.maxColor || '#5352ed';
     this.minMaxLineWidth = this.ctx.settings?.minMaxLineWidth || 2;
-    this.minMaxDebugLogs = this.ctx.settings?.debugMinMaxLogs === true;
+    this.minMaxDebugLogs = this.getBooleanSetting('debugMinMaxLogs', false);
     
     // Initialize alarm settings from widget configuration
     // Check if alarm support is enabled first
-    const alarmSupportEnabled = this.ctx.settings?.alarmSupportEnabled === true;
-    
+    const alarmSupportEnabled = this.getBooleanSetting('alarmSupportEnabled', false);
+
     // Only enable alarm features if alarm support is enabled
-    this.alarmStatusVisible = alarmSupportEnabled && this.ctx.settings?.alarmStatusVisible === true;
-    this.alarmDebugLogs = this.ctx.settings?.debugAlarmLogs === true;
-    this.alarmLinesVisible = alarmSupportEnabled && this.ctx.settings?.alarmLinesVisible === true;
+    this.alarmStatusVisible = alarmSupportEnabled && this.getBooleanSetting('alarmStatusVisible', false);
+    this.alarmDebugLogs = this.getBooleanSetting('debugAlarmLogs', false);
+    this.alarmLinesVisible = alarmSupportEnabled && this.getBooleanSetting('alarmLinesVisible', false);
     this.alarmLineStyle = this.ctx.settings?.alarmLineStyle || 'dashed';
     this.alarmLineWidth = this.ctx.settings?.alarmLineWidth || 2;
     this.alarmMinColor = this.ctx.settings?.alarmMinColor || '#ff9500';
     this.alarmMaxColor = this.ctx.settings?.alarmMaxColor || '#ff3b30';
-    
+
     // Reset color mapping on initialization
     this.entityColorMap = {};
     this.nextColorIndex = 0;
@@ -653,15 +699,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     this.nextLabelColorIndex = 0;
 
     // Load markers from local storage (only if enabled)
-    if (this.ctx.settings?.enableMarkers !== false) {
+    if (this.getBooleanSetting('enableMarkers', true)) {
       this.loadMarkersFromLocalStorage();
     }
 
     // Initialize DatePipe with user's locale
 
     // Initialize debug output first
-    this.DEBUG = this.ctx.settings.debugOutput;
-    this.PERF_DEBUG = this.ctx.settings.performanceDebug !== false; // Default enabled
+    this.DEBUG = this.getBooleanSetting('debugOutput', false);
+    this.PERF_DEBUG = this.getBooleanSetting('performanceDebug', true); // Default enabled
 
     // Log comprehensive ctx debug info when debug mode is enabled
     if (this.DEBUG) {
@@ -703,26 +749,51 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   ngAfterViewInit(): void {
-    
+
     // Don't apply height here - let initChart handle it
-    
-    // Check lazy loading setting
-    const useLazyLoading = this.ctx.settings?.useLazyLoading !== false;
-    
-    if (useLazyLoading) {
-      // Lazy loading: initialize chart when it becomes visible
-      this.initializeLazyLoading();
-    } else {
-      // Immediate loading: initialize chart right away
-      this.initializeImmediate();
-    }
-    
-    // Listen for fullscreen changes to force legend recalculation
-    this.setupFullscreenListener();
+
+    // Wait for settings to be fully loaded before initializing
+    setTimeout(() => {
+      // Ensure ctx and settings exist
+      if (!this.ctx || !this.ctx.settings) {
+        console.warn('[INIT] Settings not ready, retrying...');
+        setTimeout(() => this.ngAfterViewInit(), 100);
+        return;
+      }
+
+      // Check lazy loading setting
+      const useLazyLoading = this.getBooleanSetting('useLazyLoading', true);
+
+      if (useLazyLoading) {
+        // Lazy loading: initialize chart when it becomes visible
+        this.initializeLazyLoading();
+      } else {
+        // Immediate loading: initialize chart right away
+        this.initializeImmediate();
+      }
+
+      // Listen for fullscreen changes to force legend recalculation
+      this.setupFullscreenListener();
+    }, 100);
   }
   
   private initializeLazyLoading(): void {
-    
+    // If portrait overlay is shown, chart container won't exist yet
+    if (this.showPortraitOverlay) {
+      if (this.DEBUG) {
+        console.log('📱 [LAZY LOAD] Skipping - portrait overlay active');
+      }
+      return;
+    }
+
+    // Check if chart container exists
+    if (!this.chartContainer?.nativeElement) {
+      if (this.DEBUG) {
+        console.warn('⚠️ [LAZY LOAD] Chart container not found');
+      }
+      return;
+    }
+
     // Create intersection observer to detect when chart becomes visible
     if ('IntersectionObserver' in window) {
       const observer = new IntersectionObserver((entries) => {
@@ -737,7 +808,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         rootMargin: '50px', // Start loading 50px before it's visible
         threshold: 0.1 // Trigger when 10% visible
       });
-      
+
       observer.observe(this.chartContainer.nativeElement);
     } else {
       // Fallback for browsers without IntersectionObserver
@@ -746,6 +817,14 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   private initializeImmediate(): void {
+    // Check if we should show portrait overlay instead of chart
+    if (this.showPortraitOverlay) {
+      if (this.DEBUG) {
+        console.log('📱 [INIT] Skipping chart initialization - portrait overlay is active');
+      }
+      return; // Don't initialize chart, show portrait overlay instead
+    }
+
     // Set initial legend padding to prevent cutoff on first render
     // This ensures the CSS custom properties are set before the legend renders
     const margins = this.getPlotMargins();
@@ -755,20 +834,48 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     setTimeout(() => {
       this.initChart();
       this.setupResizeObserver();
-      
-      // Initialize zoom overlay positions
-      this.updateZoomOverlay();
-      
+
+      // Setup swipe gestures for mobile sidebar
+      if (this.isMobileDevice) {
+        this.setupSidebarSwipeGestures();
+      }
+
+      // Setup click-outside to close mobile menu
+      this.setupMobileMenuClickOutside();
+
       // CRITICAL: Expose component to ThingsBoard's widget.js bridge
       // This allows TB to call our methods and flush pending updates
       if (this.ctx.$scope) {
         this.ctx.$scope.echartsLineChartComponent = this;
-        
+
         // If widget.js has already queued pending updates, flush them now
         if (typeof this.ctx.$scope.componentReady === 'function') {
           this.ctx.$scope.componentReady();
         }
       }
+
+      // Initialize zoom overlay positions AFTER DOM is fully rendered
+      // Delay ensures zoom-overlay element exists in DOM
+      setTimeout(() => {
+        // Only initialize zoom if enabled
+        if (this.shouldShowDataZoom()) {
+          this.updateZoomOverlay();
+
+          // Recalculate chart height now that zoom element exists and has real height
+          // First calculation used estimated height (45px), now we can use actual
+          this.applyScrollableHeight();
+
+          // Resize chart to apply new height
+          if (this.chart && !this.chart.isDisposed()) {
+            this.chart.resize();
+          }
+        }
+
+        // Calculate mobile menu max-height after all overlays are rendered
+        if (this.isMobileDevice) {
+          this.calculateMobileMenuMaxHeight();
+        }
+      }, 250); // Increased delay to ensure Angular renders zoom-overlay element
     }, 100);
   }
   
@@ -942,6 +1049,20 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       document.removeEventListener('MSFullscreenChange', (this as any).fullscreenHandler);
     }
     
+    // Clean up responsive listeners
+    if (this.resizeListener) {
+      window.removeEventListener('resize', this.resizeListener);
+    }
+
+    if (this.orientationListener) {
+      window.removeEventListener('orientationchange', this.orientationListener);
+    }
+
+    // Clean up long-press timer
+    if (this.longPressTimer) {
+      clearTimeout(this.longPressTimer);
+    }
+
     // Clean up window resize listeners
     if ((this as any).windowResizeHandler) {
       window.removeEventListener('resize', (this as any).windowResizeHandler);
@@ -978,7 +1099,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
   public async onDataUpdated(): Promise<void> {
     // If device type filtering is enabled, wait for device types to be fetched first
-    if (this.ctx.settings?.deviceTypeFiltering === true && !this.isDeviceTypesFetched) {
+    if (this.getBooleanSetting('deviceTypeFiltering', false) && !this.isDeviceTypesFetched) {
       await this.fetchDeviceTypesAndFilter();
     }
 
@@ -1317,6 +1438,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     // Hide the loading spinner after data is rendered
     this.chart.hideLoading();
 
+    // Update zoom overlay to match chart dataZoom state
+    // This ensures visual overlay is synchronized after chart update
+    if (this.shouldShowDataZoom()) {
+      // Small delay to ensure chart has finished processing setOption
+      setTimeout(() => {
+        this.updateZoomOverlay();
+      }, 50);
+    }
+
     // NOTE: The glossy fix is now handled in flushChartActionBatch
     // when the first device is activated. This ensures the fix is applied
     // at the right time, matching the behavior of "hide all devices"
@@ -1387,34 +1517,85 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     const inner = outer?.querySelector('#echartContainer') as HTMLElement;
     if (!inner || !this.ctx.height) return;
 
-    const buttonBarHeight = 50;
-    const legendH = this.getLegendPx(); // floating
-    const zoomH = this.getZoomPx();   // floating
+    // Button bar height: 0 on mobile (no toolbar), 50px on desktop
+    const buttonBarHeight = this.isMobileDevice ? 0 : 50;
+    const legendH = this.getLegendPx(); // floating inside chart-container-wrapper
+    const zoomH = this.getZoomPx(); // zoom overlay at bottom of chart-container-wrapper
+
+    // Allow legend to overlap charts while keeping a sliver of breathing room
+    const legendPaddingBudget = this.isMobileDevice ? 4 : 12;
+    const legendOffset = Math.min(legendH, legendPaddingBudget);
+    const axisPadding = this.isMobileDevice ? 32 : 32; // leave space for time axis labels
 
     // Expose heights as CSS custom properties for sidebar alignment
     if (outer) {
       outer.style.setProperty('--legend-height', `${legendH}px`);
-      outer.style.setProperty('--zoom-height', `${zoomH}px`);
     }
 
-    const viewport = Math.max(0, this.ctx.height - buttonBarHeight - legendH - zoomH);
+    // Calculate viewport: Subtract button bar, legend, AND zoom overlay
+    // All of these reduce the available space for the chart
+    const viewport = Math.max(0, this.ctx.height - buttonBarHeight - legendOffset - zoomH - axisPadding);
+
+    if (this.DEBUG) {
+      console.log('[HEIGHT] Chart height calculation:', {
+        ctxHeight: this.ctx.height,
+        buttonBarHeight,
+        legendH,
+        zoomH,
+        viewport,
+        currentGrids: this.currentGrids,
+        isMobile: this.isMobileDevice
+      });
+    }
 
     // Scale plot canvas by grid count (scroll only the canvas area)
-    const scaleFactor = this.currentGrids > 3 ? (this.currentGrids / 3) : 1;
+    // Mobile: Each plot takes ~90% of viewport for comfortable scrolling (10% gap between plots)
+    // Desktop: Traditional scaling (fit 3, then scale)
+    let scaleFactor: number;
+    let shouldScroll: boolean;
+
+    if (this.isMobileDevice) {
+      // Mobile: Each plot fills 100% of viewport - scroll to see next plot
+      scaleFactor = this.currentGrids * 1.0;
+      shouldScroll = this.currentGrids > 1;
+    } else {
+      // Desktop: Original logic (fit up to 3, then scale)
+      scaleFactor = this.currentGrids > 3 ? (this.currentGrids / 3) : 1;
+      shouldScroll = this.currentGrids > 3;
+    }
+
     const innerHeight = Math.ceil(viewport * scaleFactor);
 
-    // Keep plots clear of floating bars
-    outer.style.paddingTop = `${legendH}px`;
-    outer.style.paddingBottom = `${zoomH}px`;
+    // Keep plots clear of floating legend (inside this container)
+    outer.style.paddingTop = `${legendOffset}px`;
+
+    // Give a little breathing room so axis labels are readable above the zoom bar
+    outer.style.paddingBottom = `${axisPadding}px`;
 
     outer.style.height = `${viewport}px`;
     outer.style.maxHeight = `${viewport}px`;
-    outer.style.overflowY = this.currentGrids > 3 ? 'auto' : 'hidden';
+    outer.style.overflowY = shouldScroll ? 'auto' : 'hidden';
+    outer.style.overflowX = 'hidden'; /* Prevent horizontal scroll */
     inner.style.height = `${innerHeight}px`;
+    inner.style.width = '100%'; /* Ensure full width */
+
+    if (this.DEBUG) {
+      console.log('[HEIGHT] Applied heights:', {
+        'device': this.isMobileDevice ? 'MOBILE' : 'DESKTOP',
+        'outer.height': `${viewport}px`,
+        'outer.paddingBottom': outer.style.paddingBottom,
+        'outer.overflowY': shouldScroll ? 'auto' : 'hidden',
+        'inner.height': `${innerHeight}px`,
+        'scaleFactor': scaleFactor,
+        'currentGrids': this.currentGrids,
+        'shouldScroll': shouldScroll,
+        'plotHeight': this.isMobileDevice ? `${viewport}px (each plot fills 100% of viewport)` : 'varies'
+      });
+    }
 
     // IMPORTANT: trigger resize so ECharts recomputes grids after height change
     this.chart?.resize();
-    
+
   }
 
   // Convert px to % based on the current inner chart height
@@ -1479,8 +1660,13 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
 
   // Reserve space at top and bottom to prevent line clipping
-  private getTopReservePct(): number { 
-    // Use pixel-based buffer for 1, 2, and 3 plots to prevent excessive whitespace in fullscreen
+  private getTopReservePct(): number {
+    // Mobile: Absolute minimal top reserve for maximum plot space
+    if (this.isMobileDevice) {
+      return this.pxToPct(3); // Absolute minimal 3px top reserve on mobile
+    }
+
+    // Desktop: Use pixel-based buffer for 1, 2, and 3 plots to prevent excessive whitespace in fullscreen
     if (this.currentGrids >= 1 && this.currentGrids <= 3) {
       return this.pxToPct(20); // ~60px top buffer, scales with container height
     }
@@ -1488,19 +1674,25 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     return this.pxToPct(20); // ~20px buffer for 4+ plots
   }
   
-  private getBottomReservePct(): number { 
-    // Use pixel-based buffer calculations to prevent plot cutoff in fullscreen
-    // Bottom buffer increases as plot count decreases for better fit
+  private getBottomReservePct(): number {
+    // Mobile: Minimal bottom reserve (zoom controls overlap with padding: 0)
+    // Desktop: Larger reserve for zoom controls
     const scrollThreshold = this.ctx.settings?.scrollingStartsAfter || 3;
-    
-    // If we're at or below the scrolling threshold, use larger buffers for better spacing
+
+    if (this.isMobileDevice) {
+      // Mobile: Minimal bottom reserve since padding is 0
+      return this.pxToPct(20); // ~20px minimal reserve for all plot counts
+    }
+
+    // Desktop: Use pixel-based buffer calculations to prevent plot cutoff
+    // Bottom buffer increases as plot count decreases for better fit
     if (this.currentGrids <= scrollThreshold) {
       // Use pixel-based calculations to prevent fullscreen cutoff
       if (this.currentGrids === 1) return this.pxToPct(150);  // ~100px for single plot
-      if (this.currentGrids === 2) return this.pxToPct(150);   // ~90px for two plots  
+      if (this.currentGrids === 2) return this.pxToPct(150);   // ~90px for two plots
       if (this.currentGrids === 3) return this.pxToPct(150);   // ~80px for three plots
     }
-    
+
     // Above scrolling threshold, use smaller pixel-based buffers
     if (this.currentGrids >= 7) return this.pxToPct(70);  // ~50px for 7+ plots
     if (this.currentGrids === 6) return this.pxToPct(70);  // ~60px for 6 plots
@@ -1515,12 +1707,20 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   private getZoomPx(): number {
-    return this.zoomOverlay?.nativeElement?.offsetHeight || 0;
+    // If zoom is disabled, return 0
+    if (!this.shouldShowDataZoom()) {
+      return 0;
+    }
+
+    const actualHeight = this.zoomOverlay?.nativeElement?.offsetHeight;
+    // If zoom element not rendered yet, use estimated height to prevent layout issues
+    // Zoom overlay is approximately 42-50px tall (track + padding)
+    return actualHeight || 45; // Fallback to reasonable default
   }
 
   // Helper to check if tooltip should only show hovered grid
   private onlyShowHoveredGrid(): boolean {
-    return !!this.ctx.settings?.tooltipOnlyHoveredGrid; // default off
+    return this.getBooleanSetting('tooltipOnlyHoveredGrid', false);
   }
   
   // Scroll position management for smooth mode transitions
@@ -2317,7 +2517,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     }
 
     // Check if device type filtering is enabled
-    const filteringEnabled = this.ctx.settings?.deviceTypeFiltering === true;
+    const filteringEnabled = this.getBooleanSetting('deviceTypeFiltering', false);
     if (!filteringEnabled) {
       this.isDeviceTypesFetched = true;
       if (this.DEBUG) {
@@ -2451,7 +2651,7 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
    */
   private isMeasurementAllowed(entityName: string, measurementLabel: string): boolean {
     // If device type filtering is disabled, allow all
-    if (this.ctx.settings?.deviceTypeFiltering !== true) {
+    if (!this.getBooleanSetting('deviceTypeFiltering', false)) {
       return true;
     }
 
@@ -2487,8 +2687,15 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public openSettingsDialog(): void {
     const alarmSupportEnabled = this.ctx.settings?.alarmSupportEnabled === true;
     const isSingleDeviceMode = this.ctx.settings?.multipleDevices !== true;
-    const dialogRef = this.dialog.open(EchartsSettingsDialogComponent, {
-      width: '500px',
+
+    // Responsive dialog configuration
+    const dialogConfig: any = {
+      width: this.isMobileDevice ? '100vw' : '500px',
+      maxWidth: this.isMobileDevice ? '100vw' : '90vw',
+      // Height handled by CSS (dvh units adapt to URL bar on mobile)
+      height: this.isMobileDevice ? 'auto' : 'auto',
+      maxHeight: this.isMobileDevice ? '100dvh' : '90dvh',
+      panelClass: this.isMobileDevice ? ['settings-dialog-panel', 'mobile-fullscreen'] : 'settings-dialog-panel',
       data: {
         colorScheme: this.currentColorScheme,
         sidebarCollapsedMode: this.sidebarCollapsedMode,
@@ -2513,7 +2720,9 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         showAlarmLinesInDialog: alarmSupportEnabled && this.ctx.settings?.showAlarmLinesInDialog !== false,
         showMinMaxInDialog: this.ctx.settings?.showMinMaxInDialog !== false
       }
-    });
+    };
+
+    const dialogRef = this.dialog.open(EchartsSettingsDialogComponent, dialogConfig);
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
@@ -3353,14 +3562,21 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private initChart(): void {
-    
+    // Ensure chart container exists
+    if (!this.chartContainer?.nativeElement) {
+      if (this.DEBUG) {
+        console.warn('⚠️ [INIT CHART] Chart container not found - skipping initialization');
+      }
+      return;
+    }
+
     const container = this.chartContainer.nativeElement;
     // Set up GPU acceleration hints
     container.style.willChange = 'transform';
     container.style.transform = 'translateZ(0)';
-    
+
     const containerElement = container.querySelector('#echartContainer') as HTMLElement;
-    
+
     if (!containerElement) {
       return;
     }
@@ -3490,24 +3706,38 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
     
     // Keep zoom sliders in sync when user uses mousewheel/drag - native smooth zoom
     this.chart.on('dataZoom', () => {
+      if (!this.chart || this.chart.isDisposed()) return;
+
       const now = performance.now();
-      const zoomStart = now;
-      
-      const dz = (this.chart.getOption().dataZoom || [])[0];
-      if (dz) {
-        const s = Math.round((dz.start as number) * 1000) / 1000;
-        const e = Math.round((dz.end as number) * 1000) / 1000;
-        if (s !== this.zoomStart || e !== this.zoomEnd) {
-          this.zoomStart = s;
-          this.zoomEnd = e;
-          // Update external bar positions (handles/window)
-          this.updateZoomOverlay();
-          this.ctx.detectChanges?.();
-          
-          const zoomDuration = performance.now() - zoomStart;
-          if (zoomDuration > 30) {
+      const zoomStartTime = now;
+
+      try {
+        const option = this.chart.getOption();
+        const dataZoomArray = option.dataZoom;
+
+        if (dataZoomArray && Array.isArray(dataZoomArray) && dataZoomArray.length > 0) {
+          const dz = dataZoomArray[0];
+
+          if (dz && typeof dz.start === 'number' && typeof dz.end === 'number') {
+            const s = Math.round(dz.start * 1000) / 1000;
+            const e = Math.round(dz.end * 1000) / 1000;
+
+            if (s !== this.zoomStart || e !== this.zoomEnd) {
+              this.zoomStart = s;
+              this.zoomEnd = e;
+              // Update external bar positions (handles/window)
+              this.updateZoomOverlay();
+              this.ctx.detectChanges?.();
+
+              const zoomDuration = performance.now() - zoomStartTime;
+              if (zoomDuration > 30) {
+                // Performance monitoring (if needed)
+              }
+            }
           }
         }
+      } catch (error) {
+        console.warn('[ZOOM] Error syncing dataZoom:', error);
       }
     });
 
@@ -3786,12 +4016,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
   
   private setupResizeObserver(): void {
-    
+    // Ensure chart container exists
+    if (!this.chartContainer?.nativeElement) {
+      if (this.DEBUG) {
+        console.warn('⚠️ [RESIZE OBSERVER] Chart container not found - skipping setup');
+      }
+      return;
+    }
+
     // Track previous width to detect maximize/restore
     let previousWidth = 0;
     let lastWindowWidth = window.innerWidth;
     let wasMaximized = this.isWindowMaximized();
-    
+
     this.resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
@@ -4858,13 +5095,16 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
       [this.zoomStart, this.zoomEnd] = [this.zoomEnd, this.zoomStart];
     }
 
-    if (!this.chart) return;
+    if (!this.chart || this.chart.isDisposed()) return;
+
+    // Update ECharts via dispatchAction - targets all dataZoom components
     this.chart.dispatchAction({
       type: 'dataZoom',
+      dataZoomIndex: 0, // Target first dataZoom component (the slider)
       start: this.zoomStart,
       end: this.zoomEnd
     });
-    
+
     // Update external bar positions (handles/window)
     this.updateZoomOverlay();
   }
@@ -4872,8 +5112,22 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // Update the visual position of zoom handles and window
   private updateZoomOverlay(): void {
     const track = this.zoomOverlay?.nativeElement?.querySelector('.zoom-track') as HTMLElement;
-    if (!track) return;
-    
+    if (!track) {
+      // Element not ready yet - retry after Angular renders
+      setTimeout(() => {
+        const retryTrack = this.zoomOverlay?.nativeElement?.querySelector('.zoom-track') as HTMLElement;
+        if (retryTrack) {
+          this.updateZoomOverlayDOM(retryTrack);
+        }
+      }, 100);
+      return;
+    }
+
+    this.updateZoomOverlayDOM(track);
+  }
+
+  // Extracted DOM update logic
+  private updateZoomOverlayDOM(track: HTMLElement): void {
     const left = this.zoomStart;
     const right = 100 - this.zoomEnd;
 
@@ -5814,14 +6068,74 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
 
+  /**
+   * Generic helper to get boolean settings with proper default handling
+   *
+   * Handles the common case where existing widgets have undefined settings
+   * until the user opens the settings dialog and clicks Apply.
+   *
+   * @param key - The setting key to retrieve
+   * @param defaultValue - Default value when setting is undefined/null/empty
+   * @returns Parsed boolean value
+   *
+   * @example
+   * // Setting is undefined → returns true (default)
+   * this.getBooleanSetting('showZoomControls', true)
+   *
+   * // Setting is "on" → returns true
+   * this.getBooleanSetting('showZoomControls', true)
+   *
+   * // Setting is false → returns false
+   * this.getBooleanSetting('showZoomControls', true)
+   */
+  private getBooleanSetting(key: string, defaultValue: boolean): boolean {
+    const raw = this.ctx?.settings?.[key];
+
+    // Treat undefined, null, or empty string as default
+    if (raw === undefined || raw === null || raw === '') {
+      return defaultValue;
+    }
+
+    // Pass through boolean values
+    if (typeof raw === 'boolean') {
+      return raw;
+    }
+
+    // Parse string representations
+    if (typeof raw === 'string') {
+      const normalized = raw.toLowerCase().trim();
+      if (['true', 'on', '1', 'yes'].includes(normalized)) return true;
+      if (['false', 'off', '0', 'no'].includes(normalized)) return false;
+    }
+
+    // Fallback: truthy check for any other type
+    return !!raw;
+  }
+
+  /**
+   * Check if dataZoom should be shown
+   * @returns true if dataZoom should be visible (default: true)
+   */
+  public shouldShowDataZoom(): boolean {
+    return this.getBooleanSetting('showZoomControls', true);
+  }
+
   private getDataZoomConfig(): any[] {
+    // Check if zoom should be shown using robust checker
+    const showZoom = this.shouldShowDataZoom();
+
+    if (!showZoom) {
+      // Return empty array if disabled - ECharts handles this gracefully
+      return [];
+    }
+
     return [
       // Keep the internal slider hidden — external bar controls start/end
-      { 
-        type: 'slider', 
-        show: false, 
-        xAxisIndex: 'all', 
-        start: this.zoomStart, 
+      {
+        type: 'slider',
+        show: false,
+        xAxisIndex: 'all',
+        start: this.zoomStart,
         end: this.zoomEnd,
         filterMode: 'filter'  // Actually filter out non-visible points
       },
@@ -7536,11 +7850,404 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   // ════════════════════════════════════════════════════════════════════════════
+  // Device Detection & Responsive
+  // ════════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Detect device type based on screen width
+   */
+  private detectDevice(): void {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    // Use ThingsBoard's isMobile if available, otherwise use our detection
+    this.isMobileDevice = this.ctx?.isMobile ?? (width < 768);
+    this.isTabletDevice = width >= 768 && width < 1024;
+    this.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    this.isPortraitMode = height > width;
+
+    // Show portrait overlay if:
+    // - Mobile device
+    // - Portrait orientation
+    // - Not dismissed by user
+    // Note: Removed isFullscreenAvailable() check - overlay is helpful even without fullscreen API
+    this.showPortraitOverlay = this.isMobileDevice &&
+                                this.isPortraitMode &&
+                                !this.portraitOverlayDismissed;
+
+    this.hasCheckedDeviceOrientation = true;
+
+    // Comprehensive debug logging for portrait overlay
+    if (this.DEBUG) {
+      console.group('🔍 [PORTRAIT OVERLAY] Detection Results');
+      console.log('Window dimensions:', { width, height });
+      console.log('---');
+      console.log('ctx.isMobile (ThingsBoard):', this.ctx?.isMobile);
+      console.log('Calculated isMobileDevice:', this.isMobileDevice, width < 768 ? '✓ (< 768px)' : '✗ (>= 768px)');
+      console.log('isTabletDevice:', this.isTabletDevice);
+      console.log('isTouchDevice:', this.isTouchDevice);
+      console.log('isPortraitMode:', this.isPortraitMode, height > width ? '✓ (H > W)' : '✗ (W > H)');
+      console.log('portraitOverlayDismissed:', this.portraitOverlayDismissed);
+      console.log('---');
+      console.log('Fullscreen API Support (for reference):');
+      console.log('  document.fullscreenEnabled:', (document as any).fullscreenEnabled);
+      console.log('  document.webkitFullscreenEnabled:', (document as any).webkitFullscreenEnabled);
+      console.log('---');
+      console.log('🎯 RESULT: showPortraitOverlay =', this.showPortraitOverlay);
+      console.log('Conditions:', {
+        'isMobile': this.isMobileDevice ? '✓ PASS' : '✗ FAIL',
+        'isPortrait': this.isPortraitMode ? '✓ PASS' : '✗ FAIL',
+        'notDismissed': !this.portraitOverlayDismissed ? '✓ PASS' : '✗ FAIL'
+      });
+      console.groupEnd();
+    }
+
+    // Trigger change detection to ensure Angular updates the view
+    this.ctx?.detectChanges?.();
+  }
+
+  /**
+   * Setup responsive listeners for window resize
+   */
+  private setupResponsiveListeners(): void {
+    this.resizeListener = () => {
+      const previousMobile = this.isMobileDevice;
+      const previousPortrait = this.isPortraitMode;
+      const previousShowOverlay = this.showPortraitOverlay;
+      this.detectDevice();
+
+      // Recalculate mobile menu max-height on resize (URL bar show/hide)
+      if (this.isMobileDevice) {
+        this.calculateMobileMenuMaxHeight();
+      }
+
+      // Check if portrait overlay was hidden due to orientation change
+      if (previousShowOverlay && !this.showPortraitOverlay && (!this.chart || this.chart.isDisposed())) {
+        // User rotated to landscape - initialize chart
+        if (this.DEBUG) {
+          console.log('📱 [ORIENTATION] Switched to landscape - initializing chart');
+        }
+        setTimeout(() => {
+          this.initializeImmediate();
+        }, 100);
+      }
+
+      // Re-layout if device type or orientation changed
+      if ((previousMobile !== this.isMobileDevice || previousPortrait !== this.isPortraitMode) && this.chart) {
+        this.onResize();
+        this.ctx.detectChanges?.();
+      }
+    };
+
+    window.addEventListener('resize', this.resizeListener);
+
+    // Listen for orientation changes
+    this.orientationListener = () => {
+      const previousShowOverlay = this.showPortraitOverlay;
+      this.detectDevice();
+
+      if (this.isMobileDevice) {
+        this.calculateMobileMenuMaxHeight();
+      }
+
+      // Check if portrait overlay was hidden due to orientation change
+      if (previousShowOverlay && !this.showPortraitOverlay && (!this.chart || this.chart.isDisposed())) {
+        // User rotated to landscape - initialize chart
+        if (this.DEBUG) {
+          console.log('📱 [ORIENTATION] Switched to landscape - initializing chart');
+        }
+        setTimeout(() => {
+          this.initializeImmediate();
+        }, 100);
+      }
+
+      this.ctx.detectChanges?.();
+    };
+
+    window.addEventListener('orientationchange', this.orientationListener);
+  }
+
+  /**
+   * Check if fullscreen API is available
+   */
+  private isFullscreenAvailable(): boolean {
+    const doc = document as any;
+    return !!(doc.fullscreenEnabled ||
+              doc.webkitFullscreenEnabled ||
+              doc.mozFullScreenEnabled ||
+              doc.msFullscreenEnabled);
+  }
+
+  /**
+   * Enter fullscreen mode and lock to landscape
+   */
+  public enterFullscreenLandscape(): void {
+    console.log('[FULLSCREEN] Attempting to enter fullscreen landscape mode');
+
+    // Detect iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+
+    // Try to use the widget container element for better iOS compatibility
+    const widgetElement = this.chartContainer?.nativeElement?.closest('.tb-widget-container') ||
+                          this.chartContainer?.nativeElement ||
+                          document.documentElement;
+
+    const elem = widgetElement as any;
+
+    console.log('[FULLSCREEN] Fullscreen element:', elem.tagName, 'isIOS:', isIOS);
+
+    // Request fullscreen with vendor prefixes
+    const fullscreenPromise = elem.requestFullscreen?.({ navigationUI: 'hide' }) ||
+                              elem.webkitRequestFullscreen?.() ||
+                              elem.webkitEnterFullscreen?.() ||  // iOS video element
+                              elem.mozRequestFullScreen?.() ||
+                              elem.msRequestFullscreen?.();
+
+    if (fullscreenPromise && typeof fullscreenPromise.then === 'function') {
+      fullscreenPromise.then(() => {
+        console.log('[FULLSCREEN] Fullscreen entered successfully');
+
+        // Try to lock orientation to landscape
+        this.lockOrientationLandscape();
+
+        // Dismiss the overlay
+        this.portraitOverlayDismissed = true;
+        this.showPortraitOverlay = false;
+        this.ctx.detectChanges?.();
+
+        // Initialize chart if not already initialized, otherwise resize
+        setTimeout(() => {
+          if (!this.chart || this.chart.isDisposed()) {
+            if (this.DEBUG) {
+              console.log('📱 [FULLSCREEN] Entered fullscreen - initializing chart');
+            }
+            this.initializeImmediate();
+          } else if (this.chart && !this.chart.isDisposed()) {
+            this.chart.resize();
+          }
+        }, 300);
+      }).catch((err: any) => {
+        console.warn('[FULLSCREEN] Failed to enter fullscreen:', err);
+
+        // iOS fallback: Show message to use ThingsBoard's fullscreen button
+        if (isIOS) {
+          alert('On iOS, please use the fullscreen button in the widget header (top-right corner) for the best experience.');
+        } else {
+          alert('Fullscreen mode is not available. Please rotate your device to landscape mode.');
+        }
+      });
+    } else {
+      console.warn('[FULLSCREEN] Fullscreen API not available');
+
+      // Fallback message
+      if (isIOS) {
+        alert('On iOS, please use the fullscreen button in the widget header (top-right corner) to view in fullscreen, then rotate your device to landscape.');
+      } else {
+        alert('Fullscreen mode is not available in your browser. Please rotate your device to landscape mode for the best viewing experience.');
+      }
+    }
+  }
+
+  /**
+   * Lock screen orientation to landscape (if available)
+   */
+  private lockOrientationLandscape(): void {
+    const screen = window.screen as any;
+
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('landscape').then(() => {
+        console.log('[FULLSCREEN] Orientation locked to landscape');
+      }).catch((err: any) => {
+        console.warn('[FULLSCREEN] Could not lock orientation:', err);
+        // Fallback: Just show a message
+        console.log('[FULLSCREEN] Continuing in fullscreen without orientation lock');
+      });
+    } else {
+      console.log('[FULLSCREEN] Orientation lock API not available');
+    }
+  }
+
+  /**
+   * Dismiss portrait overlay without entering fullscreen
+   */
+  public dismissPortraitOverlay(): void {
+    this.portraitOverlayDismissed = true;
+    this.showPortraitOverlay = false;
+    this.ctx.detectChanges?.();
+
+    // Initialize chart if not already initialized
+    if (!this.chart || this.chart.isDisposed()) {
+      if (this.DEBUG) {
+        console.log('📱 [PORTRAIT] Overlay dismissed - initializing chart');
+      }
+      setTimeout(() => {
+        this.initializeImmediate();
+      }, 100);
+    }
+  }
+
+  /**
+   * Toggle mobile menu with dynamic height calculation
+   */
+  public toggleMobileMenu(): void {
+    if (!this.showMobileMenu) {
+      // Before opening, calculate available space
+      this.calculateMobileMenuMaxHeight();
+    }
+    this.showMobileMenu = !this.showMobileMenu;
+    if (!this.showMobileMenu) {
+      this.showMobileExportSubmenu = false;
+    }
+    this.ctx.detectChanges?.();
+  }
+
+  /**
+   * Calculate dynamic max-height for mobile dropdown menu
+   * Ensures menu doesn't overlap zoom controls
+   */
+  private calculateMobileMenuMaxHeight(): void {
+    if (!this.isMobileDevice) return;
+
+    // Get positions of elements
+    const legendElement = this.legendOverlay?.nativeElement;
+    const zoomElement = this.zoomOverlay?.nativeElement;
+
+    if (!legendElement || !zoomElement) {
+      this.mobileMenuMaxHeight = '400px'; // Fallback
+      return;
+    }
+
+    // Get bounding rectangles
+    const legendRect = legendElement.getBoundingClientRect();
+    const zoomRect = zoomElement.getBoundingClientRect();
+
+    // Calculate available space from bottom of legend to top of zoom controls
+    const hamburgerBottom = legendRect.bottom + 8; // +8px for gap
+    const zoomTop = zoomRect.top - 16; // -16px for safe margin
+
+    const availableSpace = zoomTop - hamburgerBottom;
+
+    // Use available space, but have a reasonable minimum
+    const maxHeight = Math.max(200, Math.min(availableSpace, 600));
+
+    this.mobileMenuMaxHeight = `${maxHeight}px`;
+
+    if (this.DEBUG) {
+      console.log('[MOBILE MENU] Dynamic height calculation:', {
+        legendBottom: legendRect.bottom,
+        zoomTop: zoomRect.top,
+        availableSpace,
+        maxHeight,
+        mobileMenuMaxHeight: this.mobileMenuMaxHeight
+      });
+    }
+  }
+
+  /**
+   * Setup click outside to close mobile menu
+   */
+  private setupMobileMenuClickOutside(): void {
+    // Use capture phase and setTimeout to prevent double-click issue
+    document.addEventListener('click', (e: MouseEvent) => {
+      // Small delay to ensure menu state has updated
+      setTimeout(() => {
+        if (this.showMobileMenu) {
+          const target = e.target as HTMLElement;
+          const mobileMenuContainer = target.closest('.mobile-menu-container');
+
+          // If click is outside the mobile menu container, close it
+          if (!mobileMenuContainer) {
+            this.showMobileMenu = false;
+            this.showMobileExportSubmenu = false;
+            this.ctx.detectChanges?.();
+          }
+        }
+      }, 50); // Small delay prevents immediate close
+    }, true); // Use capture phase
+  }
+
+  public toggleMobileExportSubmenu(event: Event): void {
+    event.stopPropagation();
+    this.showMobileExportSubmenu = !this.showMobileExportSubmenu;
+    this.ctx.detectChanges?.();
+  }
+
+  public closeMobileMenuAfterAction(): void {
+    this.showMobileMenu = false;
+    this.showMobileExportSubmenu = false;
+    this.ctx.detectChanges?.();
+  }
+
+  /**
+   * Setup swipe gestures for mobile sidebar
+   */
+  private setupSidebarSwipeGestures(): void {
+    const chartWrapper = document.querySelector('.chart-container-wrapper') as HTMLElement;
+    if (!chartWrapper) return;
+
+    let swipeStartX = 0;
+    let swipeStartY = 0;
+    let isSwiping = false;
+
+    // Swipe from left edge to open sidebar
+    chartWrapper.addEventListener('touchstart', (e: TouchEvent) => {
+      const touch = e.touches[0];
+      swipeStartX = touch.clientX;
+      swipeStartY = touch.clientY;
+
+      // Only trigger if starting from left edge (first 30px)
+      if (swipeStartX < 30 && !this.isSidebarVisible) {
+        isSwiping = true;
+      }
+    }, { passive: true });
+
+    chartWrapper.addEventListener('touchmove', (e: TouchEvent) => {
+      if (!isSwiping) return;
+
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - swipeStartX;
+      const deltaY = Math.abs(touch.clientY - swipeStartY);
+
+      // Swipe right to open (min 80px, mostly horizontal)
+      if (deltaX > 80 && deltaY < 50) {
+        this.isSidebarVisible = true;
+        this.ctx.detectChanges?.();
+        isSwiping = false;
+      }
+    }, { passive: true });
+
+    chartWrapper.addEventListener('touchend', () => {
+      isSwiping = false;
+    }, { passive: true });
+
+    // Swipe left on sidebar to close
+    const sidebar = document.querySelector('.entity-sidebar') as HTMLElement;
+    if (sidebar) {
+      let sidebarSwipeStartX = 0;
+
+      sidebar.addEventListener('touchstart', (e: TouchEvent) => {
+        sidebarSwipeStartX = e.touches[0].clientX;
+      }, { passive: true });
+
+      sidebar.addEventListener('touchmove', (e: TouchEvent) => {
+        const touch = e.touches[0];
+        const deltaX = touch.clientX - sidebarSwipeStartX;
+
+        // Swipe left to close (min 80px)
+        if (deltaX < -80) {
+          this.isSidebarVisible = false;
+          this.ctx.detectChanges?.();
+        }
+      }, { passive: true });
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
   // Marker System
   // ════════════════════════════════════════════════════════════════════════════
 
   /**
-   * Setup context menu for marker placement
+   * Setup context menu for marker placement (Desktop + Mobile)
    */
   private setupContextMenu(): void {
     // Only setup if markers are enabled
@@ -7550,40 +8257,17 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
 
     const chartDom = this.chart.getDom();
 
-    // Prevent default browser context menu
-    chartDom.addEventListener('contextmenu', (e: MouseEvent) => {
-      e.preventDefault();
+    // Desktop: Right-click
+    if (!this.isTouchDevice) {
+      this.setupDesktopContextMenu(chartDom);
+    }
 
-      // Get chart coordinates
-      const rect = chartDom.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+    // Mobile: Long-press
+    if (this.isTouchDevice) {
+      this.setupMobileLongPress(chartDom);
+    }
 
-      // Convert pixel coordinates to chart value
-      const pointInGrid = this.chart.convertFromPixel({ seriesIndex: 0 }, [x, y]);
-
-      if (pointInGrid && Array.isArray(pointInGrid)) {
-        const timestamp = pointInGrid[0];
-
-        // Determine which grid was clicked
-        const gridIndex = this.getGridIndexAtPosition(y);
-        const plotName = this.currentGridNames[gridIndex] || 'Unknown';
-
-        // Store pending marker data
-        this.pendingMarkerData = {
-          timestamp,
-          gridIndex,
-          plotName
-        };
-
-        // Show context menu at click position
-        this.contextMenuPosition = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-        this.contextMenuVisible = true;
-        this.ctx.detectChanges?.();
-      }
-    });
-
-    // Close context menu on click outside
+    // Close context menu on click/tap outside
     document.addEventListener('click', (e: MouseEvent) => {
       if (this.contextMenuVisible && this.contextMenu) {
         const menuElement = this.contextMenu.nativeElement;
@@ -7593,6 +8277,102 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
         }
       }
     });
+  }
+
+  /**
+   * Setup desktop right-click context menu
+   */
+  private setupDesktopContextMenu(chartDom: HTMLElement): void {
+    chartDom.addEventListener('contextmenu', (e: MouseEvent) => {
+      e.preventDefault();
+      this.showContextMenuAtPosition(e.clientX, e.clientY, chartDom);
+    });
+  }
+
+  /**
+   * Setup mobile long-press gesture
+   */
+  private setupMobileLongPress(chartDom: HTMLElement): void {
+    chartDom.addEventListener('touchstart', (e: TouchEvent) => {
+      const touch = e.touches[0];
+      this.touchStartPos = { x: touch.clientX, y: touch.clientY };
+
+      // Start long-press timer (750ms)
+      this.longPressTimer = setTimeout(() => {
+        // Haptic feedback
+        if (navigator.vibrate) {
+          navigator.vibrate(50);
+        }
+
+        // Show context menu
+        this.showContextMenuAtPosition(this.touchStartPos!.x, this.touchStartPos!.y, chartDom);
+      }, 750);
+    }, { passive: true });
+
+    chartDom.addEventListener('touchmove', (e: TouchEvent) => {
+      if (this.touchStartPos && this.longPressTimer) {
+        const touch = e.touches[0];
+        const moveDistance = Math.sqrt(
+          Math.pow(touch.clientX - this.touchStartPos.x, 2) +
+          Math.pow(touch.clientY - this.touchStartPos.y, 2)
+        );
+
+        // Cancel if moved more than 10px
+        if (moveDistance > 10) {
+          clearTimeout(this.longPressTimer);
+          this.longPressTimer = null;
+        }
+      }
+    }, { passive: true });
+
+    chartDom.addEventListener('touchend', () => {
+      if (this.longPressTimer) {
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = null;
+      }
+      this.touchStartPos = null;
+    }, { passive: true });
+  }
+
+  /**
+   * Show context menu at specific position
+   */
+  private showContextMenuAtPosition(clientX: number, clientY: number, chartDom: HTMLElement): void {
+    const rect = chartDom.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+
+    // Convert pixel coordinates to chart value
+    const pointInGrid = this.chart.convertFromPixel({ seriesIndex: 0 }, [x, y]);
+
+    if (pointInGrid && Array.isArray(pointInGrid)) {
+      const timestamp = pointInGrid[0];
+
+      // Determine which grid was clicked
+      const gridIndex = this.getGridIndexAtPosition(y);
+      const plotName = this.currentGridNames[gridIndex] || 'Unknown';
+
+      // Store pending marker data
+      this.pendingMarkerData = {
+        timestamp,
+        gridIndex,
+        plotName
+      };
+
+      // Show context menu at click position (adjust for mobile if needed)
+      let menuX = x;
+      let menuY = y;
+
+      // On mobile, center the menu or position to avoid edge cutoff
+      if (this.isMobileDevice) {
+        menuX = Math.min(x, window.innerWidth - 220); // 220px = menu width + margin
+        menuY = Math.min(y, window.innerHeight - 120); // Prevent bottom cutoff
+      }
+
+      this.contextMenuPosition = { x: menuX, y: menuY };
+      this.contextMenuVisible = true;
+      this.ctx.detectChanges?.();
+    }
   }
 
   /**
@@ -7670,15 +8450,19 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   public showMarkersList(): void {
     this.contextMenuVisible = false;
 
-    const dialogRef = this.dialog.open(MarkerManagementDialogComponent, {
-      width: '600px',
-      maxWidth: '90vw',
-      maxHeight: '80vh',
+    // Responsive dialog configuration
+    const dialogConfig: any = {
+      width: this.isMobileDevice ? '100vw' : '600px',
+      maxWidth: this.isMobileDevice ? '100vw' : '90vw',
+      // Use dvh units (dynamic viewport height - adapts to URL bar)
+      maxHeight: this.isMobileDevice ? '85dvh' : '80dvh',
+      panelClass: this.isMobileDevice ? ['marker-dialog-panel', 'mobile-bottom-sheet'] : 'marker-dialog-panel',
       data: {
         markers: this.markers
-      },
-      panelClass: 'marker-dialog-panel'
-    });
+      }
+    };
+
+    const dialogRef = this.dialog.open(MarkerManagementDialogComponent, dialogConfig);
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {

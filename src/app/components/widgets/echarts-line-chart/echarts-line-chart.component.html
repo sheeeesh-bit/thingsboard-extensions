@@ -1,10 +1,13 @@
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
+<div class="widget-shell">
+
 <!-- Main container: Layout as column, stretching across height -->
 <div fxFlex fxLayout="column" style="height: 100%; width: 100%;" fxLayoutAlign="start stretch">
 
     <!-- Buttons at the top -->
-    <div class="tb-button-container" *ngIf="ctx.settings.showImageButton !== false || ctx.settings.showExportButton !== false || ctx.settings.showResetZoomButton !== false">
+    <div class="tb-button-container"
+         *ngIf="!isMobileDevice && (ctx.settings.showImageButton !== false || ctx.settings.showExportButton !== false || ctx.settings.showResetZoomButton !== false)">
         <button *ngIf="ctx.settings.showImageButton !== false" 
                 mat-icon-button 
                 [disableRipple]="true"
@@ -77,24 +80,27 @@
     </div>
   
   <!-- Chart and sidebar container -->
-  <div fxFlex class="echarts-layout">
-    <!-- Sidebar toggle button (always visible) -->
-    <button mat-icon-button
-            class="sidebar-toggle-btn"
-            [disableRipple]="true"
-            (click)="toggleSidebar()"
-            [matTooltip]="isSidebarVisible ? 'Hide sidebar' : 'Show sidebar'"
-            matTooltipPosition="right"
-            matTooltipClass="modern-tooltip"
-            [attr.data-sidebar-state]="!isSidebarVisible ? sidebarCollapsedMode : 'visible'"
-            [attr.data-sidebar-mode]="isSidebarVisible ? sidebarDisplayMode : sidebarCollapsedMode"
-            [style.left.px]="isSidebarVisible && sidebarDisplayMode !== 'colors' ? sidebarWidth : null"
-            *ngIf="ctx.settings.showEntitySidebar !== false && ctx.settings?.multipleDevices">
-      <i class="material-icons">{{ isSidebarVisible ? 'chevron_left' : 'chevron_right' }}</i>
-    </button>
+  <div fxFlex class="echarts-layout"
+       [class.overlay-active]="hasCheckedDeviceOrientation && showPortraitOverlay && isMobileDevice">
 
-    <!-- Entity sidebar (left side) -->
-    <aside class="entity-sidebar"
+    <div class="echarts-main-area">
+      <!-- Sidebar toggle button (always visible) -->
+      <button mat-icon-button
+              class="sidebar-toggle-btn"
+              [disableRipple]="true"
+              (click)="toggleSidebar()"
+              [matTooltip]="isSidebarVisible ? 'Hide sidebar' : 'Show sidebar'"
+              matTooltipPosition="right"
+              matTooltipClass="modern-tooltip"
+              [attr.data-sidebar-state]="!isSidebarVisible ? sidebarCollapsedMode : 'visible'"
+              [attr.data-sidebar-mode]="isSidebarVisible ? sidebarDisplayMode : sidebarCollapsedMode"
+              [style.left.px]="isSidebarVisible && sidebarDisplayMode !== 'colors' ? sidebarWidth : null"
+              *ngIf="ctx.settings.showEntitySidebar !== false && ctx.settings?.multipleDevices">
+        <i class="material-icons">{{ isSidebarVisible ? 'chevron_left' : 'chevron_right' }}</i>
+      </button>
+
+      <!-- Entity sidebar (left side) -->
+      <aside class="entity-sidebar"
            [class.sidebar-hidden]="!isSidebarVisible && sidebarCollapsedMode === 'hidden'"
            [class.sidebar-collapsed-colors]="!isSidebarVisible && sidebarCollapsedMode === 'colors'"
            [attr.data-mode]="isSidebarVisible ? sidebarDisplayMode : sidebarCollapsedMode"
@@ -151,7 +157,7 @@
               <td class="entity-count" 
                   [matTooltip]="'Series: ' + entity.count + ', Points: ' + entity.dataPoints"
                   matTooltipClass="modern-tooltip">
-                {{ entity.count }}<span class="data-points"> ({{ entity.dataPoints }})</span>
+                {{ entity.count }}<span class="data-points"> ({{ formatDataPoints(entity.dataPoints) }})</span>
               </td>
             </tr>
           </tbody>
@@ -191,10 +197,10 @@
         </div>
       </div>
       
-    </aside>
-    
-    <!-- Chart area with floating overlays -->
-    <div class="chart-container-wrapper">
+      </aside>
+
+      <!-- Chart area with floating overlays -->
+      <div class="chart-container-wrapper">
       <!-- Top floating legend overlay -->
       <nav class="legend-overlay" #legendOverlay aria-label="Series legend" *ngIf="ctx.settings.showCustomLegend !== false">
         <!-- Previous page button - only show when pagination needed -->
@@ -240,6 +246,72 @@
             <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
         </button>
+
+        <!-- Legend-aligned hamburger actions -->
+        <div class="mobile-menu-container legend-menu" *ngIf="isMobileDevice">
+          <button type="button"
+                  mat-icon-button
+                  [disableRipple]="true"
+                  class="tb-button hamburger-btn legend-hamburger"
+                  (click)="toggleMobileMenu()"
+                  [class.active]="showMobileMenu"
+                  aria-label="Open widget actions"
+                  [attr.aria-expanded]="showMobileMenu"
+                  aria-haspopup="true"
+                  aria-controls="legendActionsMenu">
+            <i class="material-icons">menu</i>
+          </button>
+
+          <div class="mobile-dropdown"
+               *ngIf="showMobileMenu"
+               [style.max-height]="mobileMenuMaxHeight"
+               id="legendActionsMenu">
+            <button type="button"
+                    class="mobile-menu-item"
+                    (click)="menuButtons('genImage'); closeMobileMenuAfterAction()"
+                    *ngIf="ctx.settings.showImageButton !== false">
+              <i class="material-icons">photo_camera</i>
+              <span>Save image</span>
+            </button>
+            <button type="button"
+                    class="mobile-menu-item"
+                    (click)="openSettingsDialog(); closeMobileMenuAfterAction()">
+              <i class="material-icons">settings</i>
+              <span>Widget settings</span>
+            </button>
+            <button type="button"
+                    class="mobile-menu-item submenu-trigger"
+                    [class.expanded]="showMobileExportSubmenu"
+                    (click)="toggleMobileExportSubmenu($event)"
+                    *ngIf="ctx.settings.showExportButton !== false">
+              <i class="material-icons">save_alt</i>
+              <span>Export data</span>
+              <i class="material-icons submenu-arrow">expand_more</i>
+            </button>
+            <div class="mobile-submenu" *ngIf="showMobileExportSubmenu && ctx.settings.showExportButton !== false">
+              <div class="mobile-submenu-items">
+                <button type="button" class="mobile-submenu-item" (click)="exportData('csv'); closeMobileMenuAfterAction()">CSV</button>
+                <button type="button" class="mobile-submenu-item" (click)="exportData('xls'); closeMobileMenuAfterAction()">XLS</button>
+                <button type="button" class="mobile-submenu-item" (click)="exportData('xlsx'); closeMobileMenuAfterAction()">XLSX</button>
+              </div>
+            </div>
+            <button type="button"
+                    class="mobile-menu-item"
+                    (click)="showMarkersList(); closeMobileMenuAfterAction()"
+                    *ngIf="ctx.settings.enableMarkers !== false">
+              <i class="material-icons">location_on</i>
+              <span>Manage markers</span>
+              <span class="menu-badge" *ngIf="markers.length > 0">{{ markers.length }}</span>
+            </button>
+            <button type="button"
+                    class="mobile-menu-item"
+                    (click)="menuButtons('reset'); closeMobileMenuAfterAction()"
+                    *ngIf="ctx.settings.showResetZoomButton !== false">
+              <i class="material-icons">restore_page</i>
+              <span>Reset zoom</span>
+            </button>
+          </div>
+        </div>
 
       </nav>
 
@@ -291,5 +363,49 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- Portrait Mode Overlay (Mobile) -->
+<div class="portrait-overlay" *ngIf="hasCheckedDeviceOrientation && showPortraitOverlay">
+  <div class="portrait-content">
+    <div class="rotate-icon">
+      <i class="material-icons">screen_rotation</i>
+    </div>
+    <h3>Rotate Your Device</h3>
+    <p>This chart works best in landscape orientation for optimal viewing experience.</p>
+
+    <div class="portrait-hint">
+      <div class="hint-item primary">
+        <i class="material-icons hint-icon">fullscreen</i>
+        <div class="hint-text">
+          <strong>Recommended</strong>
+          <span>Tap the fullscreen button in the top-right corner, then rotate your device</span>
+        </div>
+      </div>
+      <div class="hint-item">
+        <i class="material-icons hint-icon">screen_rotation</i>
+        <div class="hint-text">
+          <strong>Manual Rotation</strong>
+          <span>Rotate your device to landscape mode to continue</span>
+        </div>
+      </div>
+    </div>
+
+    <button class="dismiss-btn" (click)="dismissPortraitOverlay()">
+      Continue Anyway
+    </button>
+  </div>
+</div>
+
+<!-- Arrow pointing to fullscreen button -->
+<div class="fullscreen-arrow" *ngIf="hasCheckedDeviceOrientation && showPortraitOverlay">
+  <svg class="arrow-svg" width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <line x1="10" y1="50" x2="50" y2="10" stroke="#007aff" stroke-width="3" stroke-linecap="round"/>
+    <polyline points="35,10 50,10 50,25" fill="none" stroke="#007aff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <div class="arrow-label">Tap for fullscreen</div>
+</div>
+
+</div>
 
 </div>
