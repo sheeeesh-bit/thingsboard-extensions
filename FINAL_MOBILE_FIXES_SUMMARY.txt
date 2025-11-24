@@ -1,0 +1,54 @@
+FINAL FIXES - DROPDOWN Z-INDEX & LARGER PLOTS
+
+ISSUES FIXED:
+
+1. DROPDOWN Z-INDEX - Now above datazoom
+   FROM: z-index: 200 (not working)
+   TO:   z-index: 250 !important on mobile
+   
+   Z-Index Stack:
+     Portrait overlay: 2000
+     Mobile dropdown:  250  (Fixed!)
+     Legend menu:      150
+     Zoom/Legend:      100
+   
+   Result: Menu always visible above zoom controls
+
+2. PLOT SIZE - Increased from 85% to 98%
+   FROM: scaleFactor = grids x 0.85
+   TO:   scaleFactor = grids x 0.98
+   
+   Each plot now:
+     iPhone SE:      588px (was 510px) +78px
+     iPhone 14 Pro:  715px (was 620px) +95px
+   
+   Result: Nearly full-screen plots on mobile
+
+MOBILE PLOT SIZES (98% Viewport):
+
+iPhone 14 Pro (730px viewport):
+  1 plot:  715px (98%) - Fills screen, huge!
+  2 plots: 715px each - Scroll to plot 2
+  3 plots: 715px each - Scroll through all
+
+CODE CHANGES:
+
+echarts-line-chart.component.ts:
+  Line 1465: scaleFactor = this.currentGrids x 0.98
+  Line 1495: Updated debug message
+
+echarts-line-chart.component.scss:
+  Line 2215: z-index: 200 (global)
+  Lines 1843-1866: Mobile z-indices (250 !important)
+
+TESTING:
+
+Build: npm run build
+
+Test on iPhone:
+  - Each plot should fill 98% of screen (nearly full)
+  - Scroll to see next plot
+  - Open hamburger menu
+  - Menu should appear ABOVE zoom controls
+
+Mobile plots are now MAXIMUM SIZE! Build and test!

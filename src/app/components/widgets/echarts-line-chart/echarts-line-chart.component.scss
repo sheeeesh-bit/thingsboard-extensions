@@ -319,8 +319,8 @@ div[fxFlex] {
 
 // Main area contains sidebar (if any) and chart horizontally
 .echarts-main-area {
-  display: flex;
-  flex-direction: row; /* Sidebar left, chart right */
+  display: grid;
+  grid-template-columns: auto 1fr;
   flex: 1;
   position: relative;
   min-height: 0;
@@ -344,7 +344,7 @@ button[mat-icon-button].sidebar-toggle-btn {
   left: 240px; // Default for full mode
   top: 50%;
   transform: translateY(-50%) !important;
-  z-index: 100;
+  z-index: 600;
   background: white !important;
   border: 1px solid rgba(0, 0, 0, 0.08) !important;
   border-left: none !important;
@@ -1890,6 +1890,18 @@ $desktop: 1024px;       // Desktop
       // based on actual space between legend and zoom controls
       z-index: 250 !important; // CRITICAL: Above everything except portrait overlay
     }
+  }
+
+  button[mat-icon-button].sidebar-toggle-btn.is-mobile {
+    left: 12px !important;
+    top: calc(12px + env(safe-area-inset-top));
+    transform: none !important;
+    padding: 10px 12px !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12) !important;
+    z-index: 700 !important;
+    touch-action: manipulation;
   }
 
   // Legend chips - reduce size slightly on mobile for more space

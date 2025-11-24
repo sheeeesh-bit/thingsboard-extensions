@@ -344,27 +344,54 @@ export class EchartsLineChartComponent implements OnInit, AfterViewInit, OnDestr
   // Toggle sidebar visibility
   public toggleSidebar(): void {
     this.isSidebarVisible = !this.isSidebarVisible;
-    
+
     // Update margins and sync overlays immediately
     const margins = this.getPlotMargins();
     this.syncLegendToGridMargins(margins.left, margins.right);
     
     // Force grid reset to apply new margins
     this.resetGrid = true;
-    
+
     // Update grid margins immediately
     this.onDataUpdated();
-    
+
+    // Resize chart right away so canvas fills freed space
+    if (this.chart && !this.chart.isDisposed()) {
+      this.chart.resize();
+    }
+
+    // Adjust layout container widths instantly to avoid lag in mobile
+    this.updateLayoutForSidebar();
+
     // Trigger chart resize and legend recalculation after animation
     setTimeout(() => {
       if (this.chart && !this.chart.isDisposed()) {
         this.chart.resize();
       }
-      
+
       // Recalculate legend pagination with new width
       this.calculateItemsPerPage();
       this.ctx.detectChanges();
-    }, 300); // Wait for CSS transition
+    }, 350); // Wait for CSS transition to finish on mobile
+  }
+
+  private updateLayoutForSidebar(): void {
+    if (!this.chartContainer) {
+      return;
+    }
+
+    const mainArea = this.chartContainer.nativeElement.closest('.echarts-main-area') as HTMLElement;
+    const sidebar = this.chartContainer.nativeElement.closest('.echarts-layout')?.querySelector('.entity-sidebar') as HTMLElement;
+
+    if (!mainArea || !sidebar) {
+      return;
+    }
+
+    if (this.isSidebarVisible && !this.isMobileDevice) {
+      mainArea.style.gridTemplateColumns = `${this.sidebarWidth}px 1fr`;
+    } else {
+      mainArea.style.gridTemplateColumns = `0px 1fr`;
+    }
   }
 
   // Get count of selected (visible) devices

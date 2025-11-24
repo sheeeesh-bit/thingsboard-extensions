@@ -439,6 +439,10 @@ export interface SettingsDialogData {
       background: #ffffff;
       border-radius: 12px;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-height: 100%;
     }
     
     .dialog-header {
@@ -478,11 +482,13 @@ export interface SettingsDialogData {
     }
     
     .dialog-content {
+      flex: 1;
       padding: 24px;
-      max-height: 60vh;
+      padding-bottom: 24px;
       overflow-y: auto;
       overflow-x: hidden;
       background: #f5f5f7;
+      min-height: 0; /* Important for flexbox scrolling */
     }
     
     .settings-card {
@@ -491,6 +497,8 @@ export interface SettingsDialogData {
       padding: 20px;
       margin-bottom: 16px;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      width: 100%; /* Ensure full width for nested flex containers */
+      box-sizing: border-box;
     }
     
     .settings-card:last-child {
@@ -502,6 +510,7 @@ export interface SettingsDialogData {
       gap: 16px;
       margin-bottom: 20px;
       align-items: flex-start;
+      width: 100%;
     }
     
     .icon-wrapper {
@@ -762,7 +771,7 @@ export interface SettingsDialogData {
       color: #1d1d1f;
     }
     
-    /* Footer */
+    /* Footer - Always visible at bottom via flexbox */
     .dialog-footer {
       display: flex;
       justify-content: flex-end;
@@ -770,6 +779,8 @@ export interface SettingsDialogData {
       padding: 16px 24px;
       background: white;
       border-top: 1px solid #e5e5e7;
+      flex-shrink: 0; /* Don't shrink when content is large */
+      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
     }
     
     .btn {
@@ -841,6 +852,7 @@ export interface SettingsDialogData {
       display: flex;
       flex-direction: column;
       gap: 20px;
+      width: 100%;
     }
     
     .toggle-row {
@@ -849,12 +861,14 @@ export interface SettingsDialogData {
       align-items: center;
       padding: 12px 0;
       border-bottom: 1px solid #e5e5e7;
+      width: 100%;
     }
     
     .toggle-label {
       font-size: 14px;
       font-weight: 500;
       color: #1d1d1f;
+      flex: 1; /* Take available space */
     }
     
     /* Apple-style toggle switch */
@@ -863,6 +877,7 @@ export interface SettingsDialogData {
       display: inline-block;
       width: 51px;
       height: 31px;
+      flex-shrink: 0; /* Don't shrink in flex container */
     }
     
     .apple-switch input {
@@ -879,10 +894,10 @@ export interface SettingsDialogData {
       right: 0;
       bottom: 0;
       background-color: #c7c7cc;
-      transition: .3s;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       border-radius: 31px;
     }
-    
+
     .apple-switch .slider:before {
       position: absolute;
       content: "";
@@ -891,7 +906,7 @@ export interface SettingsDialogData {
       left: 2px;
       bottom: 2px;
       background-color: white;
-      transition: .3s;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       border-radius: 50%;
       box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
@@ -908,6 +923,7 @@ export interface SettingsDialogData {
       display: flex;
       flex-direction: column;
       gap: 12px;
+      width: 100%;
     }
     
     .control-label {
@@ -965,16 +981,19 @@ export interface SettingsDialogData {
       display: flex;
       align-items: center;
       gap: 12px;
+      width: 100%;
     }
-    
+
     .apple-slider {
       flex: 1;
+      min-width: 100px; /* Ensure slider has minimum width to display properly */
       -webkit-appearance: none;
       appearance: none;
       height: 6px;
       background: #e5e5e7;
       border-radius: 3px;
       outline: none;
+      cursor: pointer;
     }
     
     .apple-slider::-webkit-slider-thumb {
@@ -983,6 +1002,7 @@ export interface SettingsDialogData {
       width: 20px;
       height: 20px;
       background: white;
+      border: 0.5px solid rgba(0, 0, 0, 0.04);
       border-radius: 50%;
       cursor: pointer;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -998,6 +1018,7 @@ export interface SettingsDialogData {
       width: 20px;
       height: 20px;
       background: white;
+      border: 0.5px solid rgba(0, 0, 0, 0.04);
       border-radius: 50%;
       cursor: pointer;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);

@@ -1,0 +1,56 @@
+GIT CHANGES - Chart Container Wrapper (What Changed)
+
+LOCATION: echarts-line-chart.component.scss, Line 859-873
+
+BEFORE (Original):
+.chart-container-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  height: 100%;
+  min-height: 0;
+}
+
+AFTER (Current - With All Fixes):
+.chart-container-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  height: 100%;
+  max-height: 100%;      ← ADDED (prevents vertical expansion)
+  width: 100%;           ← ADDED (explicit width)
+  max-width: 100%;       ← ADDED (prevents horizontal expansion)
+  min-height: 0;
+  min-width: 0;          ← ADDED (allows shrinking)
+  box-sizing: border-box; ← ADDED (includes padding in width)
+  overflow-x: hidden;    ← ADDED (prevents horizontal scroll)
+  overflow-y: visible;   ← ADDED (allows sticky zoom to work)
+}
+
+CHANGES SUMMARY:
+  + max-height: 100%      - Keeps container within viewport
+  + width: 100%           - Explicit width
+  + max-width: 100%       - Width constraint
+  + min-width: 0          - Allow flex shrinking
+  + box-sizing: border-box - Padding included in width
+  + overflow-x: hidden    - No horizontal scroll
+  + overflow-y: visible   - Sticky positioning works
+
+PURPOSE OF EACH:
+  - max-height: 100%    → Keeps zoom controls in viewport (desktop fix)
+  - max-width: 100%     → Prevents width expansion (mobile/desktop)
+  - overflow-x: hidden  → No horizontal scroll
+  - overflow-y: visible → Allows sticky zoom to work
+  - box-sizing: border-box → Padding doesn't add to width
+  - min-width: 0        → Allows flexbox shrinking
+
+RESULT:
+  ✓ Desktop: Zoom visible at bottom
+  ✓ Mobile: Zoom visible at bottom
+  ✓ Width: Constrained to parent
+  ✓ Sticky: Works properly
+  ✓ No horizontal scroll
+  ✓ No vertical expansion beyond viewport
+

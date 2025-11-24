@@ -666,21 +666,63 @@
 }
 
 // Responsive adjustments
-@media (max-width: 600px) {
+@media (max-width: 767px) {
   .settings-container {
     padding: 8px;
   }
-  
+
   .section-header {
     padding: 16px;
   }
-  
+
   .settings-content {
     padding: 16px;
   }
-  
+
   .color-scheme-selector {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr); // 2 columns on mobile for better fit
+  }
+
+  // Make sure settings sections are visible and scrollable
+  .settings-section {
+    max-width: 100vw;
+
+    &:hover {
+      transform: none; // Disable hover transform on mobile
+    }
+  }
+
+  // Settings search bar - ensure it stays visible
+  .settings-search-bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  // Ensure toggle switches are touch-friendly
+  .apple-switch {
+    min-width: 51px;
+    min-height: 31px;
+  }
+
+  // Color options - 2 columns on mobile
+  .color-option {
+    min-width: 0; // Allow flexible sizing
+  }
+
+  // Input grids - single column on mobile
+  .grid-inputs {
+    grid-template-columns: 1fr;
+  }
+
+  .range-inputs {
+    grid-template-columns: 1fr;
+  }
+
+  // Ensure input fields don't overflow on mobile
+  .apple-input {
+    max-width: 100%;
+    font-size: 16px; // Prevent iOS zoom
   }
 }
 
@@ -807,16 +849,8 @@
   margin-top: 12px;
 }
 
-// Responsive adjustments for inputs
-@media (max-width: 600px) {
-  .grid-inputs {
-    grid-template-columns: 1fr;
-  }
-  
-  .range-inputs {
-    grid-template-columns: 1fr;
-  }
-}
+// Responsive adjustments for inputs (combined with above)
+// Removed duplicate - already handled in main mobile section above
 
 // Debug Configuration Button
 .debug-config-button {

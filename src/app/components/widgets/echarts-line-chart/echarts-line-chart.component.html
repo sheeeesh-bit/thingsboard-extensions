@@ -85,19 +85,21 @@
 
     <div class="echarts-main-area">
       <!-- Sidebar toggle button (always visible) -->
-      <button mat-icon-button
-              class="sidebar-toggle-btn"
-              [disableRipple]="true"
-              (click)="toggleSidebar()"
-              [matTooltip]="isSidebarVisible ? 'Hide sidebar' : 'Show sidebar'"
-              matTooltipPosition="right"
-              matTooltipClass="modern-tooltip"
-              [attr.data-sidebar-state]="!isSidebarVisible ? sidebarCollapsedMode : 'visible'"
-              [attr.data-sidebar-mode]="isSidebarVisible ? sidebarDisplayMode : sidebarCollapsedMode"
-              [style.left.px]="isSidebarVisible && sidebarDisplayMode !== 'colors' ? sidebarWidth : null"
-              *ngIf="ctx.settings.showEntitySidebar !== false && ctx.settings?.multipleDevices">
-        <i class="material-icons">{{ isSidebarVisible ? 'chevron_left' : 'chevron_right' }}</i>
-      </button>
+    <button type="button"
+            mat-icon-button
+            class="sidebar-toggle-btn"
+            [class.is-mobile]="isMobileDevice"
+            [disableRipple]="true"
+            (click)="toggleSidebar()"
+            [matTooltip]="isSidebarVisible ? 'Hide sidebar' : 'Show sidebar'"
+            matTooltipPosition="right"
+            matTooltipClass="modern-tooltip"
+            [attr.data-sidebar-state]="!isSidebarVisible ? sidebarCollapsedMode : 'visible'"
+            [attr.data-sidebar-mode]="isSidebarVisible ? sidebarDisplayMode : sidebarCollapsedMode"
+            [style.left.px]="!isMobileDevice && isSidebarVisible && sidebarDisplayMode !== 'colors' ? sidebarWidth : null"
+            *ngIf="ctx.settings.showEntitySidebar !== false && ctx.settings?.multipleDevices">
+      <i class="material-icons">{{ isSidebarVisible ? 'chevron_left' : 'chevron_right' }}</i>
+    </button>
 
       <!-- Entity sidebar (left side) -->
       <aside class="entity-sidebar"
